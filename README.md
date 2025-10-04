@@ -13,7 +13,7 @@ additional resources, please navigate to the official web site at
 official YouTube channel
 [Microsoft365DSC](https://www.youtube.com/channel/UCveScabVT6pxzqYgGRu17iw).
 
-<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:7379632619665313792?collapsed=1" height="580" width="504" frameborder="0" allowfullscreen="" title="Ingevoegde bijdrage"></iframe>
+[View LinkedIn Post](https://www.linkedin.com/feed/update/urn:li:share:7379632619665313792)
 
 ## Branches
 

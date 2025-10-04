@@ -26,12 +26,6 @@ official YouTube channel
 
 [![LinkedIn Preview](https://img.shields.io/badge/LinkedIn-Post-blue)](https://www.linkedin.com/feed/update/urn:li:share:7379632619665313792)
 
-## Branches
-
-### master
-
-[![codecov](https://codecov.io/gh/Microsoft/Microsoft365DSC/branch/master/graph/badge.svg)](https://codecov.io/gh/Microsoft/Microsoft365DSC)
-
 This is the dev branch containing the latest release. No contributions should be made directly to this branch.
 
 Contributors are encouraged to propose their contributions as pull requests to this development branch.

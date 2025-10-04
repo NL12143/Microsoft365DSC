@@ -15,7 +15,7 @@ See latest
 ## Quick Install PS v5 
 Note: best install and run using Powershell v5. For v7 [read this first](https://github.com/NL12143/Microsoft365DSC/blob/Dev/docs/docs/user-guide/get-started/powershell7-support.md) 
 
-To acquire the latest bits of the module from a machine that has internet connectivity, run the following PowerShell v5, as an ADMIN:
+Run the following PowerShell v5, as an ADMIN:
 
 ```PowerShell
 Install-Module -Name Microsoft365DSC -Scope AllUsers -Force

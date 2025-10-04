@@ -1,6 +1,6 @@
 # Microsoft365DSC > edits by NL1243
 
-Automate the deployment, configuration, reporting and monitoring of MS365 Tenants. It is [declarative](https://powershellmagazine.com/2013/07/05/imperative-versus-declarative-syntax-in-powershell/) upfront, by using Desired State Configuration.  
+Automate the deployment, configuration, reporting and monitoring of MS365 Tenants. Despite being PowerShell it is decarative upfront, by using Desired State Configuration. Meaning you describe the desired end state rather than scripting step-by-step instructions.  
 
 The compiled configuration needs to be executed from an agent's Local Configuration Manager (LCM) (machine or container) which can communicate back remotely to Microsoft 365 via remote API calls. 
 

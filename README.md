@@ -1,11 +1,8 @@
-# Microsoft365DSC
+# Microsoft365DSC > edits by NL1243
 
-This module allows organizations to automate the deployment,
-configuration, reporting and monitoring of Microsoft 365 Tenants via PowerShell
-Desired State Configuration. The compiled configuration needs to be
-executed from an agent's Local Configuration Manager (LCM) (machine
-or container) which can communicate back remotely to Microsoft 365 via
-remote API calls (therefore requires internet connectivity)
+Automate the deployment, configuration, reporting and monitoring of MS365 Tenants. It is [declarative](https://powershellmagazine.com/2013/07/05/imperative-versus-declarative-syntax-in-powershell/) upfront, by using Desired State Configuration.  
+
+The compiled configuration needs to be executed from an agent's Local Configuration Manager (LCM) (machine or container) which can communicate back remotely to Microsoft 365 via remote API calls. 
 
 See latest
 <a href="https://www.linkedin.com/feed/update/urn:li:share:7379632619665313792" target="_blank">

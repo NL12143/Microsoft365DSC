@@ -22,17 +22,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
 
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
-            }
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
@@ -48,9 +41,18 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             Mock -CommandName Set-User {
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            Mock -CommandName Get-User -MockWith {
+                return @{
+                    Name                 = 'John.Smith'
+                    AuthenticationPolicy = 'Test Policy'
+                }
             }
+
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -64,11 +66,11 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 }
 
                 Mock -CommandName Get-User -MockWith {
-                    return @{
-                        Name                 = 'John.Smith'
-                        AuthenticationPolicy = $null
-                    }
+                return @{
+                    Name                 = 'John.Smith'
+                    AuthenticationPolicy = $null
                 }
+            }
             }
 
             It 'Should return false from the Test method' {
@@ -93,13 +95,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Ensure                   = 'Present'
                     Credential               = $Credential
                 }
-
-                Mock -CommandName Get-User -MockWith {
-                    return @{
-                        Name                 = 'John.Smith'
-                        AuthenticationPolicy = 'Test Policy'
-                    }
-                }
             }
 
             It 'Should return true from the Test method' {
@@ -118,13 +113,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     AuthenticationPolicyName = 'Test Policy'
                     Ensure                   = 'Absent'
                     Credential               = $Credential
-                }
-
-                Mock -CommandName Get-User -MockWith {
-                    return @{
-                        Name                 = 'John.Smith'
-                        AuthenticationPolicy = 'Test Policy'
-                    }
                 }
             }
 
@@ -145,21 +133,31 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
                 }
 
                 $AuthPolicy = @{
-                    Name                 = 'John.Smith'
-                    AuthenticationPolicy = 'Test Policy'
+                    Identity = 'Test Policy'
                 }
                 Mock -CommandName Get-AuthenticationPolicy -MockWith {
                     return $AuthPolicy
                 }
+                Mock -CommandName Get-User -MockWith {
+                    return @(
+                        @{
+                            Name                 = 'John.Smith'
+                            AuthenticationPolicy = 'Test Policy'
+                            UserPrincipalName    = 'john.smith@contoso.com'
+                        }
+                    )
+                }
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

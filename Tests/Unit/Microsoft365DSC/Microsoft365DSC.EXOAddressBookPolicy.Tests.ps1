@@ -21,21 +21,34 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
         BeforeAll {
 
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
-            }
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
                 return 'Credentials'
+            }
+
+            Mock -CommandName Get-AddressBookPolicy -MockWith {
+                return @{
+                    Name                = 'Contoso ABP'
+                    AddressLists        = '\All Contoso'
+                    GlobalAddressList   = '\All Contoso'
+                    OfflineAddressBook  = '\Contoso-All-OAB'
+                    RoomList            = '\All Contoso-Rooms'
+                    FreeBusyAccessLevel = 'AvailabilityOnly'
+                }
+            }
+
+            Mock -CommandName New-AddressBookPolicy -MockWith {
+            }
+
+            Mock -CommandName Set-AddressBookPolicy -MockWith {
+            }
+
+            Mock -CommandName Remove-AddressBookPolicy -MockWith {
             }
 
             Mock -CommandName Get-PSSession -MockWith {
@@ -44,45 +57,24 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             Mock -CommandName Remove-PSSession -MockWith {
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
             }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
         Context -Name 'Address Book Policy should exist. Address Book Policy is missing. Test should fail.' -Fixture {
             BeforeAll {
                 $testParams = @{
-                    Name               = 'Contoso ABP'
+                    Name               = 'Contoso Different ABP' # Drift
                     AddressLists       = '\All Contoso'
                     GlobalAddressList  = '\All Contoso'
                     OfflineAddressBook = '\Contoso-All-OAB'
                     RoomList           = '\All Contoso-Rooms'
                     Ensure             = 'Present'
                     Credential         = $Credential
-                }
-
-                Mock -CommandName Get-AddressBookPolicy -MockWith {
-                    return @{
-                        Name                = 'Contoso Different ABP'
-                        AddressLists        = '\All Contoso'
-                        GlobalAddressList   = '\All Contoso'
-                        OfflineAddressBook  = '\Contoso-All-OAB'
-                        RoomList            = '\All Contoso-Rooms'
-                        FreeBusyAccessLevel = 'AvailabilityOnly'
-                    }
-                }
-
-                Mock -CommandName Set-AddressBookPolicy -MockWith {
-                    return @{
-                        Name               = 'Contoso ABP'
-                        AddressLists       = '\All Contoso'
-                        GlobalAddressList  = '\All Contoso'
-                        OfflineAddressBook = '\Contoso-All-OAB'
-                        RoomList           = '\All Contoso-Rooms'
-                        Ensure             = 'Present'
-                        Credential         = $Credential
-                    }
                 }
             }
 
@@ -92,6 +84,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the Set method' {
                 Set-TargetResource @testParams
+                Should -Invoke -CommandName New-AddressBookPolicy -Exactly 1
             }
 
             It 'Should return Absent from the Get method' {
@@ -109,16 +102,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     RoomList           = '\All Contoso-Rooms'
                     Ensure             = 'Present'
                     Credential         = $Credential
-                }
-
-                Mock -CommandName Get-AddressBookPolicy -MockWith {
-                    return @{
-                        Name               = 'Contoso ABP'
-                        AddressLists       = '\All Contoso'
-                        GlobalAddressList  = '\All Contoso'
-                        OfflineAddressBook = '\Contoso-All-OAB'
-                        RoomList           = '\All Contoso-Rooms'
-                    }
                 }
             }
 
@@ -138,31 +121,9 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     AddressLists       = '\All Contoso'
                     GlobalAddressList  = '\All Contoso'
                     OfflineAddressBook = '\Contoso-All-OAB'
-                    RoomList           = '\All Contoso-Rooms'
+                    RoomList           = '\All Fabrikam-Rooms' # Drift
                     Ensure             = 'Present'
                     Credential         = $Credential
-                }
-
-                Mock -CommandName Get-AddressBookPolicy -MockWith {
-                    return @{
-                        Name               = 'Contoso ABP'
-                        AddressLists       = '\All Contoso'
-                        GlobalAddressList  = '\All Contoso'
-                        OfflineAddressBook = '\Contoso-All-OAB'
-                        RoomList           = '\All Fabrikam-Rooms'
-                    }
-                }
-
-                Mock -CommandName Set-AddressBookPolicy -MockWith {
-                    return @{
-                        Name               = 'Contoso ABP'
-                        AddressLists       = '\All Contoso'
-                        GlobalAddressList  = '\All Contoso'
-                        OfflineAddressBook = '\Contoso-All-OAB'
-                        RoomList           = '\All Contoso-Rooms'
-                        Ensure             = 'Present'
-                        Credential         = $Credential
-                    }
                 }
             }
 
@@ -172,34 +133,25 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the Set method' {
                 Set-TargetResource @testParams
+                Should -Invoke -CommandName Set-AddressBookPolicy -Exactly 1
             }
         }
 
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
-                }
-
-                $AddressBookPolicy = @{
-                    Name               = 'Contoso ABP'
-                    AddressLists       = '\All Contoso'
-                    GlobalAddressList  = '\All Contoso'
-                    OfflineAddressBook = '\Contoso-All-OAB'
-                    RoomList           = '\All Contoso-Rooms'
-                }
-                Mock -CommandName Get-AddressBookPolicy -MockWith {
-                    return $AddressBookPolicy
                 }
             }
 
             It 'Should Reverse Engineer resource from the Export method when single' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }
 }
 
 Invoke-Command -ScriptBlock $Global:DscHelper.CleanupScript -NoNewScope
-

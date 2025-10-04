@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_TeamsMeetingPolicy'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -46,6 +48,7 @@ function Get-TargetResource
         $AllowCloudRecording,
 
         [Parameter()]
+        [ValidateSet('Enabled', 'Disabled')]
         [System.String]
         $AllowDocumentCollaboration,
 
@@ -54,9 +57,13 @@ function Get-TargetResource
         $AllowedStreamingMediaInput,
 
         [Parameter()]
-        [ValidateSet('Enabled', 'Disabled')]
+        [ValidateSet('Enabled', 'Disabled', 'ForceEnabled')]
         [System.String]
         $AllowEngagementReport = 'Disabled',
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowExternalNonTrustedMeetingChat,
 
         [Parameter()]
         [System.Boolean]
@@ -108,15 +115,15 @@ function Get-TargetResource
 
         [Parameter()]
         [System.Boolean]
-        $AllowPrivateMeetNow,
-
-        [Parameter()]
-        [System.Boolean]
         $AllowPowerPointSharing,
 
         [Parameter()]
         [System.Boolean]
         $AllowPrivateMeetingScheduling,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowPrivateMeetNow,
 
         [Parameter()]
         [System.Boolean]
@@ -152,9 +159,24 @@ function Get-TargetResource
         $AllowWhiteboard,
 
         [Parameter()]
+        [ValidateSet('Disabled', 'Enabled', 'DisabledUserOverride')]
+        [System.String]
+        $AttendeeIdentityMasking,
+
+        [Parameter()]
         [System.String]
         [ValidateSet('EveryoneInCompany', 'Everyone', 'EveryoneInSameAndFederatedCompany', 'OrganizerOnly', 'InvitedUsers', 'EveryoneInCompanyExcludingGuests')]
         $AutoAdmittedUsers,
+
+        [Parameter()]
+        [ValidateSet('Disabled', 'Enabled')]
+        [System.String]
+        $AutomaticallyStartCopilot,
+
+        [Parameter()]
+        [ValidateSet('Disabled', 'Enabled')]
+        [System.String]
+        $AutoRecording,
 
         [Parameter()]
         [System.String]
@@ -162,7 +184,31 @@ function Get-TargetResource
 
         [Parameter()]
         [System.String]
+        $CaptchaVerificationForMeetingJoin,
+
+        [Parameter()]
+        [ValidateSet('Allow', 'Block')]
+        [System.String]
         $ChannelRecordingDownload,
+
+        [Parameter()]
+        [ValidateSet('Disabled', 'Enabled')]
+        [System.String]
+        $ConnectToMeetingControls,
+
+        [Parameter()]
+        [ValidateSet('EnabledForAnyone', 'EnabledForTrustedOrgs', 'Disabled')]
+        [System.String]
+        $ContentSharingInExternalMeetings,
+
+        [Parameter()]
+        [ValidateSet('Disabled', 'Enabled', 'EnabledWithTranscript', 'EnabledWithTranscriptDefaultOn')]
+        [System.String]
+        $Copilot,
+
+        [Parameter()]
+        [System.Boolean]
+        $CopyRestriction,
 
         [Parameter()]
         [ValidateSet('OrganizerOnlyUserOverride', 'EveryoneInCompanyUserOverride', 'EveryoneUserOverride')]
@@ -170,17 +216,23 @@ function Get-TargetResource
         $DesignatedPresenterRoleMode = 'EveryoneUserOverride',
 
         [Parameter()]
+        [System.Boolean]
+        $DetectSensitiveContentDuringScreenSharing,
+
+        [Parameter()]
         [ValidateSet('Disabled', 'Enabled')]
         [System.String]
         $EnrollUserOverride = 'Disabled',
 
         [Parameter()]
+        [ValidateSet('Disabled', 'Enabled')]
         [System.String]
         $ExplicitRecordingConsent,
 
         [Parameter()]
+        [ValidateSet('EnabledForAnyone', 'EnabledForTrustedOrgs', 'Disabled')]
         [System.String]
-        $ForceStreamingAttendeeMode,
+        $ExternalMeetingJoin,
 
         [Parameter()]
         [System.String]
@@ -215,7 +267,7 @@ function Get-TargetResource
         $MediaBitRateKb,
 
         [Parameter()]
-        [ValidateSet('Disabled', 'Enabled')]
+        [ValidateSet('Disabled', 'Enabled', 'EnabledExceptAnonymous')]
         [System.String]
         $MeetingChatEnabledType = 'Enabled',
 
@@ -224,9 +276,14 @@ function Get-TargetResource
         $MeetingInviteLanguages,
 
         [Parameter()]
-        [System.UInt32]
-        [ValidateRange(-1,99999)]
+        [System.Int32]
+        [ValidateRange(-1, 99999)]
         $NewMeetingRecordingExpirationDays,
+
+        [Parameter()]
+        [ValidateSet('Disabled', 'Enabled')]
+        [System.String]
+        $ParticipantNameChange,
 
         [Parameter()]
         [System.String]
@@ -234,13 +291,9 @@ function Get-TargetResource
         $PreferredMeetingProviderForIslandsMode,
 
         [Parameter()]
+        [ValidateSet('Disabled', 'Enabled')]
         [System.String]
         $QnAEngagementMode,
-
-        [Parameter()]
-        [System.String]
-        [ValidateSet('Stream', 'OneDriveForBusiness')]
-        $RecordingStorageMode,
 
         [Parameter()]
         [ValidateSet('Off', 'Distinguish', 'Attribute')]
@@ -248,6 +301,7 @@ function Get-TargetResource
         $RoomAttributeUserOverride = 'Off',
 
         [Parameter()]
+        [ValidateSet('Off', 'On')]
         [System.String]
         $RoomPeopleNameUserOverride,
 
@@ -258,7 +312,7 @@ function Get-TargetResource
 
         [Parameter()]
         [System.String]
-        [ValidateSet('Disabled', 'EnabledUserOverride')]
+        [ValidateSet('Disabled', 'DisabledUserOverride', 'EnabledUserOverride', 'Enabled')]
         $SpeakerAttributionMode,
 
         [Parameter()]
@@ -267,7 +321,7 @@ function Get-TargetResource
         $StreamingAttendeeMode = 'Enabled',
 
         [Parameter()]
-        [ValidateSet('Disabled', 'Enabled')]
+        [ValidateSet('Disabled', 'AutoAcceptInTenant', 'AutoAcceptAll')]
         [System.String]
         $TeamsCameraFarEndPTZMode,
 
@@ -275,6 +329,11 @@ function Get-TargetResource
         [System.String]
         [ValidateSet('NoFilters', 'BlurOnly', 'BlurAndDefaultBackgrounds', 'AllFilters')]
         $VideoFiltersMode,
+
+        [Parameter()]
+        [ValidateSet('Disabled', 'Enabled')]
+        [System.String]
+        $VoiceIsolation,
 
         [Parameter()]
         [ValidateSet('Everyone', 'EveryoneInCompany')]
@@ -300,37 +359,52 @@ function Get-TargetResource
 
         [Parameter()]
         [System.String]
-        $CertificateThumbprint
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [Switch]
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Getting the Teams Meeting Policy $($Identity)"
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftTeams' `
-        -InboundParameters $PSBoundParameters
-
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
-
-    #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
-    $CommandName = $MyInvocation.MyCommand
-    $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
-        -CommandName $CommandName `
-        -Parameters $PSBoundParameters
-    Add-M365DSCTelemetryEvent -Data $data
-    #endregion
-
-
-    $nullReturn = $PSBoundParameters
-    $nullReturn.Ensure = 'Absent'
     try
     {
-        $policy = Get-CsTeamsMeetingPolicy -Identity $Identity `
-            -ErrorAction 'SilentlyContinue'
+        if (-not $Script:exportedInstance -or $Script:exportedInstance.Identity -ne $Identity)
+        {
+            $null = New-M365DSCConnection -Workload 'MicrosoftTeams' `
+                -InboundParameters $PSBoundParameters
+
+            #Ensure the proper dependencies are installed in the current environment.
+            Confirm-M365DSCDependencies
+
+            #region Telemetry
+            $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+            $CommandName = $MyInvocation.MyCommand
+            $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
+                -CommandName $CommandName `
+                -Parameters $PSBoundParameters
+            Add-M365DSCTelemetryEvent -Data $data
+            #endregion
+
+            $nullReturn = $PSBoundParameters
+            $nullReturn.Ensure = 'Absent'
+
+            $policy = Get-CsTeamsMeetingPolicy -Identity $Identity `
+                -ErrorAction 'SilentlyContinue'
+        }
+        else
+        {
+            $policy = $Script:exportedInstance
+        }
 
         if ($null -eq $policy)
         {
-            Write-Verbose -Message "Could not find Teams Meeting Policy ${$Identity}"
+            Write-Verbose -Message "Could not find Teams Meeting Policy {$Identity}"
             return $nullReturn
         }
         Write-Verbose -Message "Found Teams Meeting Policy {$Identity}"
@@ -348,6 +422,7 @@ function Get-TargetResource
             AllowDocumentCollaboration                 = $policy.AllowDocumentCollaboration
             AllowedStreamingMediaInput                 = $policy.AllowedStreamingMediaInput
             AllowEngagementReport                      = $policy.AllowEngagementReport
+            AllowExternalNonTrustedMeetingChat         = $policy.AllowExternalNonTrustedMeetingChat
             AllowExternalParticipantGiveRequestControl = $policy.AllowExternalParticipantGiveRequestControl
             AllowIPAudio                               = $policy.AllowIPAudio
             AllowIPVideo                               = $policy.AllowIPVideo
@@ -371,13 +446,22 @@ function Get-TargetResource
             AllowWatermarkForCameraVideo               = $policy.AllowWatermarkForCameraVideo
             AllowWatermarkForScreenSharing             = $policy.AllowWatermarkForScreenSharing
             AllowWhiteboard                            = $policy.AllowWhiteboard
+            AttendeeIdentityMasking                    = $policy.AttendeeIdentityMasking
             AutoAdmittedUsers                          = $policy.AutoAdmittedUsers
+            AutomaticallyStartCopilot                  = $policy.AutomaticallyStartCopilot
+            AutoRecording                              = $policy.AutoRecording
             BlockedAnonymousJoinClientTypes            = $policy.BlockedAnonymousJoinClientTypes
+            CaptchaVerificationForMeetingJoin          = $policy.CaptchaVerificationForMeetingJoin
             ChannelRecordingDownload                   = $policy.ChannelRecordingDownload
+            ConnectToMeetingControls                   = $policy.ConnectToMeetingControls
+            ContentSharingInExternalMeetings           = $policy.ContentSharingInExternalMeetings
+            Copilot                                    = $policy.Copilot
+            CopyRestriction                            = $policy.CopyRestriction
             DesignatedPresenterRoleMode                = $policy.DesignatedPresenterRoleMode
+            DetectSensitiveContentDuringScreenSharing  = $policy.DetectSensitiveContentDuringScreenSharing
             EnrollUserOverride                         = $policy.EnrollUserOverride
             ExplicitRecordingConsent                   = $policy.ExplicitRecordingConsent
-            ForceStreamingAttendeeMode                 = $policy.ForceStreamingAttendeeMode
+            ExternalMeetingJoin                        = $policy.ExternalMeetingJoin
             InfoShownInReportMode                      = $policy.InfoShownInReportMode
             IPAudioMode                                = $policy.IPAudioMode
             IPVideoMode                                = $policy.IPVideoMode
@@ -388,14 +472,16 @@ function Get-TargetResource
             MeetingChatEnabledType                     = $policy.MeetingChatEnabledType
             MeetingInviteLanguages                     = $policy.MeetingInviteLanguages
             NewMeetingRecordingExpirationDays          = $policy.NewMeetingRecordingExpirationDays
+            ParticipantNameChange                      = $policy.ParticipantNameChange
             PreferredMeetingProviderForIslandsMode     = $policy.PreferredMeetingProviderForIslandsMode
             QnAEngagementMode                          = $policy.QnAEngagementMode
-            RecordingStorageMode                       = $policy.RecordingStorageMode
+            RoomAttributeUserOverride                  = $policy.RoomAttributeUserOverride
             RoomPeopleNameUserOverride                 = $policy.RoomPeopleNameUserOverride
             ScreenSharingMode                          = $policy.ScreenSharingMode
             SpeakerAttributionMode                     = $policy.SpeakerAttributionMode
             StreamingAttendeeMode                      = $policy.StreamingAttendeeMode
             VideoFiltersMode                           = $policy.VideoFiltersMode
+            VoiceIsolation                             = $policy.VoiceIsolation
             TeamsCameraFarEndPTZMode                   = $policy.TeamsCameraFarEndPTZMode
             WhoCanRegister                             = $policy.WhoCanRegister
             Ensure                                     = 'Present'
@@ -403,6 +489,8 @@ function Get-TargetResource
             ApplicationId                              = $ApplicationId
             TenantId                                   = $TenantId
             CertificateThumbprint                      = $CertificateThumbprint
+            ManagedIdentity                            = $ManagedIdentity.IsPresent
+            AccessTokens                               = $AccessTokens
         }
     }
     catch
@@ -464,6 +552,7 @@ function Set-TargetResource
         $AllowCloudRecording,
 
         [Parameter()]
+        [ValidateSet('Enabled', 'Disabled')]
         [System.String]
         $AllowDocumentCollaboration,
 
@@ -472,9 +561,13 @@ function Set-TargetResource
         $AllowedStreamingMediaInput,
 
         [Parameter()]
-        [ValidateSet('Enabled', 'Disabled')]
+        [ValidateSet('Enabled', 'Disabled', 'ForceEnabled')]
         [System.String]
         $AllowEngagementReport = 'Disabled',
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowExternalNonTrustedMeetingChat,
 
         [Parameter()]
         [System.Boolean]
@@ -526,15 +619,15 @@ function Set-TargetResource
 
         [Parameter()]
         [System.Boolean]
-        $AllowPrivateMeetNow,
-
-        [Parameter()]
-        [System.Boolean]
         $AllowPowerPointSharing,
 
         [Parameter()]
         [System.Boolean]
         $AllowPrivateMeetingScheduling,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowPrivateMeetNow,
 
         [Parameter()]
         [System.Boolean]
@@ -570,9 +663,24 @@ function Set-TargetResource
         $AllowWhiteboard,
 
         [Parameter()]
+        [ValidateSet('Disabled', 'Enabled', 'DisabledUserOverride')]
+        [System.String]
+        $AttendeeIdentityMasking,
+
+        [Parameter()]
         [System.String]
         [ValidateSet('EveryoneInCompany', 'Everyone', 'EveryoneInSameAndFederatedCompany', 'OrganizerOnly', 'InvitedUsers', 'EveryoneInCompanyExcludingGuests')]
         $AutoAdmittedUsers,
+
+        [Parameter()]
+        [ValidateSet('Disabled', 'Enabled')]
+        [System.String]
+        $AutomaticallyStartCopilot,
+
+        [Parameter()]
+        [ValidateSet('Disabled', 'Enabled')]
+        [System.String]
+        $AutoRecording,
 
         [Parameter()]
         [System.String]
@@ -580,7 +688,31 @@ function Set-TargetResource
 
         [Parameter()]
         [System.String]
+        $CaptchaVerificationForMeetingJoin,
+
+        [Parameter()]
+        [ValidateSet('Allow', 'Block')]
+        [System.String]
         $ChannelRecordingDownload,
+
+        [Parameter()]
+        [ValidateSet('Disabled', 'Enabled')]
+        [System.String]
+        $ConnectToMeetingControls,
+
+        [Parameter()]
+        [ValidateSet('EnabledForAnyone', 'EnabledForTrustedOrgs', 'Disabled')]
+        [System.String]
+        $ContentSharingInExternalMeetings,
+
+        [Parameter()]
+        [ValidateSet('Disabled', 'Enabled', 'EnabledWithTranscript', 'EnabledWithTranscriptDefaultOn')]
+        [System.String]
+        $Copilot,
+
+        [Parameter()]
+        [System.Boolean]
+        $CopyRestriction,
 
         [Parameter()]
         [ValidateSet('OrganizerOnlyUserOverride', 'EveryoneInCompanyUserOverride', 'EveryoneUserOverride')]
@@ -588,17 +720,23 @@ function Set-TargetResource
         $DesignatedPresenterRoleMode = 'EveryoneUserOverride',
 
         [Parameter()]
+        [System.Boolean]
+        $DetectSensitiveContentDuringScreenSharing,
+
+        [Parameter()]
         [ValidateSet('Disabled', 'Enabled')]
         [System.String]
         $EnrollUserOverride = 'Disabled',
 
         [Parameter()]
+        [ValidateSet('Disabled', 'Enabled')]
         [System.String]
         $ExplicitRecordingConsent,
 
         [Parameter()]
+        [ValidateSet('EnabledForAnyone', 'EnabledForTrustedOrgs', 'Disabled')]
         [System.String]
-        $ForceStreamingAttendeeMode,
+        $ExternalMeetingJoin,
 
         [Parameter()]
         [System.String]
@@ -633,7 +771,7 @@ function Set-TargetResource
         $MediaBitRateKb,
 
         [Parameter()]
-        [ValidateSet('Disabled', 'Enabled')]
+        [ValidateSet('Disabled', 'Enabled', 'EnabledExceptAnonymous')]
         [System.String]
         $MeetingChatEnabledType = 'Enabled',
 
@@ -642,9 +780,14 @@ function Set-TargetResource
         $MeetingInviteLanguages,
 
         [Parameter()]
-        [System.UInt32]
-        [ValidateRange(-1,99999)]
+        [System.Int32]
+        [ValidateRange(-1, 99999)]
         $NewMeetingRecordingExpirationDays,
+
+        [Parameter()]
+        [ValidateSet('Disabled', 'Enabled')]
+        [System.String]
+        $ParticipantNameChange,
 
         [Parameter()]
         [System.String]
@@ -652,13 +795,9 @@ function Set-TargetResource
         $PreferredMeetingProviderForIslandsMode,
 
         [Parameter()]
+        [ValidateSet('Disabled', 'Enabled')]
         [System.String]
         $QnAEngagementMode,
-
-        [Parameter()]
-        [System.String]
-        [ValidateSet('Stream', 'OneDriveForBusiness')]
-        $RecordingStorageMode,
 
         [Parameter()]
         [ValidateSet('Off', 'Distinguish', 'Attribute')]
@@ -666,6 +805,7 @@ function Set-TargetResource
         $RoomAttributeUserOverride = 'Off',
 
         [Parameter()]
+        [ValidateSet('Off', 'On')]
         [System.String]
         $RoomPeopleNameUserOverride,
 
@@ -676,7 +816,7 @@ function Set-TargetResource
 
         [Parameter()]
         [System.String]
-        [ValidateSet('Disabled', 'EnabledUserOverride')]
+        [ValidateSet('Disabled', 'DisabledUserOverride', 'EnabledUserOverride', 'Enabled')]
         $SpeakerAttributionMode,
 
         [Parameter()]
@@ -685,7 +825,7 @@ function Set-TargetResource
         $StreamingAttendeeMode = 'Enabled',
 
         [Parameter()]
-        [ValidateSet('Disabled', 'Enabled')]
+        [ValidateSet('Disabled', 'AutoAcceptInTenant', 'AutoAcceptAll')]
         [System.String]
         $TeamsCameraFarEndPTZMode,
 
@@ -693,6 +833,11 @@ function Set-TargetResource
         [System.String]
         [ValidateSet('NoFilters', 'BlurOnly', 'BlurAndDefaultBackgrounds', 'AllFilters')]
         $VideoFiltersMode,
+
+        [Parameter()]
+        [ValidateSet('Disabled', 'Enabled')]
+        [System.String]
+        $VoiceIsolation,
 
         [Parameter()]
         [ValidateSet('Everyone', 'EveryoneInCompany')]
@@ -718,7 +863,15 @@ function Set-TargetResource
 
         [Parameter()]
         [System.String]
-        $CertificateThumbprint
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [Switch]
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message 'Setting Teams Meeting Policy'
@@ -735,18 +888,13 @@ function Set-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftTeams' `
-        -InboundParameters $PSBoundParameters
-
     $CurrentValues = Get-TargetResource @PSBoundParameters
+    $SetParameters = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
 
-    $SetParameters = $PSBoundParameters
-    $SetParameters.Remove('Ensure') | Out-Null
-    $SetParameters.Remove('Credential') | Out-Null
-    $SetParameters.Remove('ApplicationId') | Out-Null
-    $SetParameters.Remove('TenantId') | Out-Null
-    $SetParameters.Remove('CertificateThumbprint') | Out-Null
-    $SetParameters.Remove('Verbose') | Out-Null # Needs to be implicitly removed for the cmdlet to work
+    if ($AllowCloudRecording -eq $false -and $SetParameters.Keys -contains 'AllowRecordingStorageOutsideRegion')
+    {
+        $SetParameters.Remove('AllowRecordingStorageOutsideRegion') | Out-Null
+    }
 
     if ($Ensure -eq 'Present' -and $CurrentValues.Ensure -eq 'Absent')
     {
@@ -778,7 +926,6 @@ function Set-TargetResource
         }
         if ($SetParameters.AllowCloudRecording -eq $false )
         {
-            $SetParameters.Remove('RecordingStorageMode')
             $SetParameters.Remove('AllowRecordingStorageOutsideRegion')
         }
         Set-CsTeamsMeetingPolicy @SetParameters
@@ -838,6 +985,7 @@ function Test-TargetResource
         $AllowCloudRecording,
 
         [Parameter()]
+        [ValidateSet('Enabled', 'Disabled')]
         [System.String]
         $AllowDocumentCollaboration,
 
@@ -846,9 +994,13 @@ function Test-TargetResource
         $AllowedStreamingMediaInput,
 
         [Parameter()]
-        [ValidateSet('Enabled', 'Disabled')]
+        [ValidateSet('Enabled', 'Disabled', 'ForceEnabled')]
         [System.String]
         $AllowEngagementReport = 'Disabled',
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowExternalNonTrustedMeetingChat,
 
         [Parameter()]
         [System.Boolean]
@@ -900,15 +1052,15 @@ function Test-TargetResource
 
         [Parameter()]
         [System.Boolean]
-        $AllowPrivateMeetNow,
-
-        [Parameter()]
-        [System.Boolean]
         $AllowPowerPointSharing,
 
         [Parameter()]
         [System.Boolean]
         $AllowPrivateMeetingScheduling,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowPrivateMeetNow,
 
         [Parameter()]
         [System.Boolean]
@@ -944,9 +1096,24 @@ function Test-TargetResource
         $AllowWhiteboard,
 
         [Parameter()]
+        [ValidateSet('Disabled', 'Enabled', 'DisabledUserOverride')]
+        [System.String]
+        $AttendeeIdentityMasking,
+
+        [Parameter()]
         [System.String]
         [ValidateSet('EveryoneInCompany', 'Everyone', 'EveryoneInSameAndFederatedCompany', 'OrganizerOnly', 'InvitedUsers', 'EveryoneInCompanyExcludingGuests')]
         $AutoAdmittedUsers,
+
+        [Parameter()]
+        [ValidateSet('Disabled', 'Enabled')]
+        [System.String]
+        $AutomaticallyStartCopilot,
+
+        [Parameter()]
+        [ValidateSet('Disabled', 'Enabled')]
+        [System.String]
+        $AutoRecording,
 
         [Parameter()]
         [System.String]
@@ -954,7 +1121,31 @@ function Test-TargetResource
 
         [Parameter()]
         [System.String]
+        $CaptchaVerificationForMeetingJoin,
+
+        [Parameter()]
+        [ValidateSet('Allow', 'Block')]
+        [System.String]
         $ChannelRecordingDownload,
+
+        [Parameter()]
+        [ValidateSet('Disabled', 'Enabled')]
+        [System.String]
+        $ConnectToMeetingControls,
+
+        [Parameter()]
+        [ValidateSet('EnabledForAnyone', 'EnabledForTrustedOrgs', 'Disabled')]
+        [System.String]
+        $ContentSharingInExternalMeetings,
+
+        [Parameter()]
+        [ValidateSet('Disabled', 'Enabled', 'EnabledWithTranscript', 'EnabledWithTranscriptDefaultOn')]
+        [System.String]
+        $Copilot,
+
+        [Parameter()]
+        [System.Boolean]
+        $CopyRestriction,
 
         [Parameter()]
         [ValidateSet('OrganizerOnlyUserOverride', 'EveryoneInCompanyUserOverride', 'EveryoneUserOverride')]
@@ -962,17 +1153,23 @@ function Test-TargetResource
         $DesignatedPresenterRoleMode = 'EveryoneUserOverride',
 
         [Parameter()]
+        [System.Boolean]
+        $DetectSensitiveContentDuringScreenSharing,
+
+        [Parameter()]
         [ValidateSet('Disabled', 'Enabled')]
         [System.String]
         $EnrollUserOverride = 'Disabled',
 
         [Parameter()]
+        [ValidateSet('Disabled', 'Enabled')]
         [System.String]
         $ExplicitRecordingConsent,
 
         [Parameter()]
+        [ValidateSet('EnabledForAnyone', 'EnabledForTrustedOrgs', 'Disabled')]
         [System.String]
-        $ForceStreamingAttendeeMode,
+        $ExternalMeetingJoin,
 
         [Parameter()]
         [System.String]
@@ -1007,7 +1204,7 @@ function Test-TargetResource
         $MediaBitRateKb,
 
         [Parameter()]
-        [ValidateSet('Disabled', 'Enabled')]
+        [ValidateSet('Disabled', 'Enabled', 'EnabledExceptAnonymous')]
         [System.String]
         $MeetingChatEnabledType = 'Enabled',
 
@@ -1016,9 +1213,14 @@ function Test-TargetResource
         $MeetingInviteLanguages,
 
         [Parameter()]
-        [System.UInt32]
-        [ValidateRange(-1,99999)]
+        [System.Int32]
+        [ValidateRange(-1, 99999)]
         $NewMeetingRecordingExpirationDays,
+
+        [Parameter()]
+        [ValidateSet('Disabled', 'Enabled')]
+        [System.String]
+        $ParticipantNameChange,
 
         [Parameter()]
         [System.String]
@@ -1026,13 +1228,9 @@ function Test-TargetResource
         $PreferredMeetingProviderForIslandsMode,
 
         [Parameter()]
+        [ValidateSet('Disabled', 'Enabled')]
         [System.String]
         $QnAEngagementMode,
-
-        [Parameter()]
-        [System.String]
-        [ValidateSet('Stream', 'OneDriveForBusiness')]
-        $RecordingStorageMode,
 
         [Parameter()]
         [ValidateSet('Off', 'Distinguish', 'Attribute')]
@@ -1040,6 +1238,7 @@ function Test-TargetResource
         $RoomAttributeUserOverride = 'Off',
 
         [Parameter()]
+        [ValidateSet('Off', 'On')]
         [System.String]
         $RoomPeopleNameUserOverride,
 
@@ -1050,7 +1249,7 @@ function Test-TargetResource
 
         [Parameter()]
         [System.String]
-        [ValidateSet('Disabled', 'EnabledUserOverride')]
+        [ValidateSet('Disabled', 'DisabledUserOverride', 'EnabledUserOverride', 'Enabled')]
         $SpeakerAttributionMode,
 
         [Parameter()]
@@ -1059,7 +1258,7 @@ function Test-TargetResource
         $StreamingAttendeeMode = 'Enabled',
 
         [Parameter()]
-        [ValidateSet('Disabled', 'Enabled')]
+        [ValidateSet('Disabled', 'AutoAcceptInTenant', 'AutoAcceptAll')]
         [System.String]
         $TeamsCameraFarEndPTZMode,
 
@@ -1067,6 +1266,11 @@ function Test-TargetResource
         [System.String]
         [ValidateSet('NoFilters', 'BlurOnly', 'BlurAndDefaultBackgrounds', 'AllFilters')]
         $VideoFiltersMode,
+
+        [Parameter()]
+        [ValidateSet('Disabled', 'Enabled')]
+        [System.String]
+        $VoiceIsolation,
 
         [Parameter()]
         [ValidateSet('Everyone', 'EveryoneInCompany')]
@@ -1092,13 +1296,19 @@ function Test-TargetResource
 
         [Parameter()]
         [System.String]
-        $CertificateThumbprint
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [Switch]
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
 
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -1106,31 +1316,18 @@ function Test-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message "Testing configuration of Team Meeting Policy {$Identity}"
-
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-
-    Write-Verbose -Message "Current Values: $(Convert-M365DscHashtableToString -Hashtable $CurrentValues)"
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $ValuesToCheck = $PSBoundParameters
-
-    # The AllowAnonymousUsersToDialOut is temporarly disabled. Therefore
-    # we can't create or update a policy with it and it needs to be removed;
-    $ValuesToCheck.Remove('AllowAnonymousUsersToDialOut') | Out-Null
-
-    # The AllowIPVideo is temporarly not working, therefore we won't check the value.
-    $ValuesToCheck.Remove('AllowIPVideo') | Out-Null
-
-
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck $ValuesToCheck.Keys
-
-    Write-Verbose -Message "Test-TargetResource returned $TestResult"
-
-    return $TestResult
+    # The AllowAnonymousUsersToDialOut is temporarly disabled. Therefore we can't create or update a policy with it and it needs to be removed
+    # The AllowIPVideo is temporarly not working, therefore we won't check the value
+    # The AllowUserToJoinExternalMeeting doesn't do anything based on official documentation
+    $excludedProperties = @('AllowAnonymousUsersToDialOut', 'AllowIPVideo', 'AllowUserToJoinExternalMeeting')
+    if ($AllowCloudRecording -eq $false -and $PSBoundParameters.ContainsKey('AllowRecordingStorageOutsideRegion'))
+    {
+        $excludedProperties += 'AllowCloudRecording'
+    }
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '') `
+                                         -ExcludedProperties $excludedProperties
+    return $result
 }
 
 function Export-TargetResource
@@ -1153,8 +1350,17 @@ function Export-TargetResource
 
         [Parameter()]
         [System.String]
-        $CertificateThumbprint
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [Switch]
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftTeams' `
         -InboundParameters $PSBoundParameters
 
@@ -1175,20 +1381,27 @@ function Export-TargetResource
         $i = 1
         [array]$policies = Get-CsTeamsMeetingPolicy -ErrorAction Stop
         $dscContent = ''
-        Write-Host "`r`n" -NoNewline
+        Write-M365DSCHost -Message "`r`n" -DeferWrite
         foreach ($policy in $policies)
         {
-            Write-Host "    |---[$i/$($policies.Count)] $($policy.Identity)" -NoNewline
+            if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+            {
+                $Global:M365DSCExportResourceInstancesCount++
+            }
+
+            Write-M365DSCHost -Message "    |---[$i/$($policies.Count)] $($policy.Identity)" -DeferWrite
             $params = @{
                 Identity              = $policy.Identity
                 Credential            = $Credential
                 ApplicationId         = $ApplicationId
                 TenantId              = $TenantId
                 CertificateThumbprint = $CertificateThumbprint
+                ManagedIdentity       = $ManagedIdentity.IsPresent
+                AccessTokens          = $AccessTokens
             }
+
+            $Script:exportedInstance = $policy
             $Results = Get-TargetResource @Params
-            $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                -Results $Results
             $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                 -ConnectionMode $ConnectionMode `
                 -ModulePath $PSScriptRoot `
@@ -1197,14 +1410,14 @@ function Export-TargetResource
             $dscContent += $currentDSCBlock
             Save-M365DSCPartialExport -Content $currentDSCBlock `
                 -FileName $Global:PartialExportFileName
-            Write-Host $Global:M365DSCEmojiGreenCheckmark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
             $i++
         }
         return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `

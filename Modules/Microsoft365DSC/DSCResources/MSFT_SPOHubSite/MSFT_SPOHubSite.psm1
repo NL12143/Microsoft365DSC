@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_SPOHubSite'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -67,101 +69,113 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Getting configuration for hub site collection $Url"
-    $ConnectionMode = New-M365DSCConnection -Workload 'PnP' `
-        -InboundParameters $PSBoundParameters
-
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
-
-    #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
-    $CommandName = $MyInvocation.MyCommand
-    $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
-        -CommandName $CommandName `
-        -Parameters $PSBoundParameters
-    Add-M365DSCTelemetryEvent -Data $data
-    #endregion
-
-    $nullReturn = $PSBoundParameters
-    $nullReturn.Ensure = 'Absent'
 
     try
     {
-        Write-Verbose -Message "Getting hub site collection $Url"
-        $site = Get-PnPTenantSite -Identity $Url -ErrorAction SilentlyContinue
-        if ($null -eq $site)
+        if (-not $Script:exportedInstance -or $Script:exportedInstance.Url -ne $Url)
         {
-            Write-Verbose -Message "The specified Site Collection doesn't already exist."
-            return $nullReturn
-        }
+            $null = New-M365DSCConnection -Workload 'MicrosoftGraph' `
+                -InboundParameters $PSBoundParameters
 
-        if ($site.IsHubSite -eq $false)
-        {
-            Write-Verbose -Message "The specified Site Collection isn't a hub site."
-            return $nullReturn
+            $null = New-M365DSCConnection -Workload 'PnP' `
+                -InboundParameters $PSBoundParameters
+
+            #Ensure the proper dependencies are installed in the current environment.
+            Confirm-M365DSCDependencies
+
+            #region Telemetry
+            $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+            $CommandName = $MyInvocation.MyCommand
+            $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
+                -CommandName $CommandName `
+                -Parameters $PSBoundParameters
+            Add-M365DSCTelemetryEvent -Data $data
+            #endregion
+
+            $nullReturn = $PSBoundParameters
+            $nullReturn.Ensure = 'Absent'
+
+            Write-Verbose -Message "Getting hub site collection $Url"
+            $site = Get-PnPTenantSite -Identity $Url -ErrorAction SilentlyContinue
+            if ($null -eq $site)
+            {
+                Write-Verbose -Message "The specified Site Collection doesn't already exist."
+                return $nullReturn
+            }
+
+            if ($site.IsHubSite -eq $false)
+            {
+                Write-Verbose -Message "The specified Site Collection isn't a hub site."
+                return $nullReturn
+            }
         }
         else
         {
-            $hubSite = Get-PnPHubSite -Identity $Url
-            $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftGraph' `
-                -InboundParameters $PSBoundParameters
-            $principals = @()
-            foreach ($permission in $hubSite.Permissions.PrincipalName)
-            {
-                $result = $permission.Split('|')
-                if ($result[0].StartsWith('c') -eq $true)
-                {
-                    # Group permissions
-                    $group = Get-MgGroup -GroupId $result[2]
+            $hubSite = $Script:exportedInstance
+        }
 
-                    if ($null -eq $group.EmailAddress)
-                    {
-                        $principal = $group.DisplayName
-                    }
-                    else
-                    {
-                        $principal = $group.EmailAddress
-                    }
-                    $principals += $principal
+        $hubSite = Get-PnPHubSite -Identity $Url
+        $principals = @()
+        foreach ($permission in $hubSite.Permissions.PrincipalName)
+        {
+            $result = $permission.Split('|')
+            if ($result[0].StartsWith('c') -eq $true)
+            {
+                # Group permissions
+                $group = Get-MgGroup -GroupId $result[2]
+
+                if ($null -eq $group.EmailAddress)
+                {
+                    $principal = $group.DisplayName
                 }
                 else
                 {
-                    # User permissions
-                    $principals += $result[2]
+                    $principal = $group.EmailAddress
                 }
-            }
-
-            if ($LogoUrl.StartsWith('http'))
-            {
-                $configuredLogo = $hubSite.LogoUrl
+                $principals += $principal
             }
             else
             {
-                $configuredLogo = ([System.Uri]$hubSite.LogoUrl).AbsolutePath
+                # User permissions
+                $principals += $result[2]
             }
-
-            $result = @{
-                Url                   = $Url
-                Title                 = $hubSite.Title
-                Description           = $hubSite.Description
-                LogoUrl               = $configuredLogo
-                RequiresJoinApproval  = $hubSite.RequiresJoinApproval
-                AllowedToJoin         = $principals
-                SiteDesignId          = $hubSite.SiteDesignId
-                Ensure                = 'Present'
-                Credential            = $Credential
-                ApplicationId         = $ApplicationId
-                TenantId              = $TenantId
-                ApplicationSecret     = $ApplicationSecret
-                CertificateThumbprint = $CertificateThumbprint
-                Managedidentity       = $ManagedIdentity.IsPresent
-            }
-            return $result
         }
+
+        if ($LogoUrl.StartsWith('http'))
+        {
+            $configuredLogo = $hubSite.LogoUrl
+        }
+        else
+        {
+            $configuredLogo = ([System.Uri]$hubSite.LogoUrl).AbsolutePath
+        }
+
+        $result = @{
+            Url                   = $Url
+            Title                 = $hubSite.Title
+            Description           = $hubSite.Description
+            LogoUrl               = $configuredLogo
+            RequiresJoinApproval  = $hubSite.RequiresJoinApproval
+            AllowedToJoin         = $principals
+            SiteDesignId          = $hubSite.SiteDesignId
+            Ensure                = 'Present'
+            Credential            = $Credential
+            ApplicationId         = $ApplicationId
+            TenantId              = $TenantId
+            ApplicationSecret     = $ApplicationSecret
+            CertificateThumbprint = $CertificateThumbprint
+            ManagedIdentity       = $ManagedIdentity.IsPresent
+            AccessTokens          = $AccessTokens
+        }
+        return $result
     }
     catch
     {
@@ -243,7 +257,11 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Setting configuration for hub site collection $Url"
@@ -260,10 +278,10 @@ function Set-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'PnP' `
+    $ConnectionModeGraph = New-M365DSCConnection -Workload 'MicrosoftGraph' `
         -InboundParameters $PSBoundParameters
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftGraph' `
+    $ConnectionMode = New-M365DSCConnection -Workload 'PnP' `
         -InboundParameters $PSBoundParameters
 
     try
@@ -516,13 +534,15 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
 
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -530,28 +550,9 @@ function Test-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message "Testing configuration for hub site collection $Url"
-
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-
-    Write-Verbose -Message "Current Values: $(Convert-M365DscHashtableToString -Hashtable $CurrentValues)"
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck @('Ensure', `
-            'Url', `
-            'Title', `
-            'Description', `
-            'LogoUrl', `
-            'RequiresJoinApproval', `
-            'AllowedToJoin', `
-            'SiteDesignId')
-
-    Write-Verbose -Message "Test-TargetResource returned $TestResult"
-
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '')
+    return $result
 }
 
 function Export-TargetResource
@@ -590,7 +591,11 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     try
@@ -615,11 +620,11 @@ function Export-TargetResource
         $i = 1
         if ($hubSites.Length -eq 0)
         {
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         }
         else
         {
-            Write-Host "`r`n" -NoNewline
+            Write-M365DSCHost -Message "`r`n" -DeferWrite
         }
 
         $principal = '' # Principal represents the "NetBios" name of the tenant (e.g. the M365DSC part of M365DSC.onmicrosoft.com)
@@ -641,23 +646,28 @@ function Export-TargetResource
         $dscContent = ''
         foreach ($hub in $hubSites)
         {
-            Write-Host "    [$i/$($hubSites.Length)] $($hub.SiteUrl)" -NoNewline
+            if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+            {
+                $Global:M365DSCExportResourceInstancesCount++
+            }
+
+            Write-M365DSCHost -Message "    [$i/$($hubSites.Length)] $($hub.SiteUrl)" -DeferWrite
 
             $Params = @{
                 Url                   = $hub.SiteUrl
                 ApplicationId         = $ApplicationId
                 TenantId              = $TenantId
                 CertificateThumbprint = $CertificateThumbprint
-                Managedidentity       = $ManagedIdentity.IsPresent
+                ManagedIdentity       = $ManagedIdentity.IsPresent
                 Credential            = $Credential
                 CertificatePassword   = $CertificatePassword
                 CertificatePath       = $CertificatePath
                 ApplicationSecret     = $ApplicationSecret
+                AccessTokens          = $AccessTokens
             }
 
+            $Script:exportedInstance = $hub
             $Results = Get-TargetResource @Params
-            $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                -Results $Results
             $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                 -ConnectionMode $ConnectionMode `
                 -ModulePath $PSScriptRoot `
@@ -674,14 +684,14 @@ function Export-TargetResource
             $dscContent += $currentDSCBlock
             Save-M365DSCPartialExport -Content $currentDSCBlock `
                 -FileName $Global:PartialExportFileName
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
             $i++
         }
         return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `

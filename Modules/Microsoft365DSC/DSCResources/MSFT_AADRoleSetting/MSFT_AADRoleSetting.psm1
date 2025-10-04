@@ -1,16 +1,18 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_AADRoleSetting'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
     [OutputType([System.Collections.Hashtable])]
     param
     (
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [System.String]
         $Id,
 
-        [Parameter()]
+        [Parameter(Mandatory = $true)]
         [System.String]
-        $Displayname,
+        $DisplayName,
 
         [Parameter()]
         [System.String]
@@ -165,7 +167,19 @@ function Get-TargetResource
         $EligibleAssignmentAssigneeNotificationOnlyCritical,
 
         [Parameter()]
-        [ValidateSet('Present', 'Absent')]
+        [System.Boolean]
+        $AuthenticationContextRequired,
+
+        [Parameter()]
+        [System.String]
+        $AuthenticationContextId,
+
+        [Parameter()]
+        [System.String]
+        $AuthenticationContextName,
+
+        [Parameter()]
+        [ValidateSet('Present')]
         [System.String]
         $Ensure = 'Present',
 
@@ -191,42 +205,83 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
-    Write-Verbose -Message "Getting configuration of Role: $Displayname"
-    $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftGraph' `
-        -InboundParameters $PSBoundParameters `
-        -ProfileName 'beta'
+    Write-Verbose -Message "Getting configuration of the AAD Role Setting with Id {$Id} and DisplayName {$DisplayName}"
 
-    Select-MgProfile -Name 'beta'
-    $MaximumFunctionCount = 32000
+    if (-not $Script:exportedInstance -or $Script:exportedInstance.DisplayName -ne $DisplayName)
+    {
+        $null = New-M365DSCConnection -Workload 'MicrosoftGraph' `
+            -InboundParameters $PSBoundParameters
 
-    Write-Verbose -Message 'Getting configuration of Role'
+        Write-Verbose -Message 'Getting configuration of Role'
 
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
+        #Ensure the proper dependencies are installed in the current environment.
+        Confirm-M365DSCDependencies
 
-    #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
-    $CommandName = $MyInvocation.MyCommand
-    $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
-        -CommandName $CommandName `
-        -Parameters $PSBoundParameters
-    Add-M365DSCTelemetryEvent -Data $data
-    #endregion
+        #region Telemetry
+        $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+        $CommandName = $MyInvocation.MyCommand
+        $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
+            -CommandName $CommandName `
+            -Parameters $PSBoundParameters
+        Add-M365DSCTelemetryEvent -Data $data
+        #endregion
+
+        if ($null -eq $Script:RoleDefinitions)
+        {
+            $Script:RoleDefinitions = [System.Collections.Generic.Dictionary[string, hashtable]]::new()
+            $allRoleDefinitions = Get-MgBetaRoleManagementDirectoryRoleDefinition -All -Property 'id,displayName'
+            foreach ($roleDefinition in $allRoleDefinitions)
+            {
+                $Script:RoleDefinitions[$roleDefinition.Id] = @{
+                    Id = $roleDefinition.Id
+                    DisplayName = $roleDefinition.DisplayName
+                }
+            }
+        }
+
+        $RoleDefinition = $null
+        if (-not [System.String]::IsNullOrEmpty($Id))
+        {
+            $RoleDefinition = $Script:RoleDefinitions[$Id]
+        }
+
+        if ($null -eq $RoleDefinition -and -not [System.String]::IsNullOrEmpty($DisplayName))
+        {
+            $RoleDefinition = ($Script:RoleDefinitions.GetEnumerator() | Where-Object { $_.Value.DisplayName -eq ($RoleDefinition.DisplayName -replace "'", "''") }).Value
+        }
+    }
+    else
+    {
+        $RoleDefinition = $Script:exportedInstance
+    }
 
     $nullReturn = $PSBoundParameters
-    $nullReturn.Ensure = 'Absent'
-
-    #get role
-    [string]$Filter = $null
-    $Filter = "scopeId eq '/' and scopeType eq 'DirectoryRole' and RoleDefinitionId eq '" + $Id + "'"
-    #$Policy = Get-MgPolicyRoleManagementPolicyAssignment -Filter $Filter
+    if ($null -eq $RoleDefinition)
+    {
+        return $nullReturn
+    }
 
     try
     {
-        $Policy = Get-MgPolicyRoleManagementPolicyAssignment -Filter $Filter -ErrorAction Stop
+        if ($null -eq $Script:PolicyAssignments)
+        {
+            $Script:PolicyAssignments = [System.Collections.Generic.Dictionary[string, string]]::new()
+            $allFilter = "scopeId eq '/' and scopeType eq 'DirectoryRole'"
+            $assignments = Get-MgBetaPolicyRoleManagementPolicyAssignment -Filter $allFilter -All -Property 'roleDefinitionId,policyId'
+            foreach ($assignment in $assignments)
+            {
+                $Script:PolicyAssignments[$assignment.RoleDefinitionId] = $assignment.PolicyId
+            }
+        }
+
+        $policyId = $Script:PolicyAssignments[$RoleDefinition.Id]
     }
     catch
     {
@@ -237,22 +292,38 @@ function Get-TargetResource
         }
     }
 
-    if ($null -eq $Policy)
+    if ($null -eq $policyId)
     {
         return $nullReturn
     }
-    $RoleDefinition = Get-MgRoleManagementDirectoryRoleDefinition -UnifiedRoleDefinitionId $Id
 
-    #get Policyrule
-    $role = Get-MgPolicyRoleManagementPolicyRule -UnifiedRoleManagementPolicyId $Policy.Policyid
+    if ($null -eq $Script:Policies)
+    {
+        $Script:Policies = [System.Collections.Generic.Dictionary[string, object]]::new()
+        $allPolicies = Get-MgBetaPolicyRoleManagementPolicy -Filter "scopeId eq '/' and scopeType eq 'DirectoryRole'" -ExpandProperty "rules" -Property "Id,rules"
+        foreach ($policy in $allPolicies)
+        {
+            $Script:Policies[$policy.Id] = $policy
+        }
+    }
 
-    $Displayname = $RoleDefinition.DisplayName
-    $ActivationMaxDuration = ($role | Where-Object { $_.Id -eq 'Expiration_EndUser_Assignment' }).AdditionalProperties.maximumDuration
-    $ActivationReqJustification = (($role | Where-Object { $_.Id -eq 'Enablement_EndUser_Assignment' }).AdditionalProperties.enabledRules) -contains 'Justification'
-    $ActivationReqTicket = (($role | Where-Object { $_.Id -eq 'Enablement_EndUser_Assignment' }).AdditionalProperties.enabledRules) -contains 'Ticketing'
-    $ActivationReqMFA = (($role | Where-Object { $_.Id -eq 'Enablement_EndUser_Assignment' }).AdditionalProperties.enabledRules) -contains 'MultiFactorAuthentication'
-    $ApprovaltoActivate = (($role | Where-Object { $_.Id -eq 'Approval_EndUser_Assignment' }).AdditionalProperties.setting.isApprovalRequired)
-    [array]$ActivateApprovers = (($role | Where-Object { $_.Id -eq 'Approval_EndUser_Assignment' }).AdditionalProperties.setting.approvalStages.primaryApprovers)
+    # Get Policy Rule
+    $rule = $Script:Policies[$policyId].Rules
+
+    $DisplayName = $RoleDefinition.DisplayName
+    $ActivationMaxDuration = ($rule | Where-Object { $_.Id -eq 'Expiration_EndUser_Assignment' }).AdditionalProperties.maximumDuration
+    $ActivationReqJustification = (($rule | Where-Object { $_.Id -eq 'Enablement_EndUser_Assignment' }).AdditionalProperties.enabledRules) -contains 'Justification'
+    $ActivationReqTicket = (($rule | Where-Object { $_.Id -eq 'Enablement_EndUser_Assignment' }).AdditionalProperties.enabledRules) -contains 'Ticketing'
+    $ActivationReqMFA = (($rule | Where-Object { $_.Id -eq 'Enablement_EndUser_Assignment' }).AdditionalProperties.enabledRules) -contains 'MultiFactorAuthentication'
+    $AuthenticationContext = ($rule | Where-Object { $_.Id -eq 'AuthenticationContext_EndUser_Assignment' }).AdditionalProperties
+    $AuthenticationContextRequired = $AuthenticationContext.isEnabled
+    if ($AuthenticationContextRequired)
+    {
+        $AuthenticationContextId = $AuthenticationContext.claimValue
+        $AuthenticationContextName = (Get-MgBetaIdentityConditionalAccessAuthenticationContextClassReference -AuthenticationContextClassReferenceId $AuthenticationContextId).DisplayName
+    }
+    $ApprovaltoActivate = (($rule | Where-Object { $_.Id -eq 'Approval_EndUser_Assignment' }).AdditionalProperties.setting.isApprovalRequired)
+    [array]$ActivateApprovers = (($rule | Where-Object { $_.Id -eq 'Approval_EndUser_Assignment' }).AdditionalProperties.setting.approvalStages.primaryApprovers)
     [string[]]$ActivateApprover = @()
     foreach ($Item in $ActivateApprovers.id)
     {
@@ -274,45 +345,45 @@ function Get-TargetResource
             }
         }
     }
-    $PermanentEligibleAssignmentisExpirationRequired = ($role | Where-Object { $_.Id -eq 'Expiration_Admin_Eligibility' }).AdditionalProperties.isExpirationRequired
-    $ExpireEligibleAssignment = ($role | Where-Object { $_.Id -eq 'Expiration_Admin_Eligibility' }).AdditionalProperties.maximumDuration
-    $PermanentActiveAssignmentisExpirationRequired = ($role | Where-Object { $_.Id -eq 'Expiration_Admin_Assignment' }).AdditionalProperties.isExpirationRequired
-    $ExpireActiveAssignment = ($role | Where-Object { $_.Id -eq 'Expiration_Admin_Assignment' }).AdditionalProperties.maximumDuration
-    $AssignmentReqMFA = (($role | Where-Object { $_.Id -eq 'Enablement_Admin_Assignment' }).AdditionalProperties.enabledRules) -contains 'MultiFactorAuthentication'
-    $AssignmentReqJustification = (($role | Where-Object { $_.Id -eq 'Enablement_Admin_Assignment' }).AdditionalProperties.enabledRules) -contains 'Justification'
-    $ElegibilityAssignmentReqMFA = (($role | Where-Object { $_.Id -eq 'Enablement_Admin_Eligibility' }).AdditionalProperties.enabledRules) -contains 'MultiFactorAuthentication'
-    $ElegibilityAssignmentReqJustification = (($role | Where-Object { $_.Id -eq 'Enablement_Admin_Eligibility' }).AdditionalProperties.enabledRules) -contains 'Justification'
-    $EligibleAlertNotificationDefaultRecipient = ($role | Where-Object { $_.Id -eq 'Notification_Admin_Admin_Eligibility' }).AdditionalProperties.isDefaultRecipientsEnabled
-    [string[]]$EligibleAlertNotificationAdditionalRecipient = ($role | Where-Object { $_.Id -eq 'Notification_Admin_Admin_Eligibility' }).AdditionalProperties.notificationRecipients
-    $EligibleAlertNotificationOnlyCritical = (($role | Where-Object { $_.Id -eq 'Notification_Admin_Admin_Eligibility' }).AdditionalProperties.notificationLevel) -contains ('Critical')
-    $EligibleAssigneeNotificationDefaultRecipient = ($role | Where-Object { $_.Id -eq 'Notification_Requestor_Admin_Eligibility' }).AdditionalProperties.isDefaultRecipientsEnabled
-    [string[]]$EligibleAssigneeNotificationAdditionalRecipient = ($role | Where-Object { $_.Id -eq 'Notification_Requestor_Admin_Eligibility' }).AdditionalProperties.notificationRecipients
-    $EligibleAssigneeNotificationOnlyCritical = (($role | Where-Object { $_.Id -eq 'Notification_Requestor_Admin_Eligibility' }).AdditionalProperties.notificationLevel) -contains ('Critical')
-    $EligibleApproveNotificationDefaultRecipient = ($role | Where-Object { $_.Id -eq 'Notification_Approver_Admin_Eligibility' }).AdditionalProperties.isDefaultRecipientsEnabled
-    [string[]]$EligibleApproveNotificationAdditionalRecipient = ($role | Where-Object { $_.Id -eq 'Notification_Approver_Admin_Eligibility' }).AdditionalProperties.notificationRecipients
-    $EligibleApproveNotificationOnlyCritical = (($role | Where-Object { $_.Id -eq 'Notification_Approver_Admin_Eligibility' }).AdditionalProperties.notificationLevel) -contains ('Critical')
-    $ActiveAlertNotificationDefaultRecipient = ($role | Where-Object { $_.Id -eq 'Notification_Admin_Admin_Assignment' }).AdditionalProperties.isDefaultRecipientsEnabled
-    [string[]]$ActiveAlertNotificationAdditionalRecipient = ($role | Where-Object { $_.Id -eq 'Notification_Admin_Admin_Assignment' }).AdditionalProperties.notificationRecipients
-    $ActiveAlertNotificationOnlyCritical = (($role | Where-Object { $_.Id -eq 'Notification_Admin_Admin_Assignment' }).AdditionalProperties.notificationLevel) -contains ('Critical')
-    $ActiveAssigneeNotificationDefaultRecipient = ($role | Where-Object { $_.Id -eq 'Notification_Requestor_Admin_Assignment' }).AdditionalProperties.isDefaultRecipientsEnabled
-    [string[]]$ActiveAssigneeNotificationAdditionalRecipient = ($role | Where-Object { $_.Id -eq 'Notification_Requestor_Admin_Assignment' }).AdditionalProperties.notificationRecipients
-    $ActiveAssigneeNotificationOnlyCritical = (($role | Where-Object { $_.Id -eq 'Notification_Requestor_Admin_Assignment' }).AdditionalProperties.notificationLevel) -contains ('Critical')
-    $ActiveApproveNotificationDefaultRecipient = ($role | Where-Object { $_.Id -eq 'Notification_Approver_Admin_Assignment' }).AdditionalProperties.isDefaultRecipientsEnabled
-    [string[]]$ActiveApproveNotificationAdditionalRecipient = ($role | Where-Object { $_.Id -eq 'Notification_Approver_Admin_Assignment' }).AdditionalProperties.notificationRecipients
-    $ActiveApproveNotificationOnlyCritical = (($role | Where-Object { $_.Id -eq 'Notification_Approver_Admin_Assignment' }).AdditionalProperties.notificationLevel) -contains ('Critical')
-    $EligibleAssignmentAlertNotificationDefaultRecipient = ($role | Where-Object { $_.Id -eq 'Notification_Admin_EndUser_Assignment' }).AdditionalProperties.isDefaultRecipientsEnabled
-    [string[]]$EligibleAssignmentAlertNotificationAdditionalRecipient = ($role | Where-Object { $_.Id -eq 'Notification_Admin_EndUser_Assignment' }).AdditionalProperties.notificationRecipients
-    $EligibleAssignmentAlertNotificationOnlyCritical = (($role | Where-Object { $_.Id -eq 'Notification_Admin_EndUser_Assignment' }).AdditionalProperties.notificationLevel) -contains ('Critical')
-    $EligibleAssignmentAssigneeNotificationDefaultRecipient = ($role | Where-Object { $_.Id -eq 'Notification_Requestor_EndUser_Assignment' }).AdditionalProperties.isDefaultRecipientsEnabled
-    [string[]]$EligibleAssignmentAssigneeNotificationAdditionalRecipient = ($role | Where-Object { $_.Id -eq 'Notification_Requestor_EndUser_Assignment' }).AdditionalProperties.notificationRecipients
-    $EligibleAssignmentAssigneeNotificationOnlyCritical = (($role | Where-Object { $_.Id -eq 'Notification_Requestor_EndUser_Assignment' }).AdditionalProperties.notificationLevel) -contains ('Critical')
+    $PermanentEligibleAssignmentisExpirationRequired = ($rule | Where-Object { $_.Id -eq 'Expiration_Admin_Eligibility' }).AdditionalProperties.isExpirationRequired
+    $ExpireEligibleAssignment = ($rule | Where-Object { $_.Id -eq 'Expiration_Admin_Eligibility' }).AdditionalProperties.maximumDuration
+    $PermanentActiveAssignmentisExpirationRequired = ($rule | Where-Object { $_.Id -eq 'Expiration_Admin_Assignment' }).AdditionalProperties.isExpirationRequired
+    $ExpireActiveAssignment = ($rule | Where-Object { $_.Id -eq 'Expiration_Admin_Assignment' }).AdditionalProperties.maximumDuration
+    $AssignmentReqMFA = (($rule | Where-Object { $_.Id -eq 'Enablement_Admin_Assignment' }).AdditionalProperties.enabledRules) -contains 'MultiFactorAuthentication'
+    $AssignmentReqJustification = (($rule | Where-Object { $_.Id -eq 'Enablement_Admin_Assignment' }).AdditionalProperties.enabledRules) -contains 'Justification'
+    $ElegibilityAssignmentReqMFA = (($rule | Where-Object { $_.Id -eq 'Enablement_Admin_Eligibility' }).AdditionalProperties.enabledRules) -contains 'MultiFactorAuthentication'
+    $ElegibilityAssignmentReqJustification = (($rule | Where-Object { $_.Id -eq 'Enablement_Admin_Eligibility' }).AdditionalProperties.enabledRules) -contains 'Justification'
+    $EligibleAlertNotificationDefaultRecipient = ($rule | Where-Object { $_.Id -eq 'Notification_Admin_Admin_Eligibility' }).AdditionalProperties.isDefaultRecipientsEnabled
+    [string[]]$EligibleAlertNotificationAdditionalRecipient = ($rule | Where-Object { $_.Id -eq 'Notification_Admin_Admin_Eligibility' }).AdditionalProperties.notificationRecipients
+    $EligibleAlertNotificationOnlyCritical = (($rule | Where-Object { $_.Id -eq 'Notification_Admin_Admin_Eligibility' }).AdditionalProperties.notificationLevel) -contains ('Critical')
+    $EligibleAssigneeNotificationDefaultRecipient = ($rule | Where-Object { $_.Id -eq 'Notification_Requestor_Admin_Eligibility' }).AdditionalProperties.isDefaultRecipientsEnabled
+    [string[]]$EligibleAssigneeNotificationAdditionalRecipient = ($rule | Where-Object { $_.Id -eq 'Notification_Requestor_Admin_Eligibility' }).AdditionalProperties.notificationRecipients
+    $EligibleAssigneeNotificationOnlyCritical = (($rule | Where-Object { $_.Id -eq 'Notification_Requestor_Admin_Eligibility' }).AdditionalProperties.notificationLevel) -contains ('Critical')
+    $EligibleApproveNotificationDefaultRecipient = ($rule | Where-Object { $_.Id -eq 'Notification_Approver_Admin_Eligibility' }).AdditionalProperties.isDefaultRecipientsEnabled
+    [string[]]$EligibleApproveNotificationAdditionalRecipient = ($rule | Where-Object { $_.Id -eq 'Notification_Approver_Admin_Eligibility' }).AdditionalProperties.notificationRecipients
+    $EligibleApproveNotificationOnlyCritical = (($rule | Where-Object { $_.Id -eq 'Notification_Approver_Admin_Eligibility' }).AdditionalProperties.notificationLevel) -contains ('Critical')
+    $ActiveAlertNotificationDefaultRecipient = ($rule | Where-Object { $_.Id -eq 'Notification_Admin_Admin_Assignment' }).AdditionalProperties.isDefaultRecipientsEnabled
+    [string[]]$ActiveAlertNotificationAdditionalRecipient = ($rule | Where-Object { $_.Id -eq 'Notification_Admin_Admin_Assignment' }).AdditionalProperties.notificationRecipients
+    $ActiveAlertNotificationOnlyCritical = (($rule | Where-Object { $_.Id -eq 'Notification_Admin_Admin_Assignment' }).AdditionalProperties.notificationLevel) -contains ('Critical')
+    $ActiveAssigneeNotificationDefaultRecipient = ($rule | Where-Object { $_.Id -eq 'Notification_Requestor_Admin_Assignment' }).AdditionalProperties.isDefaultRecipientsEnabled
+    [string[]]$ActiveAssigneeNotificationAdditionalRecipient = ($rule | Where-Object { $_.Id -eq 'Notification_Requestor_Admin_Assignment' }).AdditionalProperties.notificationRecipients
+    $ActiveAssigneeNotificationOnlyCritical = (($rule | Where-Object { $_.Id -eq 'Notification_Requestor_Admin_Assignment' }).AdditionalProperties.notificationLevel) -contains ('Critical')
+    $ActiveApproveNotificationDefaultRecipient = ($rule | Where-Object { $_.Id -eq 'Notification_Approver_Admin_Assignment' }).AdditionalProperties.isDefaultRecipientsEnabled
+    [string[]]$ActiveApproveNotificationAdditionalRecipient = ($rule | Where-Object { $_.Id -eq 'Notification_Approver_Admin_Assignment' }).AdditionalProperties.notificationRecipients
+    $ActiveApproveNotificationOnlyCritical = (($rule | Where-Object { $_.Id -eq 'Notification_Approver_Admin_Assignment' }).AdditionalProperties.notificationLevel) -contains ('Critical')
+    $EligibleAssignmentAlertNotificationDefaultRecipient = ($rule | Where-Object { $_.Id -eq 'Notification_Admin_EndUser_Assignment' }).AdditionalProperties.isDefaultRecipientsEnabled
+    [string[]]$EligibleAssignmentAlertNotificationAdditionalRecipient = ($rule | Where-Object { $_.Id -eq 'Notification_Admin_EndUser_Assignment' }).AdditionalProperties.notificationRecipients
+    $EligibleAssignmentAlertNotificationOnlyCritical = (($rule | Where-Object { $_.Id -eq 'Notification_Admin_EndUser_Assignment' }).AdditionalProperties.notificationLevel) -contains ('Critical')
+    $EligibleAssignmentAssigneeNotificationDefaultRecipient = ($rule | Where-Object { $_.Id -eq 'Notification_Requestor_EndUser_Assignment' }).AdditionalProperties.isDefaultRecipientsEnabled
+    [string[]]$EligibleAssignmentAssigneeNotificationAdditionalRecipient = ($rule | Where-Object { $_.Id -eq 'Notification_Requestor_EndUser_Assignment' }).AdditionalProperties.notificationRecipients
+    $EligibleAssignmentAssigneeNotificationOnlyCritical = (($rule | Where-Object { $_.Id -eq 'Notification_Requestor_EndUser_Assignment' }).AdditionalProperties.notificationLevel) -contains ('Critical')
 
     try
     {
-        Write-Verbose -Message "Found configuration of Rule $($Displayname)"
+        Write-Verbose -Message "Found configuration of Rule $($DisplayName)"
         $result = @{
             Id                                                        = $Id
-            Displayname                                               = $Displayname
+            DisplayName                                               = $DisplayName
             ActivationMaxDuration                                     = $ActivationMaxDuration
             ActivationReqJustification                                = $ActivationReqJustification
             ActivationReqTicket                                       = $ActivationReqTicket
@@ -351,9 +422,17 @@ function Get-TargetResource
             EligibleAssignmentAssigneeNotificationDefaultRecipient    = $EligibleAssignmentAssigneeNotificationDefaultRecipient
             EligibleAssignmentAssigneeNotificationAdditionalRecipient = [System.String[]]$EligibleAssignmentAssigneeNotificationAdditionalRecipient
             EligibleAssignmentAssigneeNotificationOnlyCritical        = $EligibleAssignmentAssigneeNotificationOnlyCritical
+            AuthenticationContextRequired                             = $AuthenticationContextRequired
+            AuthenticationContextId                                   = $AuthenticationContextId
+            AuthenticationContextName                                 = $AuthenticationContextName
             Ensure                                                    = 'Present'
-            Managedidentity                                           = $ManagedIdentity.IsPresent
+            ApplicationId                                             = $ApplicationId
             TenantId                                                  = $TenantId
+            CertificateThumbprint                                     = $CertificateThumbprint
+            ApplicationSecret                                         = $ApplicationSecret
+            Credential                                                = $Credential
+            ManagedIdentity                                           = $ManagedIdentity.IsPresent
+            AccessTokens                                              = $AccessTokens
         }
         Write-Verbose -Message "Get-TargetResource Result: `n $(Convert-M365DscHashtableToString -Hashtable $result)"
         return $result
@@ -375,13 +454,13 @@ function Set-TargetResource
     [CmdletBinding()]
     param
     (
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [System.String]
         $Id,
 
-        [Parameter()]
+        [Parameter(Mandatory = $true)]
         [System.String]
-        $Displayname,
+        $DisplayName,
 
         [Parameter()]
         [System.String]
@@ -536,7 +615,19 @@ function Set-TargetResource
         $EligibleAssignmentAssigneeNotificationOnlyCritical,
 
         [Parameter()]
-        [ValidateSet('Present', 'Absent')]
+        [System.Boolean]
+        $AuthenticationContextRequired,
+
+        [Parameter()]
+        [System.String]
+        $AuthenticationContextId,
+
+        [Parameter()]
+        [System.String]
+        $AuthenticationContextName,
+
+        [Parameter()]
+        [ValidateSet('Present')]
         [System.String]
         $Ensure = 'Present',
 
@@ -562,13 +653,18 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
-    Write-Verbose -Message "Setting configuration of Role settings: $Displayname"
+    Write-Verbose -Message "Setting configuration of Role settings: $DisplayName"
 
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
+    #$PSBoundParameters.Remove('AuthenticationContextName') | Out-Null
 
     #region Telemetry
     $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
@@ -580,11 +676,23 @@ function Set-TargetResource
     #endregion
 
     #get role
-    [string]$Filter = $null
-    $Filter = "scopeId eq '/' and scopeType eq 'DirectoryRole' and RoleDefinitionId eq '" + $Id + "'"
-    $Policy = Get-MgPolicyRoleManagementPolicyAssignment -Filter $Filter
+    $RoleDefinition = Get-MgBetaRoleManagementDirectoryRoleDefinition -Filter "DisplayName eq '$($DisplayName -replace "'", "''")'"
+
+    $Policy = $null
+    if (-not [System.String]::IsNullOrEmpty($Id))
+    {
+        $Filter = "scopeId eq '/' and scopeType eq 'DirectoryRole' and RoleDefinitionId eq '" + $Id + "'"
+        $Policy = Get-MgBetaPolicyRoleManagementPolicyAssignment -Filter $Filter
+    }
+    else
+    {
+        Write-Verbose -Message "Finding Policy Assignment by Role Definition Id {$($RoleDefinition.Id)}"
+        $Filter = "scopeId eq '/' and scopeType eq 'DirectoryRole' and RoleDefinitionId eq '$($RoleDefinition.Id)'"
+        $Policy = Get-MgBetaPolicyRoleManagementPolicyAssignment -Filter $Filter
+    }
     #get Policyrule
-    $roles = Get-MgPolicyRoleManagementPolicyRule -UnifiedRoleManagementPolicyId $Policy.Policyid
+    $roles = Get-MgBetaPolicyRoleManagementPolicyRule -UnifiedRoleManagementPolicyId $Policy.PolicyId `
+        -ErrorAction SilentlyContinue
 
     foreach ($role in $roles)
     {
@@ -890,15 +998,8 @@ function Set-TargetResource
                     {
                         #is not a guid try with user
                         $Filter = "UserPrincipalName eq '" + $item + "'"
-                        try
-                        {
-                            $user = Get-MgUser -Filter $Filter -ErrorAction Stop
-                        }
-                        catch
-                        {
-                            Write-Verbose -Message 'User not found, try with group'
-                        }
-                        if ($user.length -gt 0)
+                        $user = Get-MgUser -Filter $Filter
+                        if ($null -ne $user)
                         {
                             $ActivateApprovers = @{}
                             $ActivateApprovers.Add('@odata.type', '#microsoft.graph.singleUser')
@@ -908,23 +1009,21 @@ function Set-TargetResource
                         }
                         else
                         {
-                            #try with group
-                            $Filter = "Displayname eq '" + $item + "'"
-                            try
-                            {
-                                $group = Get-MgGroup -Filter $Filter -ErrorAction Stop
-                            }
-                            catch
-                            {
-                                Write-Verbose -Message 'Group not found'
-                            }
-                            if ($group.length -gt 0)
+                            Write-Verbose -Message "User '$item' not found, trying with group"
+
+                            $Filter = "displayName eq '" + $item + "'"
+                            $group = Get-MgGroup -Filter $Filter
+                            if ($null -ne $group)
                             {
                                 $ActivateApprovers = @{}
                                 $ActivateApprovers.Add('@odata.type', '#microsoft.graph.groupMembers')
                                 $ActivateApprovers.Add('groupId', $group.Id)
                                 $primaryApprovers += $ActivateApprovers
                                 $group = $null
+                            }
+                            else
+                            {
+                                throw "Group '$item' not found. Cannot add as approver."
                             }
                         }
                     }
@@ -934,6 +1033,7 @@ function Set-TargetResource
                 $approvalStages.Add('isApproverJustificationRequired', 'true')
                 $approvalStages.Add('escalationTimeInMinutes', '0')
                 $approvalStages.Add('isEscalationEnabled', 'False')
+
                 if ($primaryApprovers.Count -gt 0)
                 {
                     $approvalStages.Add('primaryApprovers', @($primaryApprovers))
@@ -1049,22 +1149,36 @@ function Set-TargetResource
                 }
             }
         }
+        elseif ($role.Id -match 'AuthenticationContext_EndUser_Assignment')
+        {
+            if ($PSBoundParameters.ContainsKey('AuthenticationContextRequired') `
+                    -and $PSBoundParameters.ContainsKey('AuthenticationContextId'))
+            {
+                $params = @{
+                    '@odata.type' = $odatatype
+                    'id'          = $role.Id
+                    'isEnabled'   = $true
+                    'claimValue'  = $AuthenticationContextId
+                    target        = @{
+                        '@odata.type' = 'microsoft.graph.unifiedRoleManagementPolicyRuleTarget'
+                    }
+                }
+            }
+        }
 
         if ($params.Count -gt 0)
         {
             try
             {
-                Update-MgPolicyRoleManagementPolicyRule `
+                Update-MgBetaPolicyRoleManagementPolicyRule `
                     -UnifiedRoleManagementPolicyId $Policy.Policyid `
                     -UnifiedRoleManagementPolicyRuleId $role.id `
                     -BodyParameter $params `
                     -ErrorAction Stop
-
-
             }
             catch
             {
-                Write-Verbose -Message "Problem on set $($role.id) for Policy $($Policy.PolicyId)"
+                throw $_
             }
             $params = @{}
         }
@@ -1077,13 +1191,13 @@ function Test-TargetResource
     [OutputType([System.Boolean])]
     param
     (
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [System.String]
         $Id,
 
-        [Parameter()]
+        [Parameter(Mandatory = $true)]
         [System.String]
-        $Displayname,
+        $DisplayName,
 
         [Parameter()]
         [System.String]
@@ -1238,7 +1352,19 @@ function Test-TargetResource
         $EligibleAssignmentAssigneeNotificationOnlyCritical,
 
         [Parameter()]
-        [ValidateSet('Present', 'Absent')]
+        [System.Boolean]
+        $AuthenticationContextRequired,
+
+        [Parameter()]
+        [System.String]
+        $AuthenticationContextId,
+
+        [Parameter()]
+        [System.String]
+        $AuthenticationContextName,
+
+        [Parameter()]
+        [ValidateSet('Present')]
         [System.String]
         $Ensure = 'Present',
 
@@ -1264,14 +1390,15 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
-
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -1279,27 +1406,9 @@ function Test-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message "Testing configuration of Role Assignment: $Displayname"
-
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('ApplicationId') | Out-Null
-    $ValuesToCheck.Remove('TenantId') | Out-Null
-    $ValuesToCheck.Remove('ApplicationSecret') | Out-Null
-    $ValuesToCheck.Remove('Id') | Out-Null
-    $ValuesToCheck.Remove('ManagedIdentity') | Out-Null
-
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck $ValuesToCheck.Keys
-
-    Write-Verbose -Message "Test-TargetResource returned $TestResult"
-
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '')
+    return $result
 }
 
 function Export-TargetResource
@@ -1334,15 +1443,15 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftGraph' `
-        -InboundParameters $PSBoundParameters `
-        -ProfileName 'beta'
-
-    Select-MgProfile -Name 'beta'
-    $MaximumFunctionCount = 32000
+        -InboundParameters $PSBoundParameters
 
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
@@ -1358,41 +1467,47 @@ function Export-TargetResource
 
     try
     {
-        Get-MgPolicyRoleManagementPolicyAssignment -Filter "scopeId eq '/' and scopeType eq 'DirectoryRole'" -ErrorAction Stop | Out-Null
+        Get-MgBetaPolicyRoleManagementPolicyAssignment -Filter "scopeId eq '/' and scopeType eq 'DirectoryRole'" -ErrorAction Stop | Out-Null
     }
     catch
     {
-        if ($_ -match 'The tenant needs an AAD Premium 2 license')
+        if ($_.ErrorDetails.Message -like '*The tenant needs to have Microsoft Entra*')
         {
-            Write-Host -Message "`nWARNING: AAD Premium License is required to get the role" -ForegroundColor Yellow
-            continue
+            Write-M365DSCHost -Message "`r`n    $($Global:M365DSCEmojiYellowCircle) AAD Premium License is required to get the role."
+            return ''
         }
     }
     try
     {
-        [array]$roles = Get-MgRoleManagementDirectoryRoleDefinition -Filter $Filter -ErrorAction Stop
+        $Script:ExportMode = $true
+        [array] $Script:exportedInstances = Get-MgBetaRoleManagementDirectoryRoleDefinition -Filter $Filter -Sort DisplayName -ErrorAction Stop
         $i = 1
         $dscContent = ''
-        Write-Host "`r`n" -NoNewline
-        foreach ($role in $roles)
+        Write-M365DSCHost -Message "`r`n" -DeferWrite
+        foreach ($role in $Script:exportedInstances)
         {
-            Write-Host "    |---[$i/$($roles.Count)] $($role.DisplayName)" -NoNewline
+            if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+            {
+                $Global:M365DSCExportResourceInstancesCount++
+            }
+
+            Write-M365DSCHost -Message "    |---[$i/$($Script:exportedInstances.Count)] $($role.DisplayName)" -DeferWrite
             $Params = @{
                 Id                    = $role.Id
+                DisplayName           = $role.DisplayName
                 ApplicationId         = $ApplicationId
                 TenantId              = $TenantId
                 CertificateThumbprint = $CertificateThumbprint
-                Managedidentity       = $ManagedIdentity.IsPresent
+                ManagedIdentity       = $ManagedIdentity.IsPresent
                 ApplicationSecret     = $ApplicationSecret
                 Credential            = $Credential
+                AccessTokens          = $AccessTokens
             }
 
+            $Script:exportedInstance = $role
             $Results = Get-TargetResource @Params
-
             if ($Results.Ensure -eq 'Present')
             {
-                $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                    -Results $Results
                 $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                     -ConnectionMode $ConnectionMode `
                     -ModulePath $PSScriptRoot `
@@ -1402,7 +1517,7 @@ function Export-TargetResource
                 Save-M365DSCPartialExport -Content $currentDSCBlock `
                     -FileName $Global:PartialExportFileName
             }
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
             $i++
         }
         return $dscContent
@@ -1410,7 +1525,7 @@ function Export-TargetResource
 
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `

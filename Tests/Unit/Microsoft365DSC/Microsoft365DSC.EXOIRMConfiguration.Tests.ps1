@@ -20,17 +20,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
     InModuleScope -ModuleName $Global:DscHelper.ModuleName -ScriptBlock {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
-            }
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
@@ -46,26 +39,17 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             Mock -CommandName Set-IRMConfiguration -MockWith {
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
-            }
-        }
-
-        # Test contexts
-        Context -Name 'Configuration needs updating' -Fixture {
-            BeforeAll {
-                $testParams = @{
+            Mock -CommandName Get-IRMConfiguration -MockWith {
+                return @{
                     AutomaticServiceUpdateEnabled              = $True
                     AzureRMSLicensingEnabled                   = $True
-                    Credential                                 = $Credential
                     DecryptAttachmentForEncryptOnly            = $False
                     EDiscoverySuperUserEnabled                 = $True
                     EnablePdfEncryption                        = $False
-                    Ensure                                     = 'Present'
                     Identity                                   = 'Test Config'
                     InternalLicensingEnabled                   = $True
                     JournalReportDecryptionEnabled             = $True
-                    LicensingLocation                          = @('https://contoso.com/_wmcs/licensing')
+                    LicensingLocation                          = 'https://contoso.com/_wmcs/licensing'
                     RejectIfRecipientHasNoRights               = $False
                     SearchEnabled                              = $True
                     SimplifiedClientAccessDoNotForwardDisabled = $False
@@ -73,25 +57,36 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     SimplifiedClientAccessEncryptOnlyDisabled  = $False
                     TransportDecryptionSetting                 = 'Optional'
                 }
+            }
 
-                Mock -CommandName Get-IRMConfiguration  -MockWith {
-                    return @{
-                        AutomaticServiceUpdateEnabled              = $True
-                        AzureRMSLicensingEnabled                   = $True
-                        DecryptAttachmentForEncryptOnly            = $False
-                        EDiscoverySuperUserEnabled                 = $True
-                        EnablePdfEncryption                        = $True; #Drift
-                        Identity                                   = 'Test Config'
-                        InternalLicensingEnabled                   = $True
-                        JournalReportDecryptionEnabled             = $True
-                        LicensingLocation                          = @('https://contoso.com/_wmcs/licensing')
-                        RejectIfRecipientHasNoRights               = $False
-                        SearchEnabled                              = $True
-                        SimplifiedClientAccessDoNotForwardDisabled = $False
-                        SimplifiedClientAccessEnabled              = $True
-                        SimplifiedClientAccessEncryptOnlyDisabled  = $False
-                        TransportDecryptionSetting                 = 'Optional'
-                    }
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
+        }
+
+        # Test contexts
+        Context -Name 'Configuration needs updating' -Fixture {
+            BeforeAll {
+                $testParams = @{
+                    IsSingleInstance                           = 'Yes'
+                    AutomaticServiceUpdateEnabled              = $True
+                    AzureRMSLicensingEnabled                   = $True
+                    Credential                                 = $Credential
+                    DecryptAttachmentForEncryptOnly            = $False
+                    EDiscoverySuperUserEnabled                 = $True
+                    EnablePdfEncryption                        = $true # Drift
+                    Ensure                                     = 'Present'
+                    InternalLicensingEnabled                   = $True
+                    JournalReportDecryptionEnabled             = $True
+                    LicensingLocation                          = 'https://contoso.com/_wmcs/licensing'
+                    RejectIfRecipientHasNoRights               = $False
+                    SearchEnabled                              = $True
+                    SimplifiedClientAccessDoNotForwardDisabled = $False
+                    SimplifiedClientAccessEnabled              = $True
+                    SimplifiedClientAccessEncryptOnlyDisabled  = $False
+                    TransportDecryptionSetting                 = 'Optional'
                 }
             }
 
@@ -108,6 +103,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Context -Name 'Update not required.' -Fixture {
             BeforeAll {
                 $testParams = @{
+                    IsSingleInstance                           = 'Yes'
                     AutomaticServiceUpdateEnabled              = $True
                     AzureRMSLicensingEnabled                   = $True
                     Credential                                 = $Credential
@@ -115,36 +111,15 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     EDiscoverySuperUserEnabled                 = $True
                     EnablePdfEncryption                        = $False
                     Ensure                                     = 'Present'
-                    Identity                                   = 'Test Config'
                     InternalLicensingEnabled                   = $True
                     JournalReportDecryptionEnabled             = $True
-                    LicensingLocation                          = @('https://contoso.com/_wmcs/licensing')
+                    LicensingLocation                          = 'https://contoso.com/_wmcs/licensing'
                     RejectIfRecipientHasNoRights               = $False
                     SearchEnabled                              = $True
                     SimplifiedClientAccessDoNotForwardDisabled = $False
                     SimplifiedClientAccessEnabled              = $True
                     SimplifiedClientAccessEncryptOnlyDisabled  = $False
                     TransportDecryptionSetting                 = 'Optional'
-                }
-
-                Mock -CommandName Get-IRMConfiguration  -MockWith {
-                    return @{
-                        AutomaticServiceUpdateEnabled              = $True
-                        AzureRMSLicensingEnabled                   = $True
-                        DecryptAttachmentForEncryptOnly            = $False
-                        EDiscoverySuperUserEnabled                 = $True
-                        EnablePdfEncryption                        = $False
-                        Identity                                   = 'Test Config'
-                        InternalLicensingEnabled                   = $True
-                        JournalReportDecryptionEnabled             = $True
-                        LicensingLocation                          = @('https://contoso.com/_wmcs/licensing')
-                        RejectIfRecipientHasNoRights               = $False
-                        SearchEnabled                              = $True
-                        SimplifiedClientAccessDoNotForwardDisabled = $False
-                        SimplifiedClientAccessEnabled              = $True
-                        SimplifiedClientAccessEncryptOnlyDisabled  = $False
-                        TransportDecryptionSetting                 = 'Optional'
-                    }
                 }
             }
 
@@ -156,33 +131,15 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
-                }
-
-                Mock -CommandName Get-IRMConfiguration  -MockWith {
-                    return @{
-                        AutomaticServiceUpdateEnabled              = $True
-                        AzureRMSLicensingEnabled                   = $True
-                        DecryptAttachmentForEncryptOnly            = $False
-                        EDiscoverySuperUserEnabled                 = $True
-                        EnablePdfEncryption                        = $False
-                        Identity                                   = 'Test Config'
-                        InternalLicensingEnabled                   = $True
-                        JournalReportDecryptionEnabled             = $True
-                        LicensingLocation                          = @('https://contoso.com/_wmcs/licensing')
-                        RejectIfRecipientHasNoRights               = $False
-                        SearchEnabled                              = $True
-                        SimplifiedClientAccessDoNotForwardDisabled = $False
-                        SimplifiedClientAccessEnabled              = $True
-                        SimplifiedClientAccessEncryptOnlyDisabled  = $False
-                        TransportDecryptionSetting                 = 'Optional'
-                    }
                 }
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

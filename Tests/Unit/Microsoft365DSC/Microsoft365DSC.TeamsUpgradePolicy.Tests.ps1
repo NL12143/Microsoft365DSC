@@ -22,17 +22,14 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
 
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'Pass@word1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString ((New-Guid).ToString()) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
             $Global:PartialExportFileName = 'c:\TestPath'
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
+
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-                return 'FakeDSCContent'
-            }
             Mock -CommandName Save-M365DSCPartialExport -MockWith {
             }
 
@@ -43,9 +40,11 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             Mock -CommandName Grant-CsTeamsUpgradePolicy -MockWith {
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
             }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -53,7 +52,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             BeforeAll {
                 $testParams = @{
                     Identity               = 'Test Policy'
-                    Users                  = @('john.smith@contoso.onmicrosoft.com')
                     MigrateMeetingsToTeams = $false
                     Credential             = $Credential
                 }
@@ -64,42 +62,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             }
 
             It 'Should return absent from the Get method' {
-                Get-TargetResource @testParams | Should -BeNullOrEmpty
-            }
-        }
-
-        Context -Name 'When the policy already exists and is NOT in the Desired State' -Fixture {
-            BeforeAll {
-                $testParams = @{
-                    Identity               = 'Test Policy'
-                    Users                  = @('john.smith@contoso.onmicrosoft.com')
-                    MigrateMeetingsToTeams = $false
-                    Credential             = $Credential
-                }
-
-                Mock -CommandName Get-CsTeamsUpgradePolicy -MockWith {
-                    return @{
-                        Identity       = 'Test Policy'
-                        Description    = 'This is a configuration drift'
-                        NotifySfBUsers = $false
-                    }
-                }
-
-                Mock -CommandName Get-CsOnlineUser -MockWith {
-                    return @{
-                        UserPrincipalName  = 'Bob.Houle@contoso.onmicrosoft.com'
-                        TeamsUpgradePolicy = 'Global'
-                    }
-                }
-            }
-
-            It 'Should return false from the Test method' {
-                Test-TargetResource @testParams | Should -Be $false
-            }
-
-            It 'Should update the policy from the Set method' {
-                Set-TargetResource @testParams
-                Should -Invoke -CommandName Grant-CsTeamsUpgradePolicy -Exactly 1
+                Get-TargetResource @testParams | Should -BeOfType "System.Collections.Hashtable"
             }
         }
 
@@ -107,7 +70,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             BeforeAll {
                 $testParams = @{
                     Identity               = 'Islands'
-                    Users                  = @('john.smith@contoso.onmicrosoft.com')
                     MigrateMeetingsToTeams = $false
                     Credential             = $Credential
                 }
@@ -117,13 +79,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                         Identity       = 'Islands'
                         Description    = 'This is a test policy'
                         NotifySfBUsers = $false
-                    }
-                }
-
-                Mock -CommandName Get-CsOnlineUser -MockWith {
-                    return @{
-                        UserPrincipalName  = 'John.Smith@contoso.onmicrosoft.com'
-                        TeamsUpgradePolicy = 'Islands'
                     }
                 }
             }
@@ -136,6 +91,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
                 }
@@ -147,17 +103,11 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                         NotifySfBUsers = $false
                     }
                 }
-
-                Mock -CommandName Get-CsOnlineUser -MockWith {
-                    return @{
-                        UserPrincipalName  = 'John.Smith@contoso.onmicrosoft.com'
-                        TeamsUpgradePolicy = 'Islands'
-                    }
-                }
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

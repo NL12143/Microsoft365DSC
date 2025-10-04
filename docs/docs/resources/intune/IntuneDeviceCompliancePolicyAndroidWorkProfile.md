@@ -4,53 +4,84 @@
 
 | Parameter | Attribute | DataType | Description | Allowed Values |
 | --- | --- | --- | --- | --- |
-| **dataType** | Write | String | The type of the target assignment. |#microsoft.graph.groupAssignmentTarget, #microsoft.graph.allLicensedUsersAssignmentTarget, #microsoft.graph.allDevicesAssignmentTarget, #microsoft.graph.exclusionGroupAssignmentTarget, #microsoft.graph.configurationManagerCollectionAssignmentTarget|
-| **deviceAndAppManagementAssignmentFilterType** | Write | String | The type of filter of the target assignment i.e. Exclude or Include. Possible values are:none, include, exclude. |none, include, exclude|
-| **deviceAndAppManagementAssignmentFilterId** | Write | String | The Id of the filter for the target assignment. ||
-| **groupId** | Write | String | The group Id that is the target of the assignment. ||
-| **collectionId** | Write | String | The collection Id that is the target of the assignment.(ConfigMgr) ||
-| **DisplayName** | Key | String | Display name of the AndroidWorkProfile device compliance policy. ||
-| **Description** | Write | String | Description of the AndroidWorkProfile device compliance policy. ||
-| **Assignments** | Write | InstanceArray[] | Assignments of the Intune Policy. ||
-| **PasswordRequired** | Write | Boolean | PasswordRequired of the AndroidWorkProfile device compliance policy. ||
-| **PasswordMinimumLength** | Write | UInt32 | PasswordMinimumLength of the AndroidWorkProfile device compliance policy. ||
-| **PasswordRequiredType** | Write | String | PasswordRequiredType of the AndroidWorkProfile device compliance policy. |deviceDefault, alphabetic, alphanumeric, alphanumericWithSymbols, lowSecurityBiometric, numeric, numericComplex, any|
-| **PasswordMinutesOfInactivityBeforeLock** | Write | UInt32 | PasswordMinutesOfInactivityBeforeLock of the AndroidWorkProfile device compliance policy. ||
-| **PasswordExpirationDays** | Write | UInt32 | PasswordExpirationDays of the AndroidWorkProfile device compliance policy. ||
-| **PasswordPreviousPasswordBlockCount** | Write | UInt32 | PasswordPreviousPasswordBlockCount of the AndroidWorkProfile device compliance policy. ||
-| **PasswordSignInFailureCountBeforeFactoryReset** | Write | UInt32 | PasswordSignInFailureCountBeforeFactoryReset of the AndroidWorkProfile device compliance policy. ||
-| **SecurityPreventInstallAppsFromUnknownSources** | Write | Boolean | SecurityPreventInstallAppsFromUnknownSources of the AndroidWorkProfile device compliance policy. ||
-| **SecurityDisableUsbDebugging** | Write | Boolean | SecurityDisableUsbDebugging of the AndroidWorkProfile device compliance policy. ||
-| **SecurityRequireVerifyApps** | Write | Boolean | SecurityRequireVerifyApps of the AndroidWorkProfile device compliance policy. ||
-| **DeviceThreatProtectionEnabled** | Write | Boolean | DeviceThreatProtectionEnabled of the AndroidWorkProfile device compliance policy. ||
-| **DeviceThreatProtectionRequiredSecurityLevel** | Write | String | DeviceThreatProtectionRequiredSecurityLevel of the AndroidWorkProfile device compliance policy. |unavailable, secured, low, medium, high, notSet|
-| **AdvancedThreatProtectionRequiredSecurityLevel** | Write | String | AdvancedThreatProtectionRequiredSecurityLevel of the AndroidWorkProfile device compliance policy. |unavailable, secured, low, medium, high, notSet|
-| **SecurityBlockJailbrokenDevices** | Write | Boolean | SecurityBlockJailbrokenDevices of the AndroidWorkProfile device compliance policy. ||
-| **OsMinimumVersion** | Write | String | OsMinimumVersion of the AndroidWorkProfile device compliance policy. ||
-| **OsMaximumVersion** | Write | String | OsMaximumVersion of the AndroidWorkProfile device compliance policy. ||
-| **MinAndroidSecurityPatchLevel** | Write | String | MinAndroidSecurityPatchLevel of the AndroidWorkProfile device compliance policy. ||
-| **StorageRequireEncryption** | Write | Boolean | StorageRequireEncryption of the AndroidWorkProfile device compliance policy. ||
-| **SecurityRequireSafetyNetAttestationBasicIntegrity** | Write | Boolean | SecurityRequireSafetyNetAttestationBasicIntegrity of the AndroidWorkProfile device compliance policy. ||
-| **SecurityRequireSafetyNetAttestationCertifiedDevice** | Write | Boolean | SecurityRequireSafetyNetAttestationCertifiedDevice of the AndroidWorkProfile device compliance policy. ||
-| **SecurityRequireGooglePlayServices** | Write | Boolean | SecurityRequireGooglePlayServices of the AndroidWorkProfile device compliance policy. ||
-| **SecurityRequireUpToDateSecurityProviders** | Write | Boolean | SecurityRequireUpToDateSecurityProviders of the AndroidWorkProfile device compliance policy. ||
-| **SecurityRequireCompanyPortalAppIntegrity** | Write | Boolean | SecurityRequireCompanyPortalAppIntegrity of the AndroidWorkProfile device compliance policy. ||
-| **SecurityRequiredAndroidSafetyNetEvaluationType** | Write | String | Require a specific SafetyNet evaluation type for compliance. |basic, hardwareBacked|
-| **RoleScopeTagIds** | Write | String | RoleScopeTagIds of the AndroidWorkProfile device compliance policy. ||
-| **Ensure** | Write | String | Present ensures the policy exists, absent ensures it is removed. |Present, Absent|
-| **Credential** | Write | PSCredential | Credentials of the Intune Admin ||
-| **ApplicationId** | Write | String | Id of the Azure Active Directory application to authenticate with. ||
-| **TenantId** | Write | String | Id of the Azure Active Directory tenant used for authentication. ||
-| **ApplicationSecret** | Write | PSCredential | Secret of the Azure Active Directory tenant used for authentication. ||
-| **CertificateThumbprint** | Write | String | Thumbprint of the Azure Active Directory application's authentication certificate to use for authentication. ||
-| **ManagedIdentity** | Write | Boolean | Managed ID being used for authentication. ||
+| **DisplayName** | Key | String | Display name of the AndroidWorkProfile device compliance policy. | |
+| **Description** | Write | String | Description of the AndroidWorkProfile device compliance policy. | |
+| **Assignments** | Write | MSFT_DeviceManagementConfigurationPolicyAssignments[] | Assignments of the Intune Policy. | |
+| **RequiredPasswordComplexity** | Write | String | The password complexity types that can be set on Android. One of: NONE, LOW, MEDIUM, HIGH. This is an API targeted to Android 11+. | `none`, `low`, `medium`, `high` |
+| **SecurityBlockDeviceAdministratorManagedDevices** | Write | Boolean | Setting securityBlockDeviceAdministratorManagedDevices to true enhances security by preventing devices managed through the legacy device administrator method from accessing corporate resources. | |
+| **RestrictedApps** | Write | StringArray[] | Specify applications that users are prohibited from installing or using on their devices. | |
+| **WorkProfilePasswordRequiredType** | Write | String | Specifies Android Work Profile password type. | `deviceDefault`, `lowSecurityBiometric`, `required`, `atLeastNumeric`, `numericComplex`, `atLeastAlphabetic`, `atLeastAlphanumeric`, `alphanumericWithSymbols` |
+| **WorkProfileRequiredPasswordComplexity** | Write | String | Specifies Android Work Profile password complexity. | `None`, `Low`, `Medium`, `High` |
+| **WorkProfileRequirePassword** | Write | Boolean | Specifies if Android Work Profile password is required. | |
+| **WorkProfilePreviousPasswordBlockCount** | Write | UInt32 | Specifies the number of previous passwords that cannot be reused in an Android Work Profile compliance policy. | |
+| **WorkProfileInactiveBeforeScreenLockInMinutes** | Write | UInt32 | Defines the duration of inactivity (in minutes) after which the screen is locked. | |
+| **WorkProfilePasswordMinimumLength** | Write | UInt32 | Specifies the minimum number of characters required in a password for an Android Work Profile. | |
+| **WorkProfilePasswordExpirationInDays** | Write | UInt32 | Specifies the number of days before a password expires for an Android Work Profile. | |
+| **ScheduledActionsForRule** | Write | MSFT_scheduledActionConfigurations[] | Specifies the non-compliance actions. | |
+| **PasswordRequired** | Write | Boolean | PasswordRequired of the AndroidWorkProfile device compliance policy. | |
+| **PasswordMinimumLength** | Write | UInt32 | PasswordMinimumLength of the AndroidWorkProfile device compliance policy. | |
+| **PasswordRequiredType** | Write | String | PasswordRequiredType of the AndroidWorkProfile device compliance policy. | `deviceDefault`, `alphabetic`, `alphanumeric`, `alphanumericWithSymbols`, `lowSecurityBiometric`, `numeric`, `numericComplex`, `any` |
+| **PasswordMinutesOfInactivityBeforeLock** | Write | UInt32 | PasswordMinutesOfInactivityBeforeLock of the AndroidWorkProfile device compliance policy. | |
+| **PasswordExpirationDays** | Write | UInt32 | PasswordExpirationDays of the AndroidWorkProfile device compliance policy. | |
+| **PasswordPreviousPasswordBlockCount** | Write | UInt32 | PasswordPreviousPasswordBlockCount of the AndroidWorkProfile device compliance policy. | |
+| **PasswordSignInFailureCountBeforeFactoryReset** | Write | UInt32 | PasswordSignInFailureCountBeforeFactoryReset of the AndroidWorkProfile device compliance policy. | |
+| **SecurityPreventInstallAppsFromUnknownSources** | Write | Boolean | SecurityPreventInstallAppsFromUnknownSources of the AndroidWorkProfile device compliance policy. | |
+| **SecurityDisableUsbDebugging** | Write | Boolean | SecurityDisableUsbDebugging of the AndroidWorkProfile device compliance policy. | |
+| **SecurityRequireVerifyApps** | Write | Boolean | SecurityRequireVerifyApps of the AndroidWorkProfile device compliance policy. | |
+| **DeviceThreatProtectionEnabled** | Write | Boolean | DeviceThreatProtectionEnabled of the AndroidWorkProfile device compliance policy. | |
+| **DeviceThreatProtectionRequiredSecurityLevel** | Write | String | DeviceThreatProtectionRequiredSecurityLevel of the AndroidWorkProfile device compliance policy. | `unavailable`, `secured`, `low`, `medium`, `high`, `notSet` |
+| **AdvancedThreatProtectionRequiredSecurityLevel** | Write | String | AdvancedThreatProtectionRequiredSecurityLevel of the AndroidWorkProfile device compliance policy. | `unavailable`, `secured`, `low`, `medium`, `high`, `notSet` |
+| **SecurityBlockJailbrokenDevices** | Write | Boolean | SecurityBlockJailbrokenDevices of the AndroidWorkProfile device compliance policy. | |
+| **OsMinimumVersion** | Write | String | OsMinimumVersion of the AndroidWorkProfile device compliance policy. | |
+| **OsMaximumVersion** | Write | String | OsMaximumVersion of the AndroidWorkProfile device compliance policy. | |
+| **MinAndroidSecurityPatchLevel** | Write | String | MinAndroidSecurityPatchLevel of the AndroidWorkProfile device compliance policy. | |
+| **StorageRequireEncryption** | Write | Boolean | StorageRequireEncryption of the AndroidWorkProfile device compliance policy. | |
+| **SecurityRequireSafetyNetAttestationBasicIntegrity** | Write | Boolean | SecurityRequireSafetyNetAttestationBasicIntegrity of the AndroidWorkProfile device compliance policy. | |
+| **SecurityRequireSafetyNetAttestationCertifiedDevice** | Write | Boolean | SecurityRequireSafetyNetAttestationCertifiedDevice of the AndroidWorkProfile device compliance policy. | |
+| **SecurityRequireGooglePlayServices** | Write | Boolean | SecurityRequireGooglePlayServices of the AndroidWorkProfile device compliance policy. | |
+| **SecurityRequireUpToDateSecurityProviders** | Write | Boolean | SecurityRequireUpToDateSecurityProviders of the AndroidWorkProfile device compliance policy. | |
+| **SecurityRequireCompanyPortalAppIntegrity** | Write | Boolean | SecurityRequireCompanyPortalAppIntegrity of the AndroidWorkProfile device compliance policy. | |
+| **SecurityRequiredAndroidSafetyNetEvaluationType** | Write | String | Require a specific SafetyNet evaluation type for compliance. | `basic`, `hardwareBacked` |
+| **RoleScopeTagIds** | Write | String | RoleScopeTagIds of the AndroidWorkProfile device compliance policy. | |
+| **Ensure** | Write | String | Present ensures the policy exists, absent ensures it is removed. | `Present`, `Absent` |
+| **Credential** | Write | PSCredential | Credentials of the Intune Admin | |
+| **ApplicationId** | Write | String | Id of the Azure Active Directory application to authenticate with. | |
+| **TenantId** | Write | String | Id of the Azure Active Directory tenant used for authentication. | |
+| **ApplicationSecret** | Write | PSCredential | Secret of the Azure Active Directory tenant used for authentication. | |
+| **CertificateThumbprint** | Write | String | Thumbprint of the Azure Active Directory application's authentication certificate to use for authentication. | |
+| **ManagedIdentity** | Write | Boolean | Managed ID being used for authentication. | |
+| **AccessTokens** | Write | StringArray[] | Access token used for authentication. | |
 
-# IntuneDeviceCompliancePolicyAndroidWorkProfile
+### MSFT_DeviceManagementConfigurationPolicyAssignments
 
-### Description
+#### Parameters
 
-This resource configures the settings of Android Work Profile device compliance policies
-in your cloud-based organization.
+| Parameter | Attribute | DataType | Description | Allowed Values |
+| --- | --- | --- | --- | --- |
+| **dataType** | Write | String | The type of the target assignment. | `#microsoft.graph.cloudPcManagementGroupAssignmentTarget`, `#microsoft.graph.groupAssignmentTarget`, `#microsoft.graph.allLicensedUsersAssignmentTarget`, `#microsoft.graph.allDevicesAssignmentTarget`, `#microsoft.graph.exclusionGroupAssignmentTarget`, `#microsoft.graph.configurationManagerCollectionAssignmentTarget` |
+| **deviceAndAppManagementAssignmentFilterType** | Write | String | The type of filter of the target assignment i.e. Exclude or Include. Possible values are:none, include, exclude. | `none`, `include`, `exclude` |
+| **deviceAndAppManagementAssignmentFilterId** | Write | String | The Id of the filter for the target assignment. | |
+| **deviceAndAppManagementAssignmentFilterDisplayName** | Write | String | The display name of the filter for the target assignment. | |
+| **groupId** | Write | String | The group Id that is the target of the assignment. | |
+| **groupDisplayName** | Write | String | The group Display Name that is the target of the assignment. | |
+| **collectionId** | Write | String | The collection Id that is the target of the assignment.(ConfigMgr) | |
+
+### MSFT_scheduledActionConfigurations
+
+#### Parameters
+
+| Parameter | Attribute | DataType | Description | Allowed Values |
+| --- | --- | --- | --- | --- |
+| **id** | Write | String | The unique identifier of the action configuration. | |
+| **gracePeriodHours** | Write | UInt32 | Number of hours to wait till the action will be enforced. Valid values 0 to 8760. | |
+| **actionType** | Write | String | The action to take. | `notification`, `block`, `retire`, `remoteLock`, `pushNotification` |
+| **notificationTemplateId** | Write | String | The notification Message template to use. | |
+| **notificationMessageCCList** | Write | StringArray[] | A list of group IDs to specify who to CC this notification message to. | |
+
+## Description
+
+This resource configures the settings of Android Work Profile device compliance policies in your cloud-based organization.
+Labeled in Intune as `Personally-owned work profile` policy type under `Android Enterprise`.
 
 ## Parameters
 
@@ -171,6 +202,32 @@ Select the oldest security patch level a device can have. Devices that aren't at
 
 _By default, no date is configured._
 
+## Permissions
+
+### Microsoft Graph
+
+To authenticate with the Microsoft Graph API, this resource required the following permissions:
+
+#### Delegated permissions
+
+- **Read**
+
+    - Group.Read.All, DeviceManagementConfiguration.Read.All
+
+- **Update**
+
+    - Group.Read.All, DeviceManagementConfiguration.ReadWrite.All
+
+#### Application permissions
+
+- **Read**
+
+    - Group.Read.All, DeviceManagementConfiguration.Read.All
+
+- **Update**
+
+    - Group.Read.All, DeviceManagementConfiguration.ReadWrite.All
+
 ## Examples
 
 ### Example 1
@@ -181,9 +238,17 @@ This example creates a new Device Compliance Policy for iOs devices
 Configuration Example
 {
     param(
-        [Parameter(Mandatory = $true)]
-        [PSCredential]
-        $credsGlobalAdmin
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint
     )
     Import-DscResource -ModuleName Microsoft365DSC
 
@@ -191,15 +256,15 @@ Configuration Example
     {
         IntuneDeviceCompliancePolicyAndroidWorkProfile 'ConfigureAndroidDeviceCompliancePolicyWorkProfile'
         {
-            DisplayName                                        = "Test Policy"
-            Description                                        = ""
+            DisplayName                                        = 'Test Policy'
+            Description                                        = ''
             DeviceThreatProtectionEnabled                      = $False
-            DeviceThreatProtectionRequiredSecurityLevel        = "unavailable"
+            DeviceThreatProtectionRequiredSecurityLevel        = 'unavailable'
             PasswordExpirationDays                             = 90
             PasswordMinimumLength                              = 6
             PasswordMinutesOfInactivityBeforeLock              = 5
             PasswordRequired                                   = $True
-            PasswordRequiredType                               = "numericComplex"
+            PasswordRequiredType                               = 'numericComplex'
             SecurityBlockJailbrokenDevices                     = $True
             SecurityDisableUsbDebugging                        = $False
             SecurityPreventInstallAppsFromUnknownSources       = $False
@@ -210,8 +275,10 @@ Configuration Example
             SecurityRequireUpToDateSecurityProviders           = $False
             SecurityRequireVerifyApps                          = $False
             StorageRequireEncryption                           = $True
-            Ensure                                             = "Present"
-            Credential                                         = $credsglobaladmin
+            Ensure                                             = 'Present'
+            ApplicationId         = $ApplicationId;
+            TenantId              = $TenantId;
+            CertificateThumbprint = $CertificateThumbprint;
         }
     }
 }
@@ -219,25 +286,89 @@ Configuration Example
 
 ### Example 2
 
-This example removes an existing Device Compliance Policy for iOs devices
+This example creates a new Device Compliance Policy for iOs devices
 
 ```powershell
 Configuration Example
 {
     param(
-        [Parameter(Mandatory = $true)]
-        [PSCredential]
-        $credsGlobbaAdminlAdmin
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint
     )
     Import-DscResource -ModuleName Microsoft365DSC
 
     node localhost
     {
-        IntuneDeviceCompliancePolicyAndroidWorkProfile 'RemoveDeviceCompliancePolicyAndroidWorkProfile'
+        IntuneDeviceCompliancePolicyAndroidWorkProfile 'ConfigureAndroidDeviceCompliancePolicyWorkProfile'
         {
-            DisplayName = "Test Android Work Profile Device Compliance Policy"
-            Ensure      = "Absent"
-            Credential  = $credsGlobalAdmin
+            DisplayName                                        = 'Test Policy'
+            Description                                        = ''
+            DeviceThreatProtectionEnabled                      = $False
+            DeviceThreatProtectionRequiredSecurityLevel        = 'unavailable'
+            PasswordExpirationDays                             = 90
+            PasswordMinimumLength                              = 8 # Updated Property
+            PasswordMinutesOfInactivityBeforeLock              = 5
+            PasswordRequired                                   = $True
+            PasswordRequiredType                               = 'numericComplex'
+            SecurityBlockJailbrokenDevices                     = $True
+            SecurityDisableUsbDebugging                        = $False
+            SecurityPreventInstallAppsFromUnknownSources       = $False
+            SecurityRequireCompanyPortalAppIntegrity           = $False
+            SecurityRequireGooglePlayServices                  = $False
+            SecurityRequireSafetyNetAttestationBasicIntegrity  = $False
+            SecurityRequireSafetyNetAttestationCertifiedDevice = $False
+            SecurityRequireUpToDateSecurityProviders           = $False
+            SecurityRequireVerifyApps                          = $False
+            StorageRequireEncryption                           = $True
+            Ensure                                             = 'Present'
+            ApplicationId         = $ApplicationId;
+            TenantId              = $TenantId;
+            CertificateThumbprint = $CertificateThumbprint;
+        }
+    }
+}
+```
+
+### Example 3
+
+This example creates a new Device Compliance Policy for iOs devices
+
+```powershell
+Configuration Example
+{
+    param(
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint
+    )
+    Import-DscResource -ModuleName Microsoft365DSC
+
+    node localhost
+    {
+        IntuneDeviceCompliancePolicyAndroidWorkProfile 'ConfigureAndroidDeviceCompliancePolicyWorkProfile'
+        {
+            DisplayName                                        = 'Test Policy'
+            Ensure                                             = 'Absent'
+            ApplicationId         = $ApplicationId;
+            TenantId              = $TenantId;
+            CertificateThumbprint = $CertificateThumbprint;
         }
     }
 }

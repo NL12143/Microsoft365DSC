@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_EXOMessageClassification'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -72,73 +74,81 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Getting Message Classification Configuration for $($Identity)"
-    if ($Global:CurrentModeIsExport)
-    {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
-            -InboundParameters $PSBoundParameters `
-            -SkipModuleReload $true
-    }
-    else
-    {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
-            -InboundParameters $PSBoundParameters
-    }
-
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
-
-    #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
-    $CommandName = $MyInvocation.MyCommand
-    $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
-        -CommandName $CommandName `
-        -Parameters $PSBoundParameters
-    Add-M365DSCTelemetryEvent -Data $data
-    #endregion
-
-    $nullReturn = $PSBoundParameters
-    $nullReturn.Ensure = 'Absent'
 
     try
     {
-        $MessageClassifications = Get-MessageClassification -ErrorAction Stop
-
-        $MessageClassification = $MessageClassifications | Where-Object -FilterScript { $_.Identity -eq $Identity }
-        if ($null -eq $MessageClassification)
+        if (-not $Script:exportedInstance -or $Script:exportedInstance.Identity -ne $Identity)
         {
-            Write-Verbose -Message "Message Classification policy $($Identity) does not exist."
-            return $nullReturn
+            $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
+                -InboundParameters $PSBoundParameters
+
+            #Ensure the proper dependencies are installed in the current environment.
+            Confirm-M365DSCDependencies
+
+            #region Telemetry
+            $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+            $CommandName = $MyInvocation.MyCommand
+            $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
+                -CommandName $CommandName `
+                -Parameters $PSBoundParameters
+            Add-M365DSCTelemetryEvent -Data $data
+            #endregion
+
+            $nullReturn = $PSBoundParameters
+            $nullReturn.Ensure = 'Absent'
+
+            $MessageClassification = Get-MessageClassification -Identity $Identity -ErrorAction Stop
+
+            if ($null -eq $MessageClassification)
+            {
+                if (-not [System.String]::IsNullOrEmpty($DisplayName))
+                {
+                    Write-Verbose -Message "Couldn't retrieve Message Classification policy by Id {$($Identity)}. Trying by DisplayName."
+                    $MessageClassification = Get-MessageClassification -Identity $DisplayName
+                }
+                if ($null -eq $MessageClassification)
+                {
+                    return $nullReturn
+                }
+            }
         }
         else
         {
-            $result = @{
-                Identity                    = $Identity
-                ClassificationID            = $MessageClassification.ClassificationID
-                DisplayName                 = $MessageClassification.DisplayName
-                DisplayPrecedence           = $MessageClassification.DisplayPrecedence
-                Name                        = $MessageClassification.Name
-                PermissionMenuVisible       = $MessageClassification.PermissionMenuVisible
-                RecipientDescription        = $MessageClassification.RecipientDescription
-                RetainClassificationEnabled = $MessageClassification.RetainClassificationEnabled
-                SenderDescription           = $MessageClassification.SenderDescription
-                Credential                  = $Credential
-                Ensure                      = 'Present'
-                ApplicationId               = $ApplicationId
-                CertificateThumbprint       = $CertificateThumbprint
-                CertificatePath             = $CertificatePath
-                CertificatePassword         = $CertificatePassword
-                Managedidentity             = $ManagedIdentity.IsPresent
-                TenantId                    = $TenantId
-            }
-
-            Write-Verbose -Message "Found Message Classification policy $($Identity)"
-            Write-Verbose -Message "Get-TargetResource Result: `n $(Convert-M365DscHashtableToString -Hashtable $result)"
-            return $result
+            $MessageClassification = $Script:exportedInstance
         }
+
+        $result = @{
+            Identity                    = $Identity
+            ClassificationID            = $MessageClassification.ClassificationID
+            DisplayName                 = $MessageClassification.DisplayName
+            DisplayPrecedence           = $MessageClassification.DisplayPrecedence
+            Name                        = $MessageClassification.Name
+            PermissionMenuVisible       = $MessageClassification.PermissionMenuVisible
+            RecipientDescription        = $MessageClassification.RecipientDescription
+            RetainClassificationEnabled = $MessageClassification.RetainClassificationEnabled
+            SenderDescription           = $MessageClassification.SenderDescription
+            Credential                  = $Credential
+            Ensure                      = 'Present'
+            ApplicationId               = $ApplicationId
+            CertificateThumbprint       = $CertificateThumbprint
+            CertificatePath             = $CertificatePath
+            CertificatePassword         = $CertificatePassword
+            ManagedIdentity             = $ManagedIdentity.IsPresent
+            TenantId                    = $TenantId
+            AccessTokens                = $AccessTokens
+        }
+
+        Write-Verbose -Message "Found Message Classification policy $($Identity)"
+        Write-Verbose -Message "Get-TargetResource Result: `n $(Convert-M365DscHashtableToString -Hashtable $result)"
+        return $result
     }
     catch
     {
@@ -225,7 +235,11 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     #Ensure the proper dependencies are installed in the current environment.
@@ -242,32 +256,21 @@ function Set-TargetResource
 
     Write-Verbose -Message "Setting configuration of Message Classification for $($Identity)"
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
-        -InboundParameters $PSBoundParameters
-
-    $MessageClassification = Get-MessageClassification -Identity $Identity
-    $MessageClassificationParams = [System.Collections.Hashtable]($PSBoundParameters)
-    $MessageClassificationParams.Remove('Ensure') | Out-Null
-    $MessageClassificationParams.Remove('Credential') | Out-Null
-    $MessageClassificationParams.Remove('ApplicationId') | Out-Null
-    $MessageClassificationParams.Remove('TenantId') | Out-Null
-    $MessageClassificationParams.Remove('CertificateThumbprint') | Out-Null
-    $MessageClassificationParams.Remove('CertificatePath') | Out-Null
-    $MessageClassificationParams.Remove('CertificatePassword') | Out-Null
-    $MessageClassificationParams.Remove('ManagedIdentity') | Out-Null
+    $MessageClassification = Get-MessageClassification -Identity $Identity -ErrorAction SilentlyContinue
+    $messageClassificationParams = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
 
     if (('Present' -eq $Ensure ) -and ($null -eq $MessageClassification))
     {
-        $MessageClassificationParams.Remove('Identity') | Out-Null
+        $messageClassificationParams.Remove('Identity') | Out-Null
         Write-Verbose -Message "Creating Message Classification policy  $($Identity)."
-        New-MessageClassification @MessageClassificationParams
+        New-MessageClassification @messageClassificationParams
     }
-    elseif (('Present' -eq $Ensure ) -and ($Null -ne $MessageClassification))
+    elseif (('Present' -eq $Ensure) -and ($Null -ne $MessageClassification))
     {
-        Write-Verbose -Message "Setting Message Classication policy $($Identity) with values: $(Convert-M365DscHashtableToString -Hashtable $MessageClassificationParams)"
-        Set-MessageClassification @MessageClassificationParams -Confirm:$false
+        Write-Verbose -Message "Setting Message Classification policy $($Identity) with values: $(Convert-M365DscHashtableToString -Hashtable $messageClassificationParams)"
+        Set-MessageClassification @messageClassificationParams -Confirm:$false
     }
-    elseif (('Absent' -eq $Ensure ) -and ($null -ne $MessageClassification))
+    elseif (('Absent' -eq $Ensure) -and ($null -ne $MessageClassification))
     {
         Write-Verbose -Message "Removing Message Classification policy $($Identity)"
         Remove-MessageClassification -Identity $Identity -Confirm:$false
@@ -348,13 +351,15 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
 
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -362,30 +367,9 @@ function Test-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message "Testing configuration of Message Classification policy for $($Identity)"
-
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-
-    Write-Verbose -Message "Current Values: $(Convert-M365DscHashtableToString -Hashtable $CurrentValues)"
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('Credential') | Out-Null
-    $ValuesToCheck.Remove('ApplicationId') | Out-Null
-    $ValuesToCheck.Remove('TenantId') | Out-Null
-    $ValuesToCheck.Remove('CertificateThumbprint') | Out-Null
-    $ValuesToCheck.Remove('CertificatePath') | Out-Null
-    $ValuesToCheck.Remove('CertificatePassword') | Out-Null
-    $ValuesToCheck.Remove('ManagedIdentity') | Out-Null
-
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck $ValuesToCheck.Keys
-
-    Write-Verbose -Message "Test-TargetResource returned $($TestResult)"
-
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '')
+    return $result
 }
 
 function Export-TargetResource
@@ -459,8 +443,13 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' -InboundParameters $PSBoundParameters -SkipModuleReload $true
 
     #Ensure the proper dependencies are installed in the current environment.
@@ -482,31 +471,37 @@ function Export-TargetResource
         $dscContent = ''
         if ($MessageClassifications.Length -eq 0)
         {
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         }
         else
         {
-            Write-Host "`r`n" -NoNewline
+            Write-M365DSCHost -Message "`r`n" -DeferWrite
         }
         $i = 1
         foreach ($MessageClassification in $MessageClassifications)
         {
-            Write-Host "    |---[$i/$($MessageClassifications.Length)] $($MessageClassification.Identity)" -NoNewline
+            if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+            {
+                $Global:M365DSCExportResourceInstancesCount++
+            }
+
+            Write-M365DSCHost -Message "    |---[$i/$($MessageClassifications.Length)] $($MessageClassification.Identity)" -DeferWrite
 
             $Params = @{
                 Identity              = $MessageClassification.Identity
+                DisplayName           = $MessageClassification.Name
                 Credential            = $Credential
                 ApplicationId         = $ApplicationId
                 TenantId              = $TenantId
                 CertificateThumbprint = $CertificateThumbprint
                 CertificatePassword   = $CertificatePassword
-                Managedidentity       = $ManagedIdentity.IsPresent
+                ManagedIdentity       = $ManagedIdentity.IsPresent
                 CertificatePath       = $CertificatePath
+                AccessTokens          = $AccessTokens
             }
 
+            $Script:exportedInstance = $MessageClassification
             $Results = Get-TargetResource @Params
-            $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                -Results $Results
             $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                 -ConnectionMode $ConnectionMode `
                 -ModulePath $PSScriptRoot `
@@ -515,14 +510,14 @@ function Export-TargetResource
             $dscContent += $currentDSCBlock
             Save-M365DSCPartialExport -Content $currentDSCBlock `
                 -FileName $Global:PartialExportFileName
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
             $i++
         }
         return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `

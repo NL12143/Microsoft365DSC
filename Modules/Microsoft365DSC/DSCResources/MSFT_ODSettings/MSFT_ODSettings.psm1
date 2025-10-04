@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_ODSettings'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -20,10 +22,6 @@ function Get-TargetResource
         [Parameter()]
         [System.Boolean]
         $OneDriveForGuestsEnabled,
-
-        [Parameter()]
-        [System.Boolean]
-        $NotifyOwnersWhenInvitationsAccepted,
 
         [Parameter()]
         [System.Boolean]
@@ -95,11 +93,16 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message 'Getting configuration of OneDrive Settings'
-    $ConnectionMode = New-M365DSCConnection -Workload 'PnP' `
+
+    $null = New-M365DSCConnection -Workload 'PnP' `
         -InboundParameters $PSBoundParameters
 
     #Ensure the proper dependencies are installed in the current environment.
@@ -187,7 +190,6 @@ function Get-TargetResource
             OneDriveForGuestsEnabled                  = $tenant.OneDriveForGuestsEnabled
             ODBAccessRequests                         = $tenant.ODBAccessRequests
             ODBMembersCanShare                        = $ODBMembersCanShareValue
-            NotifyOwnersWhenInvitationsAccepted       = $tenant.NotifyOwnersWhenInvitationsAccepted
             NotificationsInOneDriveForBusinessEnabled = $tenant.NotificationsInOneDriveForBusinessEnabled
             Ensure                                    = 'Present'
             ApplicationId                             = $ApplicationId
@@ -196,7 +198,8 @@ function Get-TargetResource
             CertificatePath                           = $CertificatePath
             CertificateThumbprint                     = $CertificateThumbprint
             Credential                                = $Credential
-            Managedidentity                           = $ManagedIdentity.IsPresent
+            ManagedIdentity                           = $ManagedIdentity.IsPresent
+            AccessTokens                              = $AccessTokens
         }
     }
     catch
@@ -232,10 +235,6 @@ function Set-TargetResource
         [Parameter()]
         [System.Boolean]
         $OneDriveForGuestsEnabled,
-
-        [Parameter()]
-        [System.Boolean]
-        $NotifyOwnersWhenInvitationsAccepted,
 
         [Parameter()]
         [System.Boolean]
@@ -307,10 +306,17 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message 'Setting configuration of OneDrive Settings'
+
+    $null = New-M365DSCConnection -Workload 'PnP' `
+        -InboundParameters $PSBoundParameters
 
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
@@ -324,20 +330,15 @@ function Set-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'PnP' `
+    $null = New-M365DSCConnection -Workload 'PnP' `
         -InboundParameters $PSBoundParameters
 
     ## Configure OneDrive settings
     ## Parameters below are remove for the Set-SPOTenant cmdlet
     ## they are used in the Set-SPOTenantSyncClientRestriction cmdlet
-    $CurrentParameters = $PSBoundParameters
-    $CurrentParameters.Remove('Credential') | Out-Null
+    $CurrentParameters = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
     $Options = @{}
 
-    if ($CurrentParameters.ContainsKey('Ensure'))
-    {
-        $CurrentParameters.Remove('Ensure') | Out-Null
-    }
     if ($CurrentParameters.ContainsKey('BlockMacSync'))
     {
         $Options.Add('BlockMacSync', $CurrentParameters.BlockMacSync)
@@ -418,13 +419,6 @@ function Set-TargetResource
         $CurrentParameters.Remove('IsSingleInstance') | Out-Null
     }
 
-    $CurrentParameters.Remove('ApplicationId') | Out-Null
-    $CurrentParameters.Remove('TenantId') | Out-Null
-    $CurrentParameters.Remove('CertificatePath') | Out-Null
-    $CurrentParameters.Remove('CertificatePassword') | Out-Null
-    $CurrentParameters.Remove('CertificateThumbprint') | Out-Null
-    $CurrentParameters.Remove('ManagedIdentity') | Out-Null
-
     Write-Verbose -Message 'Configuring OneDrive settings.'
     Set-PnPTenant @CurrentParameters
 
@@ -435,7 +429,6 @@ function Set-TargetResource
     Write-Verbose -Message ($Options | Out-String)
 
     Set-PnPTenantSyncClientRestriction @Options
-
 }
 
 function Test-TargetResource
@@ -460,10 +453,6 @@ function Test-TargetResource
         [Parameter()]
         [System.Boolean]
         $OneDriveForGuestsEnabled,
-
-        [Parameter()]
-        [System.Boolean]
-        $NotifyOwnersWhenInvitationsAccepted,
 
         [Parameter()]
         [System.Boolean]
@@ -535,13 +524,15 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
 
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -549,34 +540,9 @@ function Test-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message 'Testing configuration of OneDrive Settings'
-
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-
-    Write-Verbose -Message "Current Values: $(Convert-M365DscHashtableToString -Hashtable $CurrentValues)"
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck @('BlockMacSync', `
-            'ExcludedFileExtensions', `
-            'DisableReportProblemDialog', `
-            'GrooveBlockOption', `
-            'TenantRestrictionEnabled', `
-            'DomainGuids', `
-            'OneDriveStorageQuota', `
-            'OrphanedPersonalSitesRetentionPeriod', `
-            'OneDriveForGuestsEnabled', `
-            'ODBAccessRequests', `
-            'ODBMembersCanShare', `
-            'NotifyOwnersWhenInvitationsAccepted', `
-            'NotificationsInOneDriveForBusinessEnabled',
-        'Ensure')
-
-    Write-Verbose -Message "Test-TargetResource returned $TestResult"
-
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '')
+    return $result
 }
 
 function Export-TargetResource
@@ -611,7 +577,11 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     try
@@ -631,6 +601,11 @@ function Export-TargetResource
         Add-M365DSCTelemetryEvent -Data $data
         #endregion
 
+        if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+        {
+            $Global:M365DSCExportResourceInstancesCount++
+        }
+
         $Params = @{
             IsSingleInstance      = 'Yes'
             ApplicationId         = $ApplicationId
@@ -638,20 +613,18 @@ function Export-TargetResource
             CertificatePassword   = $CertificatePassword
             CertificatePath       = $CertificatePath
             CertificateThumbprint = $CertificateThumbprint
-            Managedidentity       = $ManagedIdentity.IsPresent
+            ManagedIdentity       = $ManagedIdentity.IsPresent
             Credential            = $Credential
+            AccessTokens          = $AccessTokens
         }
 
         $Results = Get-TargetResource @Params
-
         if ([System.String]::IsNullOrEmpty($Results.GrooveBlockOption))
         {
             $Results.Remove('GrooveBlockOption') | Out-Null
         }
 
         $dscContent = ''
-        $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-            -Results $Results
         $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
             -ConnectionMode $ConnectionMode `
             -ModulePath $PSScriptRoot `
@@ -661,12 +634,12 @@ function Export-TargetResource
 
         Save-M365DSCPartialExport -Content $currentDSCBlock `
             -FileName $Global:PartialExportFileName
-        Write-Host $Global:M365DSCEmojiGreenCheckMark
+        Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `

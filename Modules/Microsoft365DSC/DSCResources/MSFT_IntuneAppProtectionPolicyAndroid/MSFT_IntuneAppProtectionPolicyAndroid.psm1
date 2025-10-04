@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_IntuneAppProtectionPolicyAndroid'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -11,6 +13,175 @@ function Get-TargetResource
         [Parameter()]
         [System.String]
         $Description,
+
+        [Parameter()]
+        [System.String[]]
+        $RoleScopeTagIds,
+
+        [Parameter()]
+        [System.String[]]
+        $AllowedAndroidDeviceModels,
+
+        [Parameter()]
+        [System.Int32]
+        $AllowedOutboundClipboardSharingExceptionLength,
+
+        [Parameter()]
+        [System.Boolean]
+        $BiometricAuthenticationBlocked,
+
+        [Parameter()]
+        [System.Int32]
+        $BlockAfterCompanyPortalUpdateDeferralInDays,
+
+        [Parameter()]
+        [System.Boolean]
+        $BlockDataIngestionIntoOrganizationDocuments,
+
+        [Parameter()]
+        [System.Boolean]
+        $ConnectToVpnOnLaunch,
+
+        [Parameter()]
+        [System.String]
+        $CustomDialerAppDisplayName,
+
+        [Parameter()]
+        [System.String]
+        $CustomDialerAppPackageId,
+
+        [Parameter()]
+        [System.Boolean]
+        $DeviceLockRequired,
+
+        [Parameter()]
+        [System.Boolean]
+        $FingerprintAndBiometricEnabled,
+
+        [Parameter()]
+        [System.Boolean]
+        $KeyboardsRestricted,
+
+        [Parameter()]
+        [System.String]
+        $MessagingRedirectAppDisplayName,
+
+        [Parameter()]
+        [System.String]
+        $MessagingRedirectAppPackageId,
+
+        [Parameter()]
+        [System.String]
+        $MinimumWipePatchVersion,
+
+        [Parameter()]
+        [System.Int32]
+        $PreviousPinBlockCount,
+
+        [Parameter()]
+        [System.Int32]
+        $WarnAfterCompanyPortalUpdateDeferralInDays,
+
+        [Parameter()]
+        [System.Int32]
+        $WipeAfterCompanyPortalUpdateDeferralInDays,
+
+        [Parameter()]
+        [System.String[]]
+        $Alloweddataingestionlocations,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet("block", "wipe", "warn", "blockWhenSettingIsSupported")]
+        $AppActionIfAndroidDeviceManufacturerNotAllowed,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet("block", "wipe", "warn", "blockWhenSettingIsSupported")]
+        $AppActionIfAndroidDeviceModelNotAllowed,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet("block", "wipe", "warn", "blockWhenSettingIsSupported")]
+        $AppActionIfAndroidSafetyNetAppsVerificationFailed,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet("block", "wipe", "warn", "blockWhenSettingIsSupported")]
+        $AppActionIfAndroidSafetyNetDeviceAttestationFailed,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet("block", "wipe", "warn", "blockWhenSettingIsSupported")]
+        $AppActionIfDeviceComplianceRequired,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet("block", "wipe", "warn", "blockWhenSettingIsSupported")]
+        $AppActionIfDeviceLockNotSet,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet("block", "wipe", "warn", "blockWhenSettingIsSupported")]
+        $AppActionIfMaximumPinRetriesExceeded,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet("block", "wipe", "warn", "blockWhenSettingIsSupported")]
+        $AppActionIfUnableToAuthenticateUser,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet("block", "wipe", "warn", "blockWhenSettingIsSupported")]
+        $MobileThreatDefenseRemediationAction,
+
+        [Parameter()]
+        [ValidateSet("allApps", "managedApps", "customApp", "blocked")]
+        [System.String]
+        $DialerRestrictionLevel,
+
+        [Parameter()]
+        [ValidateSet("notConfigured", "secured", "low", "medium", "high")]
+        [System.String]
+        $MaximumAllowedDeviceThreatLevel,
+
+        [Parameter()]
+        [ValidateSet("allow", "blockOrganizationalData", "block")]
+        [System.String]
+        $NotificationRestriction,
+
+        [Parameter()]
+        [ValidateSet("anyApp", "anyManagedApp", "specificApps", "blocked")]
+        [System.String]
+        $ProtectedMessagingRedirectAppType,
+
+        [Parameter()]
+        [ValidateSet("none", "enabled")]
+        [System.String]
+        $RequiredAndroidSafetyNetAppsVerificationType,
+
+        [Parameter()]
+        [ValidateSet("none", "basicIntegrity", "basicIntegrityAndDeviceCertification")]
+        [System.String]
+        $RequiredAndroidSafetyNetDeviceAttestationType,
+
+        [Parameter()]
+        [ValidateSet("basic", "hardwareBacked")]
+        [System.String]
+        $RequiredAndroidSafetyNetEvaluationType,
+
+        [Parameter()]
+        [ValidateSet("unspecified", "unmanaged", "mdm", "androidEnterprise", "androidEnterpriseDedicatedDevicesWithAzureAdSharedMode", "androidOpenSourceProjectUserAssociated", "androidOpenSourceProjectUserless", "unknownFutureValue")]
+        [System.String]
+        $TargetedAppManagementLevels,
+
+        [Parameter()]
+        [System.String[]]
+        $ApprovedKeyboards,
+
+        [Parameter()]
+        [System.String[]]
+        $ExemptedAppPackages,
 
         [Parameter()]
         [System.String]
@@ -98,6 +269,14 @@ function Get-TargetResource
 
         [Parameter()]
         [System.Boolean]
+        $RequireClass3Biometrics,
+
+        [Parameter()]
+        [System.Boolean]
+        $RequirePinAfterBiometricChange,
+
+        [Parameter()]
+        [System.Boolean]
         $FingerprintBlocked,
 
         [Parameter()]
@@ -122,12 +301,8 @@ function Get-TargetResource
         $AppGroupType,
 
         [Parameter()]
-        [System.String[]]
+        [Microsoft.Management.Infrastructure.CimInstance[]]
         $Assignments,
-
-        [Parameter()]
-        [System.String[]]
-        $ExcludedGroups,
 
         [Parameter()]
         [System.String]
@@ -160,20 +335,16 @@ function Get-TargetResource
 
         [Parameter()]
         [System.Boolean]
-        $IsAssigned,
-
-        [Parameter()]
-        [System.Boolean]
         $ScreenCaptureBlocked,
 
         [Parameter()]
         [System.Boolean]
         $EncryptAppData,
 
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [System.String]
         [ValidateSet('Absent', 'Present')]
-        $Ensure = $true,
+        $Ensure = 'Present',
 
         [Parameter()]
         [System.Management.Automation.PSCredential]
@@ -201,151 +372,203 @@ function Get-TargetResource
 
         [Parameter()]
         [System.String]
-        $Id
+        $Id,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-    Write-Verbose -Message "Checking for the Intune Android App Protection Policy {$DisplayName}"
-    $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftGraph' -ProfileName beta `
-        -InboundParameters $PSBoundParameters
 
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
-
-    #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
-    $CommandName = $MyInvocation.MyCommand
-    $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
-        -CommandName $CommandName `
-        -Parameters $PSBoundParameters
-    Add-M365DSCTelemetryEvent -Data $data
-    #endregion
-
-    $nullResult = $PSBoundParameters
-    $nullResult.Ensure = 'Absent'
+    Write-Verbose -Message "Getting configuration of the Intune Android App Protection Policy with Id {$Id} and DisplayName {$DisplayName}"
 
     try
     {
-        if ($id -ne '')
+        if (-not $Script:exportedInstance -or $Script:exportedInstance.DisplayName -ne $DisplayName)
         {
-            Write-Verbose -Message "Searching for Policy using Id {$Id}"
-            $policyInfo = Get-MgDeviceAppManagementAndroidManagedAppProtection -Filter "Id eq '$Id'" -ExpandProperty Apps, assignments `
-                -ErrorAction Stop
-            if ($null -eq $policyInfo)
+            $null = New-M365DSCConnection -Workload 'MicrosoftGraph' `
+                -InboundParameters $PSBoundParameters
+
+            #Ensure the proper dependencies are installed in the current environment.
+            Confirm-M365DSCDependencies
+
+            #region Telemetry
+            $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+            $CommandName = $MyInvocation.MyCommand
+            $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
+                -CommandName $CommandName `
+                -Parameters $PSBoundParameters
+            Add-M365DSCTelemetryEvent -Data $data
+            #endregion
+
+            $nullResult = $PSBoundParameters
+            $nullResult.Ensure = 'Absent'
+
+            $policy = $null
+            if (-not [string]::IsNullOrEmpty($Id))
             {
-                Write-Verbose -Message "No Android App Protection Policy with Id {$Id} was found"
-                Write-Verbose -Message "Function will now search for a policy with the same displayName {$Displayname} - If found this policy will be amended"
+                Write-Verbose -Message "Could not find an Intune App Protection Policy for Android with Id {$Id}"
+                $policy = Get-MgBetaDeviceAppManagementAndroidManagedAppProtection -AndroidManagedAppProtectionId $Id -ErrorAction SilentlyContinue
+            }
+
+            if ($null -eq $policy)
+            {
+                if (-not [string]::IsNullOrEmpty($DisplayName))
+                {
+                    Write-Verbose -Message "Searching for Policy using DisplayName {$DisplayName}"
+                    $policy = Get-MgBetaDeviceAppManagementAndroidManagedAppProtection `
+                        -All `
+                        -Filter "displayName eq '$DisplayName'" `
+                        -ErrorAction SilentlyContinue
+                }
+            }
+
+            if ($null -eq $policy)
+            {
+                Write-Verbose -Message "Could not find an Intune App Protection Policy for Android with Name {$DisplayName}"
+                return $nullResult
             }
         }
-        if ($null -eq $policyInfo)
+        else
         {
-            Write-Verbose -Message "Searching for Policy using DisplayName {$DisplayName}"
-            $policyInfo = Get-MgDeviceAppManagementAndroidManagedAppProtection -Filter "displayName eq '$DisplayName'" -ExpandProperty Apps, assignments `
-                -ErrorAction Stop
+            $policy = $Script:exportedInstance
         }
-        if ($null -eq $policyInfo)
-        {
-            Write-Verbose -Message "No Android App Protection Policy {$DisplayName} was found"
-            return $nullResult
-        }
+        $Id = $policy.Id
 
-        # handle multiple results - throw error - may be able to remediate to specify ID in configuration at later date
-        if ($policyInfo.gettype().isarray)
-        {
-            Write-Verbose -Message "Multiple Android Policies with name {$DisplayName} were found - Where No valid ID is specified Module will only function with unique names, please manually remediate"
-            $nullResult.Ensure = 'ERROR'
-            throw 'Multiple Policies with same displayname identified - Module currently only functions with unique names'
-        }
-
-        Write-Verbose -Message "Found Android App Protection Policy {$DisplayName}"
+        $policyApps = Get-MgBetaDeviceAppManagementAndroidManagedAppProtectionApp -AndroidManagedAppProtectionId $Id
 
         $appsArray = @()
-        if ($null -ne $policyInfo.Apps)
+        foreach ($app in $policyApps)
         {
-            foreach ($app in $policyInfo.Apps)
-            {
-                $appsArray += $app.MobileAppIdentifier.AdditionalProperties.packageId
-            }
+            $appsArray += $app.MobileAppIdentifier.AdditionalProperties.packageId
         }
 
-        $assignmentsArray = @()
-        $exclusionArray = @()
-        if ($null -ne $policyInfo.Assignments)
+        $assignmentsValues = Get-MgBetaDeviceAppManagementAndroidManagedAppProtectionAssignment -AndroidManagedAppProtectionId $policy.Id
+        $assignmentResult = @()
+        if ($assignmentsValues.Count -gt 0)
         {
-            foreach ($assignment in $policyInfo.Assignments)
-            {
-                switch ($assignment.Target.AdditionalProperties.'@odata.type')
-                {
-                    '#microsoft.graph.groupAssignmentTarget'
-                    {
-                        $assignmentsArray += $assignment.Target.AdditionalProperties.groupId
-                    }
-
-                    '#microsoft.graph.exclusionGroupAssignmentTarget'
-                    {
-                        $exclusionArray += $assignment.Target.AdditionalProperties.groupId
-                    }
-                }
-            }
+            $assignmentResult += ConvertFrom-IntunePolicyAssignment -Assignments $assignmentsValues -IncludeDeviceFilter $true
         }
-        $Allparams = get-InputParameters
-        $policy = @{}
 
-        #loop regular parameters and add from $polycyinfo
-        foreach ($param in ($Allparams.keys | Where-Object { $allparams.$_.Type -eq 'Parameter' }) )
+        $approvedKeyboardArray = @()
+        foreach ($keyboard in $policy.approvedKeyboards)
         {
-            # we need to process this because reverseDSC doesn't handle certain object types
-            switch ($Allparams.$param.ExportFileType)
-            {
-                'String'
-                {
-                    $policy.add($param, $policyInfo.$param.tostring())
-                }
-
-                'Array'
-                {
-                    $tmparray = @()
-                    $policyInfo.$param | ForEach-Object { $tmparray += $_.tostring() }
-                    $policy.add($param, $tmparray)
-                }
-
-                DEFAULT
-                {
-                    $policy.add($param, $policyInfo.$param)
-                }
-            }
+            $approvedKeyboardArray += $keyboard.Name + '|' + $keyboard.Value
         }
-        # loop credential parameters and add them from input params
-        foreach ($param in ($Allparams.keys | Where-Object { $allparams.$_.Type -eq 'Credential' }) )
+
+        $exemptedAppPackagesArray = @()
+        foreach ($exemptedapppackage in $policy.exemptedAppPackages)
         {
-            $policy.add($param, (Get-Variable -Name $param).value)
+            $exemptedAppPackagesArray += $exemptedapppackage.Name + '|' + $exemptedapppackage.Value
         }
-        # fix for managed identity credential value
-        $policy.add('ManagedIdentity', $ManagedIdentity.IsPresent)
-        # add complex parameters manually as they all have different requirements - potential to change in future
-        $policy.add('Ensure', 'Present')
-        $policy.add('Apps', $appsArray)
-        $policy.add('Assignments', $assignmentsArray)
-        $policy.add('ExcludedGroups', $exclusionArray)
-        $policy.add('AppGroupType', $policyInfo.AppGroupType.toString())
-        #managed browser settings - export as is, when re-applying function will correct
-        $policy.add('ManagedBrowser', $policyInfo.ManagedBrowser.toString())
-        $policy.add('ManagedBrowserToOpenLinksRequired', $policyInfo.ManagedBrowserToOpenLinksRequired)
-        $policy.add('CustomBrowserDisplayName', $policyInfo.CustomBrowserDisplayName)
-        $policy.add('CustomBrowserPackageId', $policyInfo.CustomBrowserPackageId)
 
-        return $policy
+        return @{
+            AllowedAndroidDeviceModels                          = $policy.AllowedAndroidDeviceModels
+            AllowedDataIngestionLocations                       = [string[]]$policy.AllowedDataIngestionLocations
+            AllowedDataStorageLocations                         = [string[]]$policy.AllowedDataStorageLocations
+            AllowedInboundDataTransferSources                   = [string]$policy.AllowedInboundDataTransferSources
+            AllowedOutboundClipboardSharingExceptionLength      = $policy.AllowedOutboundClipboardSharingExceptionLength
+            AllowedOutboundClipboardSharingLevel                = [string]$policy.AllowedOutboundClipboardSharingLevel
+            AllowedOutboundDataTransferDestinations             = [string]$policy.AllowedOutboundDataTransferDestinations
+            AppActionIfAndroidDeviceManufacturerNotAllowed      = [string]$policy.AppActionIfAndroidDeviceManufacturerNotAllowed
+            AppActionIfAndroidDeviceModelNotAllowed             = [string]$policy.AppActionIfAndroidDeviceModelNotAllowed
+            AppActionIfAndroidSafetyNetAppsVerificationFailed   = [string]$policy.AppActionIfAndroidSafetyNetAppsVerificationFailed
+            AppActionIfAndroidSafetyNetDeviceAttestationFailed  = [string]$policy.AppActionIfAndroidSafetyNetDeviceAttestationFailed
+            AppActionIfDeviceComplianceRequired                 = [string]$policy.AppActionIfDeviceComplianceRequired
+            AppActionIfDeviceLockNotSet                         = [string]$policy.AppActionIfDeviceLockNotSet
+            AppActionIfMaximumPinRetriesExceeded                = [string]$policy.AppActionIfMaximumPinRetriesExceeded
+            AppActionIfUnableToAuthenticateUser                 = [string]$policy.AppActionIfUnableToAuthenticateUser
+            AppGroupType                                        = $policy.AppGroupType.ToString()
+            ApprovedKeyboards                                   = $approvedKeyboardArray
+            Apps                                                = $appsArray
+            Assignments                                         = $assignmentResult
+            BiometricAuthenticationBlocked                      = $policy.BiometricAuthenticationBlocked
+            BlockAfterCompanyPortalUpdateDeferralInDays         = $policy.BlockAfterCompanyPortalUpdateDeferralInDays
+            BlockDataIngestionIntoOrganizationDocuments         = $policy.BlockDataIngestionIntoOrganizationDocuments
+            ConnectToVpnOnLaunch                                = $policy.ConnectToVpnOnLaunch
+            ContactSyncBlocked                                  = $policy.ContactSyncBlocked
+            CustomBrowserDisplayName                            = $policy.CustomBrowserDisplayName
+            CustomBrowserPackageId                              = $policy.CustomBrowserPackageId
+            CustomDialerAppDisplayName                          = $policy.CustomDialerAppDisplayName
+            CustomDialerAppPackageId                            = $policy.CustomDialerAppPackageId
+            DataBackupBlocked                                   = $policy.DataBackupBlocked
+            Description                                         = $policy.Description
+            DeviceComplianceRequired                            = $policy.DeviceComplianceRequired
+            DeviceLockRequired                                  = $policy.DeviceLockRequired
+            DialerRestrictionLevel                              = [string]$policy.DialerRestrictionLevel
+            DisableAppEncryptionIfDeviceEncryptionIsEnabled     = $policy.DisableAppEncryptionIfDeviceEncryptionIsEnabled
+            DisableAppPinIfDevicePinIsSet                       = $policy.DisableAppPinIfDevicePinIsSet
+            DisplayName                                         = $policy.DisplayName
+            EncryptAppData                                      = $policy.EncryptAppData
+            ExemptedAppPackages                                 = $exemptedAppPackagesArray
+            FingerprintAndBiometricEnabled                      = $policy.FingerprintAndBiometricEnabled
+            FingerprintBlocked                                  = $policy.FingerprintBlocked
+            Id                                                  = $policy.Id
+            KeyboardsRestricted                                 = $policy.KeyboardsRestricted
+            ManagedBrowser                                      = $policy.ManagedBrowser.ToString()
+            ManagedBrowserToOpenLinksRequired                   = $policy.ManagedBrowserToOpenLinksRequired
+            MaximumAllowedDeviceThreatLevel                     = [string]$policy.MaximumAllowedDeviceThreatLevel
+            MaximumPinRetries                                   = $policy.MaximumPinRetries
+            MessagingRedirectAppDisplayName                     = $policy.MessagingRedirectAppDisplayName
+            MessagingRedirectAppPackageId                       = $policy.MessagingRedirectAppPackageId
+            MinimumPinLength                                    = $policy.MinimumPinLength
+            MinimumRequiredAppVersion                           = $policy.MinimumRequiredAppVersion
+            MinimumRequiredOSVersion                            = $policy.MinimumRequiredOSVersion
+            MinimumRequiredPatchVersion                         = $policy.MinimumRequiredPatchVersion
+            MinimumWarningAppVersion                            = $policy.MinimumWarningAppVersion
+            MinimumWarningOSVersion                             = $policy.MinimumWarningOSVersion
+            MinimumWarningPatchVersion                          = $policy.MinimumWarningPatchVersion
+            MinimumWipePatchVersion                             = $policy.MinimumWipePatchVersion
+            MobileThreatDefenseRemediationAction                = [string]$policy.MobileThreatDefenseRemediationAction
+            NotificationRestriction                             = [string]$policy.NotificationRestriction
+            OrganizationalCredentialsRequired                   = $policy.OrganizationalCredentialsRequired
+            PeriodBeforePinReset                                = [System.Xml.XmlConvert]::ToString($policy.PeriodBeforePinReset)
+            PeriodOfflineBeforeAccessCheck                      = [System.Xml.XmlConvert]::ToString($policy.PeriodOfflineBeforeAccessCheck)
+            PeriodOfflineBeforeWipeIsEnforced                   = [System.Xml.XmlConvert]::ToString($policy.PeriodOfflineBeforeWipeIsEnforced)
+            PeriodOnlineBeforeAccessCheck                       = [System.Xml.XmlConvert]::ToString($policy.PeriodOnlineBeforeAccessCheck)
+            PinCharacterSet                                     = [string]$policy.PinCharacterSet
+            PinRequired                                         = $policy.PinRequired
+            PreviousPinBlockCount                               = $policy.PreviousPinBlockCount
+            PrintBlocked                                        = $policy.PrintBlocked
+            ProtectedMessagingRedirectAppType                   = [string]$policy.ProtectedMessagingRedirectAppType
+            RequireClass3Biometrics                             = $policy.RequireClass3Biometrics
+            RequiredAndroidSafetyNetAppsVerificationType        = [string]$policy.RequiredAndroidSafetyNetAppsVerificationType
+            RequiredAndroidSafetyNetDeviceAttestationType       = [string]$policy.RequiredAndroidSafetyNetDeviceAttestationType
+            RequiredAndroidSafetyNetEvaluationType              = [string]$policy.RequiredAndroidSafetyNetEvaluationType
+            RequirePinAfterBiometricChange                      = $policy.RequirePinAfterBiometricChange
+            RoleScopeTagIds                                     = $policy.RoleScopeTagIds
+            SaveAsBlocked                                       = $policy.SaveAsBlocked
+            ScreenCaptureBlocked                                = $policy.ScreenCaptureBlocked
+            SimplePinBlocked                                    = $policy.SimplePinBlocked
+            TargetedAppManagementLevels                         = [string]$policy.TargetedAppManagementLevels
+            WarnAfterCompanyPortalUpdateDeferralInDays          = $policy.WarnAfterCompanyPortalUpdateDeferralInDays
+            WipeAfterCompanyPortalUpdateDeferralInDays          = $policy.WipeAfterCompanyPortalUpdateDeferralInDays
+            Ensure                                              = 'Present'
+            Credential                                          = $Credential
+            ApplicationId                                       = $ApplicationId
+            ApplicationSecret                                   = $ApplicationSecret
+            TenantId                                            = $TenantId
+            CertificateThumbprint                               = $CertificateThumbprint
+            ManagedIdentity                                     = $ManagedIdentity.IsPresent
+            AccessTokens                                        = $AccessTokens
+        }
     }
     catch
     {
-        Write-Verbose -Message "ERROR on get-targetresource for $displayName"
-        $nullResult.Ensure = 'ERROR'
+        Write-Verbose -Message $_
+        if ($_.Exception.Message -eq 'Multiple Policies with same displayname identified - Module currently only functions with unique names')
+        {
+            throw $_
+        }
+        else
+        {
+            New-M365DSCLogEntry -Message 'Error retrieving data:' `
+                -Exception $_ `
+                -Source $($MyInvocation.MyCommand.Source) `
+                -TenantId $TenantId `
+                -Credential $Credential
 
-        New-M365DSCLogEntry -Message 'Error retrieving data:' `
-            -Exception $_ `
-            -Source $($MyInvocation.MyCommand.Source) `
-            -TenantId $TenantId `
-            -Credential $Credential
-
-        return $nullResult
+            return $nullResult
+        }
     }
 }
 
@@ -363,6 +586,175 @@ function Set-TargetResource
         $Description,
 
         [Parameter()]
+        [System.String[]]
+        $RoleScopeTagIds,
+
+        [Parameter()]
+        [System.String[]]
+        $AllowedAndroidDeviceModels,
+
+        [Parameter()]
+        [System.Int32]
+        $AllowedOutboundClipboardSharingExceptionLength,
+
+        [Parameter()]
+        [System.Boolean]
+        $BiometricAuthenticationBlocked,
+
+        [Parameter()]
+        [System.Int32]
+        $BlockAfterCompanyPortalUpdateDeferralInDays,
+
+        [Parameter()]
+        [System.Boolean]
+        $BlockDataIngestionIntoOrganizationDocuments,
+
+        [Parameter()]
+        [System.Boolean]
+        $ConnectToVpnOnLaunch,
+
+        [Parameter()]
+        [System.String]
+        $CustomDialerAppDisplayName,
+
+        [Parameter()]
+        [System.String]
+        $CustomDialerAppPackageId,
+
+        [Parameter()]
+        [System.Boolean]
+        $DeviceLockRequired,
+
+        [Parameter()]
+        [System.Boolean]
+        $FingerprintAndBiometricEnabled,
+
+        [Parameter()]
+        [System.Boolean]
+        $KeyboardsRestricted,
+
+        [Parameter()]
+        [System.String]
+        $MessagingRedirectAppDisplayName,
+
+        [Parameter()]
+        [System.String]
+        $MessagingRedirectAppPackageId,
+
+        [Parameter()]
+        [System.String]
+        $MinimumWipePatchVersion,
+
+        [Parameter()]
+        [System.Int32]
+        $PreviousPinBlockCount,
+
+        [Parameter()]
+        [System.Int32]
+        $WarnAfterCompanyPortalUpdateDeferralInDays,
+
+        [Parameter()]
+        [System.Int32]
+        $WipeAfterCompanyPortalUpdateDeferralInDays,
+
+        [Parameter()]
+        [System.String[]]
+        $Alloweddataingestionlocations,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet("block", "wipe", "warn", "blockWhenSettingIsSupported")]
+        $AppActionIfAndroidDeviceManufacturerNotAllowed,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet("block", "wipe", "warn", "blockWhenSettingIsSupported")]
+        $AppActionIfAndroidDeviceModelNotAllowed,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet("block", "wipe", "warn", "blockWhenSettingIsSupported")]
+        $AppActionIfAndroidSafetyNetAppsVerificationFailed,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet("block", "wipe", "warn", "blockWhenSettingIsSupported")]
+        $AppActionIfAndroidSafetyNetDeviceAttestationFailed,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet("block", "wipe", "warn", "blockWhenSettingIsSupported")]
+        $AppActionIfDeviceComplianceRequired,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet("block", "wipe", "warn", "blockWhenSettingIsSupported")]
+        $AppActionIfDeviceLockNotSet,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet("block", "wipe", "warn", "blockWhenSettingIsSupported")]
+        $AppActionIfMaximumPinRetriesExceeded,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet("block", "wipe", "warn", "blockWhenSettingIsSupported")]
+        $AppActionIfUnableToAuthenticateUser,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet("block", "wipe", "warn", "blockWhenSettingIsSupported")]
+        $MobileThreatDefenseRemediationAction,
+
+        [Parameter()]
+        [ValidateSet("allApps", "managedApps", "customApp", "blocked")]
+        [System.String]
+        $DialerRestrictionLevel,
+
+        [Parameter()]
+        [ValidateSet("notConfigured", "secured", "low", "medium", "high")]
+        [System.String]
+        $MaximumAllowedDeviceThreatLevel,
+
+        [Parameter()]
+        [ValidateSet("allow", "blockOrganizationalData", "block")]
+        [System.String]
+        $NotificationRestriction,
+
+        [Parameter()]
+        [ValidateSet("anyApp", "anyManagedApp", "specificApps", "blocked")]
+        [System.String]
+        $ProtectedMessagingRedirectAppType,
+
+        [Parameter()]
+        [ValidateSet("none", "enabled")]
+        [System.String]
+        $RequiredAndroidSafetyNetAppsVerificationType,
+
+        [Parameter()]
+        [ValidateSet("none", "basicIntegrity", "basicIntegrityAndDeviceCertification")]
+        [System.String]
+        $RequiredAndroidSafetyNetDeviceAttestationType,
+
+        [Parameter()]
+        [ValidateSet("basic", "hardwareBacked")]
+        [System.String]
+        $RequiredAndroidSafetyNetEvaluationType,
+
+        [Parameter()]
+        [ValidateSet("unspecified", "unmanaged", "mdm", "androidEnterprise", "androidEnterpriseDedicatedDevicesWithAzureAdSharedMode", "androidOpenSourceProjectUserAssociated", "androidOpenSourceProjectUserless", "unknownFutureValue")]
+        [System.String]
+        $TargetedAppManagementLevels,
+
+        [Parameter()]
+        [System.String[]]
+        $ApprovedKeyboards,
+
+        [Parameter()]
+        [System.String[]]
+        $ExemptedAppPackages,
+
+        [Parameter()]
         [System.String]
         $PeriodOfflineBeforeAccessCheck,
 
@@ -448,6 +840,14 @@ function Set-TargetResource
 
         [Parameter()]
         [System.Boolean]
+        $RequireClass3Biometrics,
+
+        [Parameter()]
+        [System.Boolean]
+        $RequirePinAfterBiometricChange,
+
+        [Parameter()]
+        [System.Boolean]
         $FingerprintBlocked,
 
         [Parameter()]
@@ -472,12 +872,8 @@ function Set-TargetResource
         $AppGroupType,
 
         [Parameter()]
-        [System.String[]]
+        [Microsoft.Management.Infrastructure.CimInstance[]]
         $Assignments,
-
-        [Parameter()]
-        [System.String[]]
-        $ExcludedGroups,
 
         [Parameter()]
         [System.String]
@@ -510,20 +906,16 @@ function Set-TargetResource
 
         [Parameter()]
         [System.Boolean]
-        $IsAssigned,
-
-        [Parameter()]
-        [System.Boolean]
         $ScreenCaptureBlocked,
 
         [Parameter()]
         [System.Boolean]
         $EncryptAppData,
 
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [System.String]
         [ValidateSet('Absent', 'Present')]
-        $Ensure = $true,
+        $Ensure = 'Present',
 
         [Parameter()]
         [System.Management.Automation.PSCredential]
@@ -551,10 +943,14 @@ function Set-TargetResource
 
         [Parameter()]
         [System.String]
-        $Id
+        $Id,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-    $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftGraph' `
-        -InboundParameters $PSBoundParameters
+
+    Write-Verbose -Message "Setting configuration of the Intune App Protection Policy for Android with Id {$Id} and DisplayName {$DisplayName}"
 
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
@@ -570,126 +966,107 @@ function Set-TargetResource
 
     $currentPolicy = Get-TargetResource @PSBoundParameters
 
-    if ($currentPolicy.Ensure -eq 'ERROR')
+    $BoundParameters = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
+
+    #rebuild array as a MicrosoftGraphKeyValuePair hash table for ApprovedKeyboards
+    $myApprovedKeyboards = @()
+    foreach ($keyboard in $ApprovedKeyboards)
     {
-
-        Throw 'Error when searching for current policy details - Please check verbose output for further detail'
-
+        $myApprovedKeyboards += @{
+            name = $keyboard.Split('|')[0]
+            value = $keyboard.Split('|')[1]
+        }
     }
-    if (($Ensure -eq 'Absent') -and ($currentPolicy.Ensure -eq 'Present'))
+    $BoundParameters.ApprovedKeyboards = $myApprovedKeyboards
+
+    $myExemptedAppPackages = @()
+    foreach ($exemptedAppPackage in $ExemptedAppPackages)
     {
-        Write-Verbose -Message "Removing Android App Protection Policy {$DisplayName}"
-        Remove-MgDeviceAppManagementAndroidManagedAppProtection -AndroidManagedAppProtectionId $currentPolicy.id
-        # then exit
-        return $true
+        $myExemptedAppPackages += @{
+            name = $exemptedAppPackage.Split('|')[0]
+            value = $exemptedAppPackage.Split('|')[1]
+        }
     }
 
-    $setParams = @{}
-    $assignmentsArray = @()
-    $appsarray = @()
-
-    $configstring = "`r`nConfiguration To Be Applied:`r`n"
-
-    $Allparams = get-InputParameters
-
-    # loop through regular parameters
-    foreach ($param in ($Allparams.keys | Where-Object { $allparams.$_.Type -eq 'Parameter' }) )
+    $durationParameters = @(
+        'PeriodOfflineBeforeAccessCheck',
+        'PeriodOnlineBeforeAccessCheck',
+        'PeriodOfflineBeforeWipeIsEnforced',
+        'PeriodBeforePinReset'
+    )
+    foreach ($duration in $durationParameters)
     {
-        if ($PSBoundParameters.keys -contains $param )
+        if (-not [String]::IsNullOrEmpty($BoundParameters.$duration))
         {
-            switch ($Allparams.$param.ExportFileType)
+            if ($BoundParameters.$duration.Startswith('P'))
             {
-                'Duration'
-                {
-                    $setParams.add($param, (set-TimeSpan -duration $PSBoundParameters.$param))
-                    $configstring += ($param + ':' + ($setParams.$param.tostring()) + "`r`n")
-                }
-
-                default
-                {
-                    $setParams.add($param, $psboundparameters.$param)
-                    $configstring += ($param + ':' + $setParams.$param + "`r`n")
-                }
+                $timespan = [System.Xml.XmlConvert]::ToTimeSpan($BoundParameters.$duration)
             }
-        }
-        else
-        {
-            #write-host 'value' $param 'not specified'
-        }
-    }
-
-    # handle complex parameters - manually for now
-    if ($PSBoundParameters.keys -contains 'Assignments' )
-    {
-        $PSBoundParameters.Assignments | ForEach-Object {
-            if ($_ -ne $null)
+            else
             {
-                $assignmentsArray += set-JSONstring -id $_ -type 'Assignments'
+                $timespan = [TimeSpan]$BoundParameters.$duration
             }
-        }
-        $configstring += ( 'Assignments' + ":`r`n" + ($PSBoundParameters.Assignments | Out-String) + "`r`n" )
-    }
-    if ($PSBoundParameters.keys -contains 'ExcludedGroups' )
-    {
-        $PSBoundParameters.ExcludedGroups | ForEach-Object {
-            if ($_ -ne $null)
-            {
-                $assignmentsArray += set-JSONstring -id $_ -type 'ExcludedGroups'
-            }
-        }
-        $configstring += ( 'ExcludedGroups' + ":`r`n" + ($PSBoundParameters.ExcludedGroups | Out-String) + "`r`n" )
-
-    }
-    # set the apps values
-    $AppsHash = set-AppsHash -AppGroupType $AppGroupType -apps $apps
-    $appshash.Apps | ForEach-Object {
-        if ($_ -ne $null)
-        {
-            $appsarray += set-JSONstring -id $_ -type 'Apps'
+            $BoundParameters.$duration = $timespan
         }
     }
-    $configstring += ('AppGroupType:' + $appshash.AppGroupType + "`r`n")
-    $configstring += ('Apps' + ":`r`n" + ($appshash.Apps | Out-String) + "`r`n" )
 
     # Set the managedbrowser values
-    $ManagedBrowserValuesHash = set-ManagedBrowserValues @PSBoundParameters
-    foreach ($param in $ManagedBrowserValuesHash.keys)
-    {
-        $setParams.add($param, $ManagedBrowserValuesHash.$param)
-        $configstring += ($param + ':' + $setParams.$param + "`r`n")
-    }
-
-    Write-Verbose -Message $configstring
+    $ManagedBrowserValuesHash = Set-ManagedBrowserValues @BoundParameters
+    $BoundParameters.ManagedBrowser = $ManagedBrowserValuesHash.ManagedBrowser
+    $BoundParameters.ManagedBrowserToOpenLinksRequired = $ManagedBrowserValuesHash.ManagedBrowserToOpenLinksRequired
+    $BoundParameters.CustomBrowserDisplayName = $ManagedBrowserValuesHash.CustomBrowserDisplayName
+    $BoundParameters.CustomBrowserPackageId = $ManagedBrowserValuesHash.CustomBrowserPackageId
 
     if (($Ensure -eq 'Present') -and ($currentPolicy.Ensure -eq 'Absent'))
     {
-        Write-Verbose -Message "Creating new Android App Protection Policy {$DisplayName}"
-        if ($id -ne '')
-        {
-            Write-Verbose -Message 'ID in Configuration Document will be ignored, Policy will be created with a new ID'
-        }
-        $setParams.add('Assignments', $assignmentsArray)
-        $newpolicy = New-MgDeviceAppMgtAndroidManagedAppProtection @setParams
-        $setParams.add('AndroidManagedAppProtectionId', $newpolicy.Id)
+        $createParameters = ([Hashtable]$BoundParameters).Clone()
+        $createParameters.Remove('Id') | Out-Null
+        $createParameters.Remove('Assignments') | Out-Null
+        $createParameters.Remove('Apps') | Out-Null
 
+        Write-Verbose -Message "Creating new Android App Protection Policy {$DisplayName}"
+        $newpolicy = New-MgBetaDeviceAppManagementAndroidManagedAppProtection @createParameters
+
+        if ($newPolicy.Id)
+        {
+            Write-Verbose -Message "Update targetApps for Android App Protection Policy with Id {$($newpolicy.Id)} and DisplayName {$DisplayName}"
+            $targetApps = Get-IntuneAppProtectionPolicyAndroidAppsToHashtable -Apps $Apps
+            $Url = (Get-MSCloudLoginConnectionProfile -Workload MicrosoftGraph).ResourceUrl + "beta/deviceAppManagement/androidManagedAppProtections('$($policy.Id)')/targetApps"
+            Invoke-MgGraphRequest -Method POST -Uri $Url -Body $targetApps
+
+            $assignmentsHash = ConvertTo-IntunePolicyAssignment -IncludeDeviceFilter:$true -Assignments $Assignments
+            Update-DeviceConfigurationPolicyAssignment `
+                -DeviceConfigurationPolicyId $newPolicy.Id `
+                -Targets $assignmentsHash `
+                -Repository 'deviceAppManagement/androidManagedAppProtections'
+        }
     }
     elseif (($Ensure -eq 'Present') -and ($currentPolicy.Ensure -eq 'Present'))
     {
+        $updateParameters = ([Hashtable]$BoundParameters).Clone()
+        $updateParameters.Remove('Id') | Out-Null
+        $updateParameters.Remove('Assignments') | Out-Null
+        $updateParameters.Remove('Apps') | Out-Null
+
         Write-Verbose -Message "Updating existing Android App Protection Policy {$DisplayName}"
-        if ( ($id -ne '') -and ( $id -ne $currentPolicy.id ) )
-        {
-            Write-Verbose -Message ("id in configuration document and returned policy do not match - updating policy with matching Displayname {$displayname} - ID {" + $currentPolicy.id + '}')
-        }
-        $setParams.add('AndroidManagedAppProtectionId', $currentPolicy.id)
-        Update-MgDeviceAppMgtAndroidManagedAppProtection @setParams
+        Update-MgBetaDeviceAppManagementAndroidManagedAppProtection -AndroidManagedAppProtectionId $currentPolicy.Id -BodyParameter $updateParameters
 
-        Write-Verbose -Message 'Setting Group Assignments...'
-        Set-MgDeviceAppMgtTargetedManagedAppConfiguration -TargetedManagedAppConfigurationId $setParams.AndroidManagedAppProtectionId -Assignments $assignmentsArray
+        Write-Verbose -Message "Update targetApps for Android App Protection Policy with Id {$($currentPolicy.Id)} and DisplayName {$DisplayName}"
+        $targetApps = Get-IntuneAppProtectionPolicyAndroidAppsToHashtable -Apps $Apps
+        $Url = (Get-MSCloudLoginConnectionProfile -Workload MicrosoftGraph).ResourceUrl + "beta/deviceAppManagement/androidManagedAppProtections('$($currentPolicy.Id)')/targetApps"
+        Invoke-MgGraphRequest -Method POST -Uri $Url -Body $targetApps
 
+        $assignmentsHash = ConvertTo-IntunePolicyAssignment -IncludeDeviceFilter:$true -Assignments $Assignments
+        Update-DeviceConfigurationPolicyAssignment `
+            -DeviceConfigurationPolicyId $currentPolicy.Id `
+            -Targets $assignmentsHash `
+            -Repository 'deviceAppManagement/androidManagedAppProtections'
     }
-    # now we need to set up the apps
-    Write-Verbose -Message ('Setting Application values of type: ' + $AppsHash.AppGroupType)
-    Invoke-MgTargetDeviceAppMgtTargetedManagedAppConfigurationApp -TargetedManagedAppConfigurationId $setParams.AndroidManagedAppProtectionId -Apps $appsarray -AppGroupType $AppsHash.AppGroupType
+    elseif ($Ensure -eq 'Absent' -and $currentPolicy.Ensure -eq 'Present')
+    {
+        Write-Verbose -Message "Removing Android App Protection Policy {$DisplayName}"
+        Remove-MgBetaDeviceAppManagementAndroidManagedAppProtection -AndroidManagedAppProtectionId $currentPolicy.id
+    }
 }
 
 function Test-TargetResource
@@ -707,6 +1084,175 @@ function Test-TargetResource
         $Description,
 
         [Parameter()]
+        [System.String[]]
+        $RoleScopeTagIds,
+
+        [Parameter()]
+        [System.String[]]
+        $AllowedAndroidDeviceModels,
+
+        [Parameter()]
+        [System.Int32]
+        $AllowedOutboundClipboardSharingExceptionLength,
+
+        [Parameter()]
+        [System.Boolean]
+        $BiometricAuthenticationBlocked,
+
+        [Parameter()]
+        [System.Int32]
+        $BlockAfterCompanyPortalUpdateDeferralInDays,
+
+        [Parameter()]
+        [System.Boolean]
+        $BlockDataIngestionIntoOrganizationDocuments,
+
+        [Parameter()]
+        [System.Boolean]
+        $ConnectToVpnOnLaunch,
+
+        [Parameter()]
+        [System.String]
+        $CustomDialerAppDisplayName,
+
+        [Parameter()]
+        [System.String]
+        $CustomDialerAppPackageId,
+
+        [Parameter()]
+        [System.Boolean]
+        $DeviceLockRequired,
+
+        [Parameter()]
+        [System.Boolean]
+        $FingerprintAndBiometricEnabled,
+
+        [Parameter()]
+        [System.Boolean]
+        $KeyboardsRestricted,
+
+        [Parameter()]
+        [System.String]
+        $MessagingRedirectAppDisplayName,
+
+        [Parameter()]
+        [System.String]
+        $MessagingRedirectAppPackageId,
+
+        [Parameter()]
+        [System.String]
+        $MinimumWipePatchVersion,
+
+        [Parameter()]
+        [System.Int32]
+        $PreviousPinBlockCount,
+
+        [Parameter()]
+        [System.Int32]
+        $WarnAfterCompanyPortalUpdateDeferralInDays,
+
+        [Parameter()]
+        [System.Int32]
+        $WipeAfterCompanyPortalUpdateDeferralInDays,
+
+        [Parameter()]
+        [System.String[]]
+        $Alloweddataingestionlocations,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet("block", "wipe", "warn", "blockWhenSettingIsSupported")]
+        $AppActionIfAndroidDeviceManufacturerNotAllowed,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet("block", "wipe", "warn", "blockWhenSettingIsSupported")]
+        $AppActionIfAndroidDeviceModelNotAllowed,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet("block", "wipe", "warn", "blockWhenSettingIsSupported")]
+        $AppActionIfAndroidSafetyNetAppsVerificationFailed,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet("block", "wipe", "warn", "blockWhenSettingIsSupported")]
+        $AppActionIfAndroidSafetyNetDeviceAttestationFailed,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet("block", "wipe", "warn", "blockWhenSettingIsSupported")]
+        $AppActionIfDeviceComplianceRequired,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet("block", "wipe", "warn", "blockWhenSettingIsSupported")]
+        $AppActionIfDeviceLockNotSet,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet("block", "wipe", "warn", "blockWhenSettingIsSupported")]
+        $AppActionIfMaximumPinRetriesExceeded,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet("block", "wipe", "warn", "blockWhenSettingIsSupported")]
+        $AppActionIfUnableToAuthenticateUser,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet("block", "wipe", "warn", "blockWhenSettingIsSupported")]
+        $MobileThreatDefenseRemediationAction,
+
+        [Parameter()]
+        [ValidateSet("allApps", "managedApps", "customApp", "blocked")]
+        [System.String]
+        $DialerRestrictionLevel,
+
+        [Parameter()]
+        [ValidateSet("notConfigured", "secured", "low", "medium", "high")]
+        [System.String]
+        $MaximumAllowedDeviceThreatLevel,
+
+        [Parameter()]
+        [ValidateSet("allow", "blockOrganizationalData", "block")]
+        [System.String]
+        $NotificationRestriction,
+
+        [Parameter()]
+        [ValidateSet("anyApp", "anyManagedApp", "specificApps", "blocked")]
+        [System.String]
+        $ProtectedMessagingRedirectAppType,
+
+        [Parameter()]
+        [ValidateSet("none", "enabled")]
+        [System.String]
+        $RequiredAndroidSafetyNetAppsVerificationType,
+
+        [Parameter()]
+        [ValidateSet("none", "basicIntegrity", "basicIntegrityAndDeviceCertification")]
+        [System.String]
+        $RequiredAndroidSafetyNetDeviceAttestationType,
+
+        [Parameter()]
+        [ValidateSet("basic", "hardwareBacked")]
+        [System.String]
+        $RequiredAndroidSafetyNetEvaluationType,
+
+        [Parameter()]
+        [ValidateSet("unspecified", "unmanaged", "mdm", "androidEnterprise", "androidEnterpriseDedicatedDevicesWithAzureAdSharedMode", "androidOpenSourceProjectUserAssociated", "androidOpenSourceProjectUserless", "unknownFutureValue")]
+        [System.String]
+        $TargetedAppManagementLevels,
+
+        [Parameter()]
+        [System.String[]]
+        $ApprovedKeyboards,
+
+        [Parameter()]
+        [System.String[]]
+        $ExemptedAppPackages,
+
+        [Parameter()]
         [System.String]
         $PeriodOfflineBeforeAccessCheck,
 
@@ -792,6 +1338,14 @@ function Test-TargetResource
 
         [Parameter()]
         [System.Boolean]
+        $RequireClass3Biometrics,
+
+        [Parameter()]
+        [System.Boolean]
+        $RequirePinAfterBiometricChange,
+
+        [Parameter()]
+        [System.Boolean]
         $FingerprintBlocked,
 
         [Parameter()]
@@ -816,12 +1370,8 @@ function Test-TargetResource
         $AppGroupType,
 
         [Parameter()]
-        [System.String[]]
+        [Microsoft.Management.Infrastructure.CimInstance[]]
         $Assignments,
-
-        [Parameter()]
-        [System.String[]]
-        $ExcludedGroups,
 
         [Parameter()]
         [System.String]
@@ -854,20 +1404,16 @@ function Test-TargetResource
 
         [Parameter()]
         [System.Boolean]
-        $IsAssigned,
-
-        [Parameter()]
-        [System.Boolean]
         $ScreenCaptureBlocked,
 
         [Parameter()]
         [System.Boolean]
         $EncryptAppData,
 
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [System.String]
         [ValidateSet('Absent', 'Present')]
-        $Ensure = $true,
+        $Ensure = 'Present',
 
         [Parameter()]
         [System.Management.Automation.PSCredential]
@@ -895,13 +1441,14 @@ function Test-TargetResource
 
         [Parameter()]
         [System.String]
-        $Id
+        $Id,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
-
-    $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftGraph' -ProfileName beta `
-        -InboundParameters $PSBoundParameters
 
     #region Telemetry
     $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
@@ -914,107 +1461,44 @@ function Test-TargetResource
     Write-Verbose -Message "Testing configuration of Android App Protection Policy {$DisplayName}"
 
     $CurrentValues = Get-TargetResource @PSBoundParameters
+    $ValuesToCheck = ([Hashtable]$PSBoundParameters).Clone()
+    $testResult = $true
 
-    if ($CurrentValues.Ensure -eq 'ERROR')
+    #Compare Cim instances
+    foreach ($key in $PSBoundParameters.Keys)
     {
-
-        Throw 'Error when searching for current policy details - Please check verbose output for further detail'
-
-    }
-
-    if ($Ensure -eq 'Absent')
-    {
-        if ($currentvalues.Ensure -eq 'Present')
+        $source = $PSBoundParameters.$key
+        $target = $CurrentValues.$key
+        if ($null -ne $source -and $source.GetType().Name -like '*CimInstance*')
         {
-            Write-Verbose -Message "Existing Policy {$DisplayName} will be removed"
-            return $False
-        }
-        else
-        {
-            Write-Verbose -Message "Policy {$DisplayName} already removed"
-            return $True
-        }
-    }
+            $testResult = Compare-M365DSCComplexObject `
+                -Source ($source) `
+                -Target ($target)
 
-    if (($CurrentValues.Ensure -eq 'Absent') -and ($Ensure -eq 'Present'))
-    {
-        Write-Verbose -Message "Policy {$DisplayName} Not Present on tenant - New Policy will be created"
-        return $false
-    }
-
-    $targetvalues = @{}
-
-    $Allparams = get-InputParameters
-
-    ($Allparams.keys | Where-Object { $allparams.$_.Type -eq 'Credential' }) | ForEach-Object {
-        $CurrentValues.Remove($_) | Out-Null
-    }
-
-    # loop through regular parameters
-    foreach ($param in ($Allparams.keys | Where-Object { $allparams.$_.Type -eq 'Parameter' }) )
-    {
-        if ($PSBoundParameters.keys -contains $param )
-        {
-            switch ($Allparams.$param.ExportFileType)
+            if (-not $testResult)
             {
-                'Duration'
-                {
-                    $targetvalues.add($param, (set-TimeSpan -duration $PSBoundParameters.$param))
-                }
-
-                default
-                {
-                    $targetvalues.add($param, $psboundparameters.$param)
-                }
+                break
             }
-        }
-        else
-        {
-            Write-Verbose -Message ('Unspecified Parameter in Config: ' + $param + '  Current Value Will be retained: ' + $CurrentValues.$param)
+
+            $ValuesToCheck.Remove($key) | Out-Null
         }
     }
 
-    # handle complex parameters - manually for now
-    if ($PSBoundParameters.keys -contains 'Assignments' )
-    {
-        $targetvalues.add('Assignments', $psboundparameters.Assignments)
-    }
-    else
-    {
-        Write-Host 'Unspecified Parameter in Config: Assignments - Current Value is:' $CurrentValues.Assignments `
-            "`r`nNOTE: Assignments interacts with other values - not specifying may lead to unexpected output"
-    }
+    $ValuesToCheck.Remove('Id') | Out-Null
+    $ValuesToCheck = Remove-M365DSCAuthenticationParameter -BoundParameters $ValuesToCheck
 
-    if ($PSBoundParameters.keys -contains 'ExcludedGroups' )
-    {
-        $targetvalues.add('ExcludedGroups', $psboundparameters.ExcludedGroups)
-    }
-    else
-    {
-        Write-Host 'Unspecified Parameter in Config: ExcludedGroups - Current Value is:' $CurrentValues.ExcludedGroups `
-            "`r`nNOTE: ExcludedGroups interacts with other values - not specifying may lead to unexpected output"
-    }
-
-    # set the apps values
-    $AppsHash = set-AppsHash -AppGroupType $AppGroupType -apps $apps
-    $targetvalues.add('Apps', $AppsHash.Apps)
-    $targetvalues.add('AppGroupType', $AppsHash.AppGroupType)
-    # wipe out the current apps value if AppGroupType is anything but selectedpublicapps to match the appshash values
     if ($CurrentValues.AppGroupType -ne 'selectedPublicApps')
     {
-        $CurrentValues.Apps = @()
+        $ValuesToCheck.Remove('Apps') | Out-Null
     }
 
-    # remove thre ID from the values to check as it may not match
-    $targetvalues.remove('ID') | Out-Null
-
-    Write-Verbose -Message "Current Values: $((Convert-M365DscHashtableToString -Hashtable $CurrentValues) -replace ';', "`r`n")"
-    Write-Verbose -Message "Target Values: $((Convert-M365DscHashtableToString -Hashtable $targetvalues) -replace ';', "`r`n")"
+    Write-Verbose -Message "Current Values: $(Convert-M365DscHashtableToString -Hashtable $CurrentValues)"
+    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $ValuesToCheck)"
 
     $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
         -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $targetvalues `
-        -ValuesToCheck $targetvalues.Keys
+        -DesiredValues $PSBoundParameters `
+        -ValuesToCheck $ValuesToCheck.Keys
     #-verbose
 
     Write-Verbose -Message "Test-TargetResource returned $TestResult"
@@ -1054,8 +1538,13 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftGraph' `
         -InboundParameters $PSBoundParameters
 
@@ -1073,23 +1562,35 @@ function Export-TargetResource
 
     try
     {
-        [array]$policies = Get-MgDeviceAppManagementAndroidManagedAppProtection -All:$true -Filter $Filter -ErrorAction Stop
+        if (-not [string]::IsNullOrEmpty($Filter))
+        {
+            $complexFunctions = Get-ComplexFunctionsFromFilterQuery -FilterQuery $Filter
+            $Filter = Remove-ComplexFunctionsFromFilterQuery -FilterQuery $Filter
+        }
+        [array]$policies = Get-MgBetaDeviceAppManagementAndroidManagedAppProtection -All:$true -Filter $Filter -ErrorAction Stop
+        $policies = Find-GraphDataUsingComplexFunctions -ComplexFunctions $complexFunctions -Policies $policies
+
         $i = 1
         $dscContent = ''
         if ($policies.Length -eq 0)
         {
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         }
         else
         {
-            Write-Host "`r`n" -NoNewline
+            Write-M365DSCHost -Message "`r`n" -DeferWrite
         }
         foreach ($policy in $policies)
         {
-            Write-Host "    |---[$i/$($policies.Count)] $($policy.displayName)" -NoNewline
+            if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+            {
+                $Global:M365DSCExportResourceInstancesCount++
+            }
+
+            Write-M365DSCHost -Message "    |---[$i/$($policies.Count)] $($policy.displayName)" -DeferWrite
             $params = @{
-                Id                    = $policy.id
-                DisplayName           = $policy.displayName
+                Id                    = $policy.Id
+                DisplayName           = $policy.DisplayName
                 Ensure                = 'Present'
                 Credential            = $Credential
                 ApplicationID         = $ApplicationId
@@ -1097,32 +1598,49 @@ function Export-TargetResource
                 ApplicationSecret     = $ApplicationSecret
                 CertificateThumbprint = $CertificateThumbprint
                 ManagedIdentity       = $ManagedIdentity.IsPresent
+                AccessTokens          = $AccessTokens
             }
-            $Results = Get-TargetResource @Params
-            $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                -Results $Results
+
+            $Script:exportedInstance = $policy
+            $Results = Get-TargetResource @params
+
+            if ($Results.Assignments)
+            {
+                $complexTypeStringResult = Get-M365DSCDRGComplexTypeToString -ComplexObject $Results.Assignments -CIMInstanceName DeviceManagementConfigurationPolicyAssignments
+                if ($complexTypeStringResult)
+                {
+                    $Results.Assignments = $complexTypeStringResult
+                }
+                else
+                {
+                    $Results.Remove('Assignments') | Out-Null
+                }
+            }
+
             $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                 -ConnectionMode $ConnectionMode `
                 -ModulePath $PSScriptRoot `
                 -Results $Results `
-                -Credential $Credential
+                -Credential $Credential `
+                -NoEscape @('Assignments')
             $dscContent += $currentDSCBlock
             Save-M365DSCPartialExport -Content $currentDSCBlock `
                 -FileName $Global:PartialExportFileName
             $i++
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         }
         return $dscContent
     }
     catch
     {
-        if ($_.Exception -like '*401*')
+        if ($_.Exception -like '*401*' -or $_.ErrorDetails.Message -like "*`"ErrorCode`":`"Forbidden`"*" -or `
+                $_.Exception -like '*Request not applicable to target tenant*')
         {
-            Write-Host "`r`n    $($Global:M365DSCEmojiYellowCircle) The current tenant is not registered for Intune."
+            Write-M365DSCHost -Message "`r`n    $($Global:M365DSCEmojiYellowCircle) The current tenant is not registered for Intune."
         }
         else
         {
-            Write-Host $Global:M365DSCEmojiRedX
+            Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
             New-M365DSCLogEntry -Message 'Error during Export:' `
                 -Exception $_ `
@@ -1135,121 +1653,31 @@ function Export-TargetResource
     }
 }
 
-function Set-JSONstring
+function Get-IntuneAppProtectionPolicyAndroidAppsToHashtable
 {
-    param
-    (
-        [string]$id,
-        [string]$type
+    [CmdletBinding()]
+    [OutputType([System.Collections.Hashtable])]
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.String[]]
+        $Apps
     )
 
-    $JsonContent = ''
-
-    switch ($type)
+    $formattedApps = @()
+    foreach ($app in $Apps)
     {
-
-        'Apps'
-        {
-            $JsonContent = @"
-                    {
-                    "id":"$($id)",
-                    "mobileAppIdentifier": {
-                        "@odata.type": "#microsoft.graph.AndroidMobileAppIdentifier",
-                        "packageId": "$id"
-                    }
-                }
-"@
-
-        }
-        'Assignments'
-        {
-            $JsonContent = @"
-            {
-            "id":"$($id)_incl",
-            "target": {
-                        "@odata.type": "#microsoft.graph.groupAssignmentTarget",
-                        "groupId": "$($id)"
-                    }
+        $formattedApps += @{
+            id                  = $app + '.android'
+            mobileAppIdentifier = @{
+                '@odata.type' = '#microsoft.graph.AndroidMobileAppIdentifier'
+                packageId     = $app
             }
-"@
-        }
-        'ExcludedGroups'
-        {
-            $JsonContent = @"
-            {
-            "id":"$($id)_excl",
-            "target": {
-                        "@odata.type": "#microsoft.graph.exclusionGroupAssignmentTarget",
-                        "groupId": "$($id)"
-                    }
-            }
-"@
-
         }
     }
 
-    return $JsonContent
-
-}
-
-function Set-Timespan
-{
-    param
-    (
-        [string]$duration
-    )
-
-    try
-    {
-        if ($duration.startswith('P'))
-        {
-            $timespan = [System.Xml.XmlConvert]::ToTimeSpan($duration)
-        }
-        else
-        {
-            $timespan = [TimeSpan]$duration
-        }
+    return @{
+        apps = $formattedApps
     }
-    catch
-    {
-        throw 'Problem converting input to a timespan - If configuration document is using iso8601 string (e.g. PT15M) try using new-timespan (e.g. new-timespan -minutes 15)'
-    }
-    return $timespan
-}
-
-function Set-AppsHash
-{
-    param
-    (
-        [string]$AppGroupType,
-        [array]$Apps
-    )
-
-    if ($AppGroupType -eq '')
-    {
-        if ($apps.count -eq 0 )
-        {
-            $AppGroupType = 'allApps'
-        }
-        else
-        {
-            $AppGroupType = 'selectedPublicApps'
-        }
-        Write-Verbose -Message "setting AppGroupType to $AppGroupType"
-    }
-
-    $appsarray = @()
-    if ($AppGroupType -eq 'selectedPublicApps' )
-    {
-        $appsarray = $apps
-    }
-
-    $AppsHash = @{
-        'AppGroupType' = $AppGroupType;
-        'Apps'         = $appsarray
-    }
-
-    return $AppsHash
 }
 
 function Set-ManagedBrowserValues
@@ -1266,12 +1694,8 @@ function Set-ManagedBrowserValues
     # edge - edge, true, empty id strings
     # any app - not configured, false, empty strings
     # unmanaged browser not configured, true, strings must not be empty
-
-    Write-Host 'Setting Managed Browser Properties'
-
     if (!$ManagedBrowserToOpenLinksRequired)
     {
-        Write-Host 'Setting Managed Browser to Any App'
         $ManagedBrowser = 'notConfigured'
         $ManagedBrowserToOpenLinksRequired = $false
         $CustomBrowserDisplayName = ''
@@ -1282,7 +1706,6 @@ function Set-ManagedBrowserValues
     {
         if (($CustomBrowserDisplayName -ne '') -and ($CustomBrowserPackageId -ne ''))
         {
-            Write-Host 'Setting Managed Browser to Custom Browser'
             $ManagedBrowser = 'notConfigured'
             $ManagedBrowserToOpenLinksRequired = $true
             $CustomBrowserDisplayName = $CustomBrowserDisplayName
@@ -1290,7 +1713,6 @@ function Set-ManagedBrowserValues
         }
         else
         {
-            Write-Host 'Setting Managed Browser to Microsoft Edge'
             $ManagedBrowser = 'microsoftEdge'
             $ManagedBrowserToOpenLinksRequired = $true
             $CustomBrowserDisplayName = ''
@@ -1300,68 +1722,13 @@ function Set-ManagedBrowserValues
     }
 
     $ManagedBrowserHash = @{
-        'ManagedBrowser'                    = $ManagedBrowser;
-        'ManagedBrowserToOpenLinksRequired' = $ManagedBrowserToOpenLinksRequired;
-        'CustomBrowserDisplayName'          = $CustomBrowserDisplayName;
+        'ManagedBrowser'                    = $ManagedBrowser
+        'ManagedBrowserToOpenLinksRequired' = $ManagedBrowserToOpenLinksRequired
+        'CustomBrowserDisplayName'          = $CustomBrowserDisplayName
         'CustomBrowserPackageId'            = $CustomBrowserPackageId
     }
 
     return $ManagedBrowserHash
-}
-
-function Get-InputParameters
-{
-    return @{
-        AllowedDataStorageLocations                     = @{Type = 'Parameter'        ; ExportFileType = 'Array'; };
-        AllowedInboundDataTransferSources               = @{Type = 'Parameter'        ; ExportFileType = 'String'; };
-        AllowedOutboundClipboardSharingLevel            = @{Type = 'Parameter'        ; ExportFileType = 'String'; };
-        AllowedOutboundDataTransferDestinations         = @{Type = 'Parameter'        ; ExportFileType = 'String'; };
-        ApplicationId                                   = @{Type = 'Credential'       ; ExportFileType = 'NA'; };
-        ApplicationSecret                               = @{Type = 'Credential'       ; ExportFileType = 'NA'; };
-        AppGroupType                                    = @{Type = 'ComplexParameter' ; ExportFileType = 'String'; };
-        Apps                                            = @{Type = 'ComplexParameter' ; ExportFileType = 'NA'; };
-        Assignments                                     = @{Type = 'ComplexParameter' ; ExportFileType = 'NA'; };
-        CertificateThumbprint                           = @{Type = 'Credential'       ; ExportFileType = 'NA'; };
-        Managedidentity                                 = @{Type = 'ComplexParameter' ; ExportFileType = 'NA'; };
-        ContactSyncBlocked                              = @{Type = 'Parameter'        ; ExportFileType = 'NA'; };
-        Credential                                      = @{Type = 'Credential'       ; ExportFileType = 'NA'; };
-        CustomBrowserDisplayName                        = @{Type = 'ComplexParameter' ; ExportFileType = 'NA'; };
-        CustomBrowserPackageId                          = @{Type = 'ComplexParameter' ; ExportFileType = 'NA'; };
-        DataBackupBlocked                               = @{Type = 'Parameter'        ; ExportFileType = 'NA'; };
-        Description                                     = @{Type = 'Parameter'        ; ExportFileType = 'NA'; };
-        DeviceComplianceRequired                        = @{Type = 'Parameter'        ; ExportFileType = 'NA'; };
-        DisableAppEncryptionIfDeviceEncryptionIsEnabled = @{Type = 'Parameter'        ; ExportFileType = 'NA'; };
-        DisableAppPinIfDevicePinIsSet                   = @{Type = 'Parameter'        ; ExportFileType = 'NA'; };
-        DisplayName                                     = @{Type = 'Parameter'        ; ExportFileType = 'NA'; };
-        EncryptAppData                                  = @{Type = 'Parameter'        ; ExportFileType = 'NA'; };
-        Ensure                                          = @{Type = 'ComplexParameter' ; ExportFileType = 'NA'; };
-        ExcludedGroups                                  = @{Type = 'ComplexParameter' ; ExportFileType = 'NA'; };
-        FingerprintBlocked                              = @{Type = 'Parameter'        ; ExportFileType = 'NA'; };
-        Id                                              = @{Type = 'Parameter'        ; ExportFileType = 'NA'; };
-        IsAssigned                                      = @{Type = 'ComplexParameter' ; ExportFileType = 'NA'; };
-        ManagedBrowser                                  = @{Type = 'ComplexParameter' ; ExportFileType = 'String'; };
-        ManagedBrowserToOpenLinksRequired               = @{Type = 'ComplexParameter' ; ExportFileType = 'NA'; };
-        MaximumPinRetries                               = @{Type = 'Parameter'        ; ExportFileType = 'NA'; };
-        MinimumPinLength                                = @{Type = 'Parameter'        ; ExportFileType = 'NA'; };
-        MinimumRequiredAppVersion                       = @{Type = 'Parameter'        ; ExportFileType = 'NA'; };
-        MinimumRequiredOSVersion                        = @{Type = 'Parameter'        ; ExportFileType = 'NA'; };
-        MinimumRequiredPatchVersion                     = @{Type = 'Parameter'        ; ExportFileType = 'NA'; };
-        MinimumWarningAppVersion                        = @{Type = 'Parameter'        ; ExportFileType = 'NA'; };
-        MinimumWarningOSVersion                         = @{Type = 'Parameter'        ; ExportFileType = 'NA'; };
-        MinimumWarningPatchVersion                      = @{Type = 'Parameter'        ; ExportFileType = 'NA'; };
-        OrganizationalCredentialsRequired               = @{Type = 'Parameter'        ; ExportFileType = 'NA'; };
-        PeriodBeforePinReset                            = @{Type = 'Parameter'        ; ExportFileType = 'Duration'; };
-        PeriodOfflineBeforeAccessCheck                  = @{Type = 'Parameter'        ; ExportFileType = 'Duration'; };
-        PeriodOfflineBeforeWipeIsEnforced               = @{Type = 'Parameter'        ; ExportFileType = 'Duration'; };
-        PeriodOnlineBeforeAccessCheck                   = @{Type = 'Parameter'        ; ExportFileType = 'Duration'; };
-        PinCharacterSet                                 = @{Type = 'Parameter'        ; ExportFileType = 'String'; };
-        PinRequired                                     = @{Type = 'Parameter'        ; ExportFileType = 'NA'; };
-        PrintBlocked                                    = @{Type = 'Parameter'        ; ExportFileType = 'NA'; };
-        SaveAsBlocked                                   = @{Type = 'Parameter'        ; ExportFileType = 'NA'; };
-        ScreenCaptureBlocked                            = @{Type = 'Parameter'        ; ExportFileType = 'NA'; };
-        SimplePinBlocked                                = @{Type = 'Parameter'        ; ExportFileType = 'NA'; };
-        TenantId                                        = @{Type = 'Credential'       ; ExportFileType = 'NA'; }
-    }
 }
 
 Export-ModuleMember -Function *-TargetResource

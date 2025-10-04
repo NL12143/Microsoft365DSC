@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_EXOSafeAttachmentRule'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -79,19 +81,24 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Getting configuration of SafeAttachmentRule for $Identity"
+
     if ($Global:CurrentModeIsExport)
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+        $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
             -InboundParameters $PSBoundParameters `
             -SkipModuleReload $true
     }
     else
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+        $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
             -InboundParameters $PSBoundParameters
     }
 
@@ -112,9 +119,6 @@ function Get-TargetResource
 
     try
     {
-        Write-Verbose -Message 'Global ExchangeOnlineSession status:'
-        Write-Verbose -Message "$( Get-PSSession -ErrorAction SilentlyContinue | Where-Object -FilterScript { $_.Name -eq 'ExchangeOnline' } | Out-String)"
-
         try
         {
             $SafeAttachmentRules = Get-SafeAttachmentRule -ErrorAction Stop
@@ -152,8 +156,9 @@ function Get-TargetResource
                 CertificateThumbprint     = $CertificateThumbprint
                 CertificatePath           = $CertificatePath
                 CertificatePassword       = $CertificatePassword
-                Managedidentity           = $ManagedIdentity.IsPresent
+                ManagedIdentity           = $ManagedIdentity.IsPresent
                 TenantId                  = $TenantId
+                AccessTokens              = $AccessTokens
             }
             if ('Enabled' -eq $SafeAttachmentRule.State)
             {
@@ -262,7 +267,11 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Setting configuration of SafeAttachmentRule for $Identity"
@@ -278,26 +287,20 @@ function Set-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+    $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
         -InboundParameters $PSBoundParameters
 
     $SafeAttachmentRules = Get-SafeAttachmentRule
     $SafeAttachmentRule = $SafeAttachmentRules | Where-Object -FilterScript { $_.Identity -eq $Identity }
-    $SafeAttachmentRuleParams = [System.Collections.Hashtable]($PSBoundParameters)
-    $SafeAttachmentRuleParams.Remove('Ensure') | Out-Null
-    $SafeAttachmentRuleParams.Remove('Credential') | Out-Null
-    $SafeAttachmentRuleParams.Remove('ApplicationId') | Out-Null
-    $SafeAttachmentRuleParams.Remove('TenantId') | Out-Null
-    $SafeAttachmentRuleParams.Remove('CertificateThumbprint') | Out-Null
-    $SafeAttachmentRuleParams.Remove('CertificatePath') | Out-Null
-    $SafeAttachmentRuleParams.Remove('CertificatePassword') | Out-Null
-    $SafeAttachmentRuleParams.Remove('ManagedIdentity') | Out-Null
+    $SafeAttachmentRuleParams = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
 
     if (('Present' -eq $Ensure ) -and (-not $SafeAttachmentRule))
     {
-        New-EXOSafeAttachmentRule -SafeAttachmentRuleParams $PSBoundParameters
+        $SafeAttachmentRuleParams.Add('Name', $SafeAttachmentRuleParams.Identity)
+        $SafeAttachmentRuleParams.Remove('Identity') | Out-Null
+        $SafeAttachmentRuleParams.Remove('MakeDefault') | Out-Null
+        New-SafeAttachmentRule @SafeAttachmentRuleParams -Confirm:$false
     }
-
     elseif (('Present' -eq $Ensure ) -and ($SafeAttachmentRule))
     {
         if ($SafeAttachmentRuleParams.Enabled -and ('Disabled' -eq $SafeAttachmentRule.State))
@@ -306,22 +309,22 @@ function Set-TargetResource
             # There doesn't appear to be any way to change the Enabled state of a rule once created.
             Write-Verbose -Message "Removing SafeAttachmentRule $($Identity) in order to change Enabled state."
             Remove-SafeAttachmentRule -Identity $Identity -Confirm:$false
-            New-EXOSafeAttachmentRule -SafeAttachmentRuleParams $SafeAttachmentRuleParams
+            $SafeAttachmentRuleParams.Add('Name', $SafeAttachmentRuleParams.Identity)
+            $SafeAttachmentRuleParams.Remove('Identity') | Out-Null
+            $SafeAttachmentRuleParams.Remove('MakeDefault') | Out-Null
+            New-SafeAttachmentRule @SafeAttachmentRuleParams -Confirm:$false
         }
         else
         {
-            if ($SafeAttachmentRuleParams.SafeAttachmentPolicy -ne $SafeAttachmentRule.SafeAttachmentPolicy)
-            {
-                Set-EXOSafeAttachmentRule -SafeAttachmentRuleParams $SafeAttachmentRuleParams
-            }
-            else
+            $SafeAttachmentRuleParams.Remove('Enabled') | Out-Null
+            if ($SafeAttachmentRuleParams.SafeAttachmentPolicy -eq $SafeAttachmentRule.SafeAttachmentPolicy)
             {
                 $SafeAttachmentRuleParams.Remove('SafeAttachmentPolicy')
-                Set-EXOSafeAttachmentRule -SafeAttachmentRuleParams $SafeAttachmentRuleParams
             }
+            Write-Verbose -Message "Setting SafeAttachmentRule $($Identity)"
+            Set-SafeAttachmentRule @SafeAttachmentRuleParams -Confirm:$false
         }
     }
-
     elseif (('Absent' -eq $Ensure ) -and ($SafeAttachmentRule))
     {
         Write-Verbose -Message "Removing SafeAttachmentRule $($Identity)"
@@ -410,7 +413,11 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
@@ -432,13 +439,6 @@ function Test-TargetResource
     Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
 
     $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('Credential') | Out-Null
-    $ValuesToCheck.Remove('ApplicationId') | Out-Null
-    $ValuesToCheck.Remove('TenantId') | Out-Null
-    $ValuesToCheck.Remove('CertificateThumbprint') | Out-Null
-    $ValuesToCheck.Remove('CertificatePath') | Out-Null
-    $ValuesToCheck.Remove('CertificatePassword') | Out-Null
-    $ValuesToCheck.Remove('ManagedIdentity') | Out-Null
 
     $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
         -Source $($MyInvocation.MyCommand.Source) `
@@ -482,8 +482,13 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
         -InboundParameters $PSBoundParameters `
         -SkipModuleReload $true
@@ -510,16 +515,21 @@ function Export-TargetResource
 
             if ($SafeAttachmentRules.Length -eq 0)
             {
-                Write-Host $Global:M365DSCEmojiGreenCheckMark
+                Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
             }
             else
             {
-                Write-Host "`r`n" -NoNewline
+                Write-M365DSCHost -Message "`r`n" -DeferWrite
             }
 
             foreach ($SafeAttachmentRule in $SafeAttachmentRules)
             {
-                Write-Host "    |---[$i/$($SafeAttachmentRules.Length)] $($SafeAttachmentRule.Identity)" -NoNewline
+                if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+                {
+                    $Global:M365DSCExportResourceInstancesCount++
+                }
+
+                Write-M365DSCHost -Message "    |---[$i/$($SafeAttachmentRules.Length)] $($SafeAttachmentRule.Identity)" -DeferWrite
                 $Params = @{
                     Identity              = $SafeAttachmentRule.Identity
                     SafeAttachmentPolicy  = $SafeAttachmentRule.SafeAttachmentPolicy
@@ -528,12 +538,11 @@ function Export-TargetResource
                     TenantId              = $TenantId
                     CertificateThumbprint = $CertificateThumbprint
                     CertificatePassword   = $CertificatePassword
-                    Managedidentity       = $ManagedIdentity.IsPresent
+                    ManagedIdentity       = $ManagedIdentity.IsPresent
                     CertificatePath       = $CertificatePath
+                    AccessTokens          = $AccessTokens
                 }
                 $Results = Get-TargetResource @Params
-                $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                    -Results $Results
                 $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                     -ConnectionMode $ConnectionMode `
                     -ModulePath $PSScriptRoot `
@@ -542,19 +551,19 @@ function Export-TargetResource
                 $dscContent += $currentDSCBlock
                 Save-M365DSCPartialExport -Content $currentDSCBlock `
                     -FileName $Global:PartialExportFileName
-                Write-Host $Global:M365DSCEmojiGreenCheckMark
+                Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
                 $i++
             }
         }
         else
         {
-            Write-Host "`r`n    $($Global:M365DSCEmojiYellowCircle) The current tenant doesn't have access to the Safe Attachment Rule API."
+            Write-M365DSCHost -Message "`r`n    $($Global:M365DSCEmojiYellowCircle) The current tenant doesn't have access to the Safe Attachment Rule API."
         }
         return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `

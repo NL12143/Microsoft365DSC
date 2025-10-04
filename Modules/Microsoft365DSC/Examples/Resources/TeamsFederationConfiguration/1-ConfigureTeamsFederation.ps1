@@ -7,7 +7,7 @@ Configuration Example
     param(
         [Parameter(Mandatory = $true)]
         [PSCredential]
-        $credsGlobalAdmin
+        $Credscredential
     )
     Import-DscResource -ModuleName Microsoft365DSC
 
@@ -15,12 +15,16 @@ Configuration Example
     {
         TeamsFederationConfiguration 'FederationConfiguration'
         {
-            Identity                  = "Global"
-            AllowFederatedUsers       = $True
-            AllowPublicUsers          = $True
-            AllowTeamsConsumer        = $False
-            AllowTeamsConsumerInbound = $False
-            Credential                = $credsGlobalAdmin
+            Identity                                    = "Global";
+            AllowedDomains                              = @();
+            BlockedDomains                              = @();
+            AllowFederatedUsers                         = $True;
+            AllowTeamsConsumer                          = $True;
+            AllowTeamsConsumerInbound                   = $True;
+            RestrictTeamsConsumerToExternalUserProfiles = $False;
+            SharedSipAddressSpace                       = $False;
+            TreatDiscoveredPartnersAsUnverified         = $False;
+            Credential                                  = $Credscredential
         }
     }
 }

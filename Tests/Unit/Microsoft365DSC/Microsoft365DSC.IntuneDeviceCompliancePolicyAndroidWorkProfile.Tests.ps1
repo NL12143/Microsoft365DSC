@@ -22,40 +22,112 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
 
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'Pass@word1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString ((New-Guid).ToString()) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
-            }
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
                 return 'Credentials'
             }
 
-            Mock -CommandName Update-MgDeviceManagementDeviceCompliancePolicy -MockWith {
+            Mock -CommandName Update-MgBetaDeviceManagementDeviceCompliancePolicy -MockWith {
             }
 
-            Mock -CommandName New-MgDeviceManagementDeviceCompliancePolicy -MockWith {
+            Mock -CommandName New-MgBetaDeviceManagementDeviceCompliancePolicy -MockWith {
             }
 
-            Mock -CommandName Remove-MgDeviceManagementDeviceCompliancePolicy -MockWith {
+            Mock -CommandName Remove-MgBetaDeviceManagementDeviceCompliancePolicy -MockWith {
             }
 
-            Mock -CommandName Get-MGDeviceManagementDeviceCompliancePolicyAssignment -MockWith {
+            Mock -CommandName Get-MgBetaDeviceManagementDeviceCompliancePolicy -MockWith {
+                return @{
+                    DisplayName                                    = 'Test Android Work Profile Device Compliance Policy'
+                    Description                                    = 'Test Android Work Profile Device Compliance Policy Description'
+                    Id                                             = '9c4e2ed7-706e-4874-a826-0c2778352d46'
+                    ScheduledActionsForRule =@(
+                    @{
+                        ruleName = ''
+                        scheduledActionConfigurations = @(
+                            @{
+                                actionType = 'block'
+                                gracePeriodHours = 0
+                                notificationTemplateId = '00000000-0000-0000-0000-000000000000'
+                                notificationMessageCCList = @()
+                            },
+                            @{
+                                actionType = 'pushNotification'
+                                gracePeriodHours = 0
+                                notificationTemplateId = '00000000-0000-0000-0000-000000000000'
+                                notificationMessageCCList = @()
+                            },
+                            @{
+                                actionType = 'remoteLock'
+                                gracePeriodHours = 0
+                                notificationTemplateId = '00000000-0000-0000-0000-000000000000'
+                                notificationMessageCCList = @()
+                            },
+                            @{
+                                actionType = 'Notification'
+                                gracePeriodHours = 0
+                                notificationTemplateId = '00000000-0000-0000-0000-000000000000'
+                                notificationMessageCCList = @('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000000')
+                            }
+                        )
+                        }
+                    )
+                    AdditionalProperties = @{
+                        '@odata.type'                                      = '#microsoft.graph.androidWorkProfileCompliancePolicy'
+                        PasswordRequired                                   = $True
+                        PasswordMinimumLength                              = 6
+                        PasswordRequiredType                               = 'DeviceDefault'
+                        RequiredPasswordComplexity                         = 'low'
+                        PasswordMinutesOfInactivityBeforeLock              = 5
+                        PasswordExpirationDays                             = 365
+                        PasswordPreviousPasswordBlockCount                 = 10
+                        PasswordSignInFailureCountBeforeFactoryReset       = 11
+                        SecurityPreventInstallAppsFromUnknownSources       = $True
+                        SecurityDisableUsbDebugging                        = $True
+                        SecurityRequireVerifyApps                          = $True
+                        DeviceThreatProtectionEnabled                      = $True
+                        DeviceThreatProtectionRequiredSecurityLevel        = 'Unavailable'
+                        AdvancedThreatProtectionRequiredSecurityLevel      = 'Unavailable'
+                        SecurityBlockJailbrokenDevices                     = $True
+                        OsMinimumVersion                                   = 7
+                        OsMaximumVersion                                   = 11
+                        StorageRequireEncryption                           = $True
+                        SecurityRequireSafetyNetAttestationBasicIntegrity  = $True
+                        SecurityRequireSafetyNetAttestationCertifiedDevice = $True
+                        SecurityRequireGooglePlayServices                  = $True
+                        SecurityRequireUpToDateSecurityProviders           = $True
+                        SecurityRequireCompanyPortalAppIntegrity           = $True
+                        RoleScopeTagIds                                    = '0'
+                        MinAndroidSecurityPatchLevel                       = "2024-01-01";
+                        SecurityRequiredAndroidSafetyNetEvaluationType     = "hardwareBacked"
+                        WorkProfileInactiveBeforeScreenLockInMinutes       = 480
+                        WorkProfilePasswordExpirationInDays                = 30
+                        WorkProfilePasswordMinimumLength                   = 12
+                        WorkProfilePasswordRequiredType                    = "atLeastNumeric"
+                        WorkProfilePreviousPasswordBlockCount              = 5
+                        WorkProfileRequiredPasswordComplexity              = "high"
+                        WorkProfileRequirePassword                         = $True
+                        SecurityBlockDeviceAdministratorManagedDevices     = $true
+                        RestrictedApps                                     = @('App1', 'App2', 'App3')
+                    }
+                }
+            }
 
+            Mock -CommandName Get-MgBetaDeviceManagementDeviceCompliancePolicyAssignment -MockWith {
                 return @()
             }
-
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            Mock -CommandName Update-DeviceConfigurationPolicyAssignment -MockWith {
             }
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -86,11 +158,52 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     SecurityRequireGooglePlayServices                  = $True
                     SecurityRequireUpToDateSecurityProviders           = $True
                     SecurityRequireCompanyPortalAppIntegrity           = $True
+                    MinAndroidSecurityPatchLevel                       = "2024-01-01";
+                    RequiredPasswordComplexity                         = "medium";
+                    SecurityRequiredAndroidSafetyNetEvaluationType     = "hardwareBacked"
+                    WorkProfileInactiveBeforeScreenLockInMinutes       = 480
+                    WorkProfilePasswordExpirationInDays                = 30
+                    WorkProfilePasswordMinimumLength                   = 12
+                    WorkProfilePasswordRequiredType                    = "atLeastNumeric"
+                    WorkProfilePreviousPasswordBlockCount              = 5
+                    WorkProfileRequiredPasswordComplexity              = "high"
+                    WorkProfileRequirePassword                         = $True
                     Ensure                                             = 'Present'
                     Credential                                         = $Credential
+                    ScheduledActionsForRule = [CimInstance[]]@(
+                                                (New-CimInstance `
+                                                -ClassName MSFT_scheduledActionConfigurations `
+                                                -Property @{
+                                                    actionType = 'block'
+                                                    gracePeriodHours = 0
+                                                    notificationTemplateId = '00000000-0000-0000-0000-000000000000'
+                                                } -ClientOnly)
+                                                (New-CimInstance `
+                                                -ClassName MSFT_scheduledActionConfigurations `
+                                                -Property @{
+                                                    actionType = 'pushNotification'
+                                                    gracePeriodHours = 0
+                                                    notificationTemplateId = '00000000-0000-0000-0000-000000000000'
+                                                } -ClientOnly)
+                                                (New-CimInstance `
+                                                -ClassName MSFT_scheduledActionConfigurations `
+                                                -Property @{
+                                                    actionType = 'remoteLock'
+                                                    gracePeriodHours = 0
+                                                    notificationTemplateId = '00000000-0000-0000-0000-000000000000'
+                                                } -ClientOnly)
+                                                (New-CimInstance `
+                                                -ClassName MSFT_scheduledActionConfigurations `
+                                                -Property @{
+                                                    actionType = 'Notification'
+                                                    gracePeriodHours = 0
+                                                    notificationTemplateId = '00000000-0000-0000-0000-000000000000'
+                                                    notificationMessageCCList = @('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000000')
+                                                } -ClientOnly)
+                        )
                 }
 
-                Mock -CommandName Get-MgDeviceManagementDeviceCompliancePolicy -MockWith {
+                Mock -CommandName Get-MgBetaDeviceManagementDeviceCompliancePolicy -MockWith {
                     return $null
                 }
             }
@@ -105,7 +218,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should create the Android Device Compliance Policy from the Set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName 'New-MgDeviceManagementDeviceCompliancePolicy' -Exactly 1
+                Should -Invoke -CommandName 'New-MgBetaDeviceManagementDeviceCompliancePolicy' -Exactly 1
             }
         }
 
@@ -136,43 +249,52 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     SecurityRequireGooglePlayServices                  = $True
                     SecurityRequireUpToDateSecurityProviders           = $True
                     SecurityRequireCompanyPortalAppIntegrity           = $True
+                    MinAndroidSecurityPatchLevel                       = "2024-01-01";
+                    SecurityRequiredAndroidSafetyNetEvaluationType     = "hardwareBacked"
+                    WorkProfileInactiveBeforeScreenLockInMinutes       = 360 # Updated property
+                    WorkProfilePasswordExpirationInDays                = 30
+                    WorkProfilePasswordMinimumLength                   = 12
+                    WorkProfilePasswordRequiredType                    = "atLeastNumeric"
+                    WorkProfilePreviousPasswordBlockCount              = 5
+                    WorkProfileRequiredPasswordComplexity              = "high"
+                    WorkProfileRequirePassword                         = $True
                     Ensure                                             = 'Present'
                     Credential                                         = $Credential
-                }
+                    RequiredPasswordComplexity                         = 'low'
+                    SecurityBlockDeviceAdministratorManagedDevices     = $true
+                    RestrictedApps                                     = @('App1', 'App2', 'App3')
+                    ScheduledActionsForRule = [CimInstance[]]@(
+                                                (New-CimInstance `
+                                                -ClassName MSFT_scheduledActionConfigurations `
+                                                -Property @{
+                                                    actionType = 'block'
+                                                    gracePeriodHours = 0
+                                                    notificationTemplateId = '00000000-0000-0000-0000-000000000000'
+                                                } -ClientOnly)
+                                                (New-CimInstance `
+                                                -ClassName MSFT_scheduledActionConfigurations `
+                                                -Property @{
+                                                    actionType = 'pushNotification'
+                                                    gracePeriodHours = 0
+                                                    notificationTemplateId = '00000000-0000-0000-0000-000000000000'
+                                                } -ClientOnly)
+                                                (New-CimInstance `
+                                                -ClassName MSFT_scheduledActionConfigurations `
+                                                -Property @{
+                                                    actionType = 'remoteLock'
+                                                    gracePeriodHours = 0
+                                                    notificationTemplateId = '00000000-0000-0000-0000-000000000000'
+                                                } -ClientOnly)
+                                                (New-CimInstance `
+                                                -ClassName MSFT_scheduledActionConfigurations `
+                                                -Property @{
+                                                    actionType = 'Notification'
+                                                    gracePeriodHours = 0
+                                                    notificationTemplateId = '00000000-0000-0000-0000-000000000000'
+                                                    notificationMessageCCList = @('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000000')
+                                                } -ClientOnly)
+                        )
 
-                Mock -CommandName Get-MgDeviceManagementDeviceCompliancePolicy -MockWith {
-                    return @{
-                        DisplayName          = 'Test Android Work Profile Device Compliance Policy'
-                        Description          = 'Test Android Work Profile Device Compliance Policy Description'
-                        Id                   = '9c4e2ed7-706e-4874-a826-0c2778352d47'
-                        AdditionalProperties = @{
-                            '@odata.type'                                      = '#microsoft.graph.androidWorkProfileCompliancePolicy'
-                            PasswordRequired                                   = $True
-                            PasswordMinimumLength                              = 6
-                            PasswordRequiredType                               = 'DeviceDefault'
-                            RequiredPasswordComplexity                         = 'None'
-                            PasswordMinutesOfInactivityBeforeLock              = 5
-                            PasswordExpirationDays                             = 365
-                            PasswordPreviousPasswordBlockCount                 = 10
-                            PasswordSignInFailureCountBeforeFactoryReset       = 11
-                            SecurityPreventInstallAppsFromUnknownSources       = $True
-                            SecurityDisableUsbDebugging                        = $True
-                            SecurityRequireVerifyApps                          = $True
-                            DeviceThreatProtectionEnabled                      = $True
-                            DeviceThreatProtectionRequiredSecurityLevel        = 'Unavailable'
-                            AdvancedThreatProtectionRequiredSecurityLevel      = 'Unavailable'
-                            SecurityBlockJailbrokenDevices                     = $True
-                            OsMinimumVersion                                   = 7
-                            OsMaximumVersion                                   = 11
-                            StorageRequireEncryption                           = $True
-                            SecurityRequireSafetyNetAttestationBasicIntegrity  = $True
-                            SecurityRequireSafetyNetAttestationCertifiedDevice = $True
-                            SecurityRequireGooglePlayServices                  = $True
-                            SecurityRequireUpToDateSecurityProviders           = $True
-                            SecurityRequireCompanyPortalAppIntegrity           = $True
-                            RoleScopeTagIds                                    = '0'
-                        }
-                    }
                 }
             }
 
@@ -186,7 +308,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should update the iOS Device Compliance Policy from the Set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName Update-MgDeviceManagementDeviceCompliancePolicy -Exactly 1
+                Should -Invoke -CommandName Update-MgBetaDeviceManagementDeviceCompliancePolicy -Exactly 1
             }
         }
 
@@ -217,43 +339,51 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     SecurityRequireGooglePlayServices                  = $True
                     SecurityRequireUpToDateSecurityProviders           = $True
                     SecurityRequireCompanyPortalAppIntegrity           = $True
+                    MinAndroidSecurityPatchLevel                       = "2024-01-01";
+                    SecurityRequiredAndroidSafetyNetEvaluationType     = "hardwareBacked"
+                    WorkProfileInactiveBeforeScreenLockInMinutes       = 480
+                    WorkProfilePasswordExpirationInDays                = 30
+                    WorkProfilePasswordMinimumLength                   = 12
+                    WorkProfilePasswordRequiredType                    = "atLeastNumeric"
+                    WorkProfilePreviousPasswordBlockCount              = 5
+                    WorkProfileRequiredPasswordComplexity              = "high"
+                    WorkProfileRequirePassword                         = $True
                     Ensure                                             = 'Present'
                     Credential                                         = $Credential
-                }
-
-                Mock -CommandName Get-MgDeviceManagementDeviceCompliancePolicy -MockWith {
-                    return @{
-                        DisplayName          = 'Test Android Work Profile Device Compliance Policy'
-                        Description          = 'Test Android Work Profile Device Compliance Policy Description'
-                        Id                   = '9c4e2ed7-706e-4874-a826-0c2778352d46'
-                        AdditionalProperties = @{
-                            '@odata.type'                                      = '#microsoft.graph.androidWorkProfileCompliancePolicy'
-                            PasswordRequired                                   = $True
-                            PasswordMinimumLength                              = 6
-                            PasswordRequiredType                               = 'DeviceDefault'
-                            RequiredPasswordComplexity                         = 'None'
-                            PasswordMinutesOfInactivityBeforeLock              = 5
-                            PasswordExpirationDays                             = 365
-                            PasswordPreviousPasswordBlockCount                 = 10
-                            PasswordSignInFailureCountBeforeFactoryReset       = 11
-                            SecurityPreventInstallAppsFromUnknownSources       = $True
-                            SecurityDisableUsbDebugging                        = $True
-                            SecurityRequireVerifyApps                          = $True
-                            DeviceThreatProtectionEnabled                      = $True
-                            DeviceThreatProtectionRequiredSecurityLevel        = 'Unavailable'
-                            AdvancedThreatProtectionRequiredSecurityLevel      = 'Unavailable'
-                            SecurityBlockJailbrokenDevices                     = $True
-                            OsMinimumVersion                                   = 7
-                            OsMaximumVersion                                   = 11
-                            StorageRequireEncryption                           = $True
-                            SecurityRequireSafetyNetAttestationBasicIntegrity  = $True
-                            SecurityRequireSafetyNetAttestationCertifiedDevice = $True
-                            SecurityRequireGooglePlayServices                  = $True
-                            SecurityRequireUpToDateSecurityProviders           = $True
-                            SecurityRequireCompanyPortalAppIntegrity           = $True
-                            RoleScopeTagIds                                    = '0'
-                        }
-                    }
+                    RequiredPasswordComplexity                         = 'low'
+                    SecurityBlockDeviceAdministratorManagedDevices     = $true
+                    RestrictedApps                                     = @('App1', 'App2', 'App3')
+                    ScheduledActionsForRule = [CimInstance[]]@(
+                                                (New-CimInstance `
+                                                -ClassName MSFT_scheduledActionConfigurations `
+                                                -Property @{
+                                                    actionType = 'block'
+                                                    gracePeriodHours = 0
+                                                    notificationTemplateId = '00000000-0000-0000-0000-000000000000'
+                                                } -ClientOnly)
+                                                (New-CimInstance `
+                                                -ClassName MSFT_scheduledActionConfigurations `
+                                                -Property @{
+                                                    actionType = 'pushNotification'
+                                                    gracePeriodHours = 0
+                                                    notificationTemplateId = '00000000-0000-0000-0000-000000000000'
+                                                } -ClientOnly)
+                                                (New-CimInstance `
+                                                -ClassName MSFT_scheduledActionConfigurations `
+                                                -Property @{
+                                                    actionType = 'remoteLock'
+                                                    gracePeriodHours = 0
+                                                    notificationTemplateId = '00000000-0000-0000-0000-000000000000'
+                                                } -ClientOnly)
+                                                (New-CimInstance `
+                                                -ClassName MSFT_scheduledActionConfigurations `
+                                                -Property @{
+                                                    actionType = 'Notification'
+                                                    gracePeriodHours = 0
+                                                    notificationTemplateId = '00000000-0000-0000-0000-000000000000'
+                                                    notificationMessageCCList = @('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000000')
+                                                } -ClientOnly)
+                        )
                 }
             }
 
@@ -291,41 +421,40 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     SecurityRequireCompanyPortalAppIntegrity           = $True
                     Ensure                                             = 'Absent'
                     Credential                                         = $Credential
-                }
-
-                Mock -CommandName Get-MgDeviceManagementDeviceCompliancePolicy -MockWith {
-                    return @{
-                        DisplayName          = 'Test Android Work Profile Device Compliance Policy'
-                        Description          = 'Test Android Work Profile Device Compliance Policy Description'
-                        Id                   = '9c4e2ed7-706e-4874-a826-0c2778352d46'
-                        AdditionalProperties = @{
-                            '@odata.type'                                      = '#microsoft.graph.androidWorkProfileCompliancePolicy'
-                            PasswordRequired                                   = $True
-                            PasswordMinimumLength                              = 6
-                            PasswordRequiredType                               = 'DeviceDefault'
-                            RequiredPasswordComplexity                         = 'None'
-                            PasswordMinutesOfInactivityBeforeLock              = 5
-                            PasswordExpirationDays                             = 365
-                            PasswordPreviousPasswordBlockCount                 = 10
-                            PasswordSignInFailureCountBeforeFactoryReset       = 11
-                            SecurityPreventInstallAppsFromUnknownSources       = $True
-                            SecurityDisableUsbDebugging                        = $True
-                            SecurityRequireVerifyApps                          = $True
-                            DeviceThreatProtectionEnabled                      = $True
-                            DeviceThreatProtectionRequiredSecurityLevel        = 'Unavailable'
-                            AdvancedThreatProtectionRequiredSecurityLevel      = 'Unavailable'
-                            SecurityBlockJailbrokenDevices                     = $True
-                            OsMinimumVersion                                   = 7
-                            OsMaximumVersion                                   = 11
-                            StorageRequireEncryption                           = $True
-                            SecurityRequireSafetyNetAttestationBasicIntegrity  = $True
-                            SecurityRequireSafetyNetAttestationCertifiedDevice = $True
-                            SecurityRequireGooglePlayServices                  = $True
-                            SecurityRequireUpToDateSecurityProviders           = $True
-                            SecurityRequireCompanyPortalAppIntegrity           = $True
-                            RoleScopeTagIds                                    = '0'
-                        }
-                    }
+                    RequiredPasswordComplexity                         = 'low'
+                    SecurityBlockDeviceAdministratorManagedDevices     = $true
+                    RestrictedApps                                     = @('App1', 'App2', 'App3')
+                    ScheduledActionsForRule = [CimInstance[]]@(
+                                                (New-CimInstance `
+                                                -ClassName MSFT_scheduledActionConfigurations `
+                                                -Property @{
+                                                    actionType = 'block'
+                                                    gracePeriodHours = 0
+                                                    notificationTemplateId = '00000000-0000-0000-0000-000000000000'
+                                                } -ClientOnly)
+                                                (New-CimInstance `
+                                                -ClassName MSFT_scheduledActionConfigurations `
+                                                -Property @{
+                                                    actionType = 'pushNotification'
+                                                    gracePeriodHours = 0
+                                                    notificationTemplateId = '00000000-0000-0000-0000-000000000000'
+                                                } -ClientOnly)
+                                                (New-CimInstance `
+                                                -ClassName MSFT_scheduledActionConfigurations `
+                                                -Property @{
+                                                    actionType = 'remoteLock'
+                                                    gracePeriodHours = 0
+                                                    notificationTemplateId = '00000000-0000-0000-0000-000000000000'
+                                                } -ClientOnly)
+                                                (New-CimInstance `
+                                                -ClassName MSFT_scheduledActionConfigurations `
+                                                -Property @{
+                                                    actionType = 'Notification'
+                                                    gracePeriodHours = 0
+                                                    notificationTemplateId = '00000000-0000-0000-0000-000000000000'
+                                                    notificationMessageCCList = @('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000000')
+                                                } -ClientOnly)
+                        )
                 }
             }
 
@@ -339,54 +468,22 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should remove the iOS Device Compliance Policy from the Set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName Remove-MgDeviceManagementDeviceCompliancePolicy -Exactly 1
+                Should -Invoke -CommandName Remove-MgBetaDeviceManagementDeviceCompliancePolicy -Exactly 1
             }
         }
 
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
-                }
-
-                Mock -CommandName Get-MgDeviceManagementDeviceCompliancePolicy -MockWith {
-                    return @{
-                        DisplayName          = 'Test Android Device Compliance Policy'
-                        Description          = 'Test Android Device Compliance Policy Description'
-                        Id                   = '9c4e2ed7-706e-4874-a826-0c2778352d46'
-                        AdditionalProperties = @{
-                            '@odata.type'                                      = '#microsoft.graph.androidWorkProfileCompliancePolicy'
-                            PasswordRequired                                   = $True
-                            PasswordMinimumLength                              = 6
-                            PasswordRequiredType                               = 'DeviceDefault'
-                            RequiredPasswordComplexity                         = 'None'
-                            PasswordMinutesOfInactivityBeforeLock              = 5
-                            PasswordExpirationDays                             = 365
-                            PasswordPreviousPasswordBlockCount                 = 10
-                            PasswordSignInFailureCountBeforeFactoryReset       = 11
-                            SecurityPreventInstallAppsFromUnknownSources       = $True
-                            SecurityDisableUsbDebugging                        = $True
-                            SecurityRequireVerifyApps                          = $True
-                            DeviceThreatProtectionEnabled                      = $True
-                            DeviceThreatProtectionRequiredSecurityLevel        = 'Unavailable'
-                            AdvancedThreatProtectionRequiredSecurityLevel      = 'Unavailable'
-                            SecurityBlockJailbrokenDevices                     = $True
-                            OsMinimumVersion                                   = 7
-                            OsMaximumVersion                                   = 11
-                            StorageRequireEncryption                           = $True
-                            SecurityRequireSafetyNetAttestationBasicIntegrity  = $True
-                            SecurityRequireSafetyNetAttestationCertifiedDevice = $True
-                            SecurityRequireGooglePlayServices                  = $True
-                            SecurityRequireUpToDateSecurityProviders           = $True
-                            SecurityRequireCompanyPortalAppIntegrity           = $True
-                        }
-                    }
                 }
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

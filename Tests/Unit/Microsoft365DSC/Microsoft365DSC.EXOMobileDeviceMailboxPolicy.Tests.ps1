@@ -23,17 +23,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
 
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
-            }
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
@@ -46,9 +39,30 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             Mock -CommandName Remove-PSSession -MockWith {
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            Mock -CommandName Set-MobileDeviceMailboxPolicy -MockWith {
             }
+
+            Mock -CommandName Remove-MobileDeviceMailboxPolicy -MockWith {
+            }
+
+            Mock -CommandName New-MobileDeviceMailboxPolicy -MockWith {
+            }
+
+            Mock -CommandName Get-MobileDeviceMailboxPolicy -MockWith {
+                return @{
+                    Name                         = 'Contoso Mobile Device Policy'
+                    AllowBluetooth               = 'Allow'
+                    IrmEnabled                   = $true
+                    PasswordHistory              = '4'
+                    RequireManualSyncWhenRoaming = $false
+                }
+            }
+
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -65,25 +79,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 }
 
                 Mock -CommandName Get-MobileDeviceMailboxPolicy -MockWith {
-                    return @{
-                        Name                         = 'Contoso Different Mobile Device Policy'
-                        AllowBluetooth               = 'Allow'
-                        IrmEnabled                   = $true
-                        PasswordHistory              = '4'
-                        RequireManualSyncWhenRoaming = $false
-                    }
-                }
-
-                Mock -CommandName Set-MobileDeviceMailboxPolicy -MockWith {
-                    return @{
-                        Name                         = 'Contoso Mobile Device Policy'
-                        AllowBluetooth               = 'Allow'
-                        IrmEnabled                   = $true
-                        PasswordHistory              = '4'
-                        RequireManualSyncWhenRoaming = $false
-                        Ensure                       = 'Present'
-                        Credential                   = $Credential
-                    }
+                    return $null
                 }
             }
 
@@ -93,6 +89,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the Set method' {
                 Set-TargetResource @testParams
+                Should -Invoke -CommandName New-MobileDeviceMailboxPolicy -Exactly 1
             }
 
             It 'Should return Absent from the Get method' {
@@ -111,16 +108,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Ensure                       = 'Present'
                     Credential                   = $Credential
                 }
-
-                Mock -CommandName Get-MobileDeviceMailboxPolicy -MockWith {
-                    return @{
-                        Name                         = 'Contoso Mobile Device Policy'
-                        AllowBluetooth               = 'Allow'
-                        IrmEnabled                   = $true
-                        PasswordHistory              = '4'
-                        RequireManualSyncWhenRoaming = $false
-                    }
-                }
             }
 
             It 'Should return true from the Test method' {
@@ -138,32 +125,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Name                         = 'Contoso Mobile Device Policy'
                     AllowBluetooth               = 'Allow'
                     IrmEnabled                   = $true
-                    PasswordHistory              = '4'
+                    PasswordHistory              = '2' # Drift
                     RequireManualSyncWhenRoaming = $false
                     Ensure                       = 'Present'
                     Credential                   = $Credential
-                }
-
-                Mock -CommandName Get-MobileDeviceMailboxPolicy -MockWith {
-                    return @{
-                        Name                         = 'Contoso Mobile Device Policy'
-                        AllowBluetooth               = 'Allow'
-                        IrmEnabled                   = $true
-                        PasswordHistory              = '2'
-                        RequireManualSyncWhenRoaming = $false
-                    }
-                }
-
-                Mock -CommandName Set-MobileDeviceMailboxPolicy -MockWith {
-                    return @{
-                        Name                         = 'Contoso Mobile Device Policy'
-                        AllowBluetooth               = 'Allow'
-                        IrmEnabled                   = $true
-                        PasswordHistory              = '4'
-                        RequireManualSyncWhenRoaming = $false
-                        Ensure                       = 'Present'
-                        Credential                   = $Credential
-                    }
                 }
             }
 
@@ -173,30 +138,22 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the Set method' {
                 Set-TargetResource @testParams
+                Should -Invoke -CommandName Set-MobileDeviceMailboxPolicy -Exactly 1
             }
         }
 
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
-                }
-
-                $MobileDeviceMailboxPolicy = @{
-                    Name                         = 'Contoso Mobile Device Policy'
-                    AllowBluetooth               = 'Allow'
-                    IrmEnabled                   = $true
-                    PasswordHistory              = '4'
-                    RequireManualSyncWhenRoaming = $false
-                }
-                Mock -CommandName Get-MobileDeviceMailboxPolicy -MockWith {
-                    return $MobileDeviceMailboxPolicy
                 }
             }
 
             It 'Should Reverse Engineer resource from the Export method when single' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

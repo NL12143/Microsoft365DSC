@@ -20,17 +20,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
     InModuleScope -ModuleName $Global:DscHelper.ModuleName -ScriptBlock {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
-            }
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
@@ -46,9 +39,26 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             Mock -CommandName Set-OMEConfiguration -MockWith {
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            Mock -CommandName Get-OMEConfiguration  -MockWith {
+                return @{
+                    BackgroundColor     = 'Navy'
+                    DisclaimerText      = 'Test Text'
+                    EmailText           = 'Email'
+                    Identity            = 'OME Configuration'
+                    IntroductionText    = 'Hello World'
+                    OTPEnabled          = $True
+                    PortalText          = 'Portal Text'
+                    PrivacyStatementUrl = 'Privacy'
+                    ReadButtonText      = 'Read'
+                    SocialIdSignIn      = $True
+                }
             }
+
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -62,26 +72,11 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Ensure              = 'Present'
                     Identity            = 'OME Configuration'
                     IntroductionText    = 'Hello World'
-                    OTPEnabled          = $True
+                    OTPEnabled          = $false # Drift
                     PortalText          = 'Portal Text'
                     PrivacyStatementUrl = 'Privacy'
                     ReadButtonText      = 'Read'
                     SocialIdSignIn      = $True
-                }
-
-                Mock -CommandName Get-OMEConfiguration -MockWith {
-                    return @{
-                        BackgroundColor     = 'Navy'
-                        DisclaimerText      = 'Test Text'
-                        EmailText           = 'Email'
-                        Identity            = 'OME Configuration'
-                        IntroductionText    = 'Hello World'
-                        OTPEnabled          = $False; #drift
-                        PortalText          = 'Portal Text'
-                        PrivacyStatementUrl = 'Privacy'
-                        ReadButtonText      = 'Read'
-                        SocialIdSignIn      = $True
-                    }
                 }
             }
 
@@ -111,21 +106,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     ReadButtonText      = 'Read'
                     SocialIdSignIn      = $True
                 }
-
-                Mock -CommandName Get-OMEConfiguration  -MockWith {
-                    return @{
-                        BackgroundColor     = 'Navy'
-                        DisclaimerText      = 'Test Text'
-                        EmailText           = 'Email'
-                        Identity            = 'OME Configuration'
-                        IntroductionText    = 'Hello World'
-                        OTPEnabled          = $True
-                        PortalText          = 'Portal Text'
-                        PrivacyStatementUrl = 'Privacy'
-                        ReadButtonText      = 'Read'
-                        SocialIdSignIn      = $True
-                    }
-                }
             }
 
             It 'Should return true from the Test method' {
@@ -136,28 +116,15 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
-                }
-
-                Mock -CommandName Get-OMEConfiguration  -MockWith {
-                    return @{
-                        BackgroundColor     = 'Navy'
-                        DisclaimerText      = 'Test Text'
-                        EmailText           = 'Email'
-                        Identity            = 'OME Configuration'
-                        IntroductionText    = 'Hello World'
-                        OTPEnabled          = $True
-                        PortalText          = 'Portal Text'
-                        PrivacyStatementUrl = 'Privacy'
-                        ReadButtonText      = 'Read'
-                        SocialIdSignIn      = $True
-                    }
                 }
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

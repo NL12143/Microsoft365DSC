@@ -1,12 +1,15 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_EXOResourceConfiguration'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
     [OutputType([System.Collections.Hashtable])]
     param
     (
-        [Parameter()]
+        [Parameter(Mandatory = $true)]
         [System.String]
-        $Identity,
+        [ValidateSet('Yes')]
+        $IsSingleInstance,
 
         [Parameter()]
         [System.String[]]
@@ -43,19 +46,24 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-    Write-Verbose -Message 'Getting Resource Configuration'
+
+    Write-Verbose -Message 'Getting configuration of the EXO Resource Configuration'
 
     if ($Global:CurrentModeIsExport)
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+        $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
             -InboundParameters $PSBoundParameters `
             -SkipModuleReload $true
     }
     else
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+        $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
             -InboundParameters $PSBoundParameters
     }
 
@@ -78,13 +86,13 @@ function Get-TargetResource
     {
         #Get-Resourceconfig do NOT accept ErrorAction parameter
         $ResourceConfiguration = Get-ResourceConfig 2>&1
-        if ($null -ne ($ResourceConfiguration | Where-Object { $_.gettype().Name -like '*ErrorRecord*' }))
+        if ($null -ne ($ResourceConfiguration | Where-Object { $_.GetType().Name -like '*ErrorRecord*' }))
         {
             throw $ResourceConfiguration
         }
 
         $result = @{
-            Identity               = $ResourceConfiguration.Identity
+            IsSingleInstance       = 'Yes'
             ResourcePropertySchema = $ResourceConfiguration.ResourcePropertySchema
             Credential             = $Credential
             Ensure                 = 'Present'
@@ -92,8 +100,9 @@ function Get-TargetResource
             CertificateThumbprint  = $CertificateThumbprint
             CertificatePath        = $CertificatePath
             CertificatePassword    = $CertificatePassword
-            Managedidentity        = $ManagedIdentity.IsPresent
+            ManagedIdentity        = $ManagedIdentity.IsPresent
             TenantId               = $TenantId
+            AccessTokens           = $AccessTokens
         }
 
         Write-Verbose -Message 'Found resource configuration '
@@ -117,9 +126,10 @@ function Set-TargetResource
     [CmdletBinding()]
     param
     (
-        [Parameter()]
+        [Parameter(Mandatory = $true)]
         [System.String]
-        $Identity,
+        [ValidateSet('Yes')]
+        $IsSingleInstance,
 
         [Parameter()]
         [System.String[]]
@@ -156,7 +166,11 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
@@ -172,19 +186,11 @@ function Set-TargetResource
 
     Write-Verbose -Message 'Setting configuration of Resource Configuration'
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+    $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
         -InboundParameters $PSBoundParameters
 
-    $ResourceConfigurationParams = [System.Collections.Hashtable]($PSBoundParameters)
-    $ResourceConfigurationParams.Remove('Ensure') | Out-Null
-    $ResourceConfigurationParams.Remove('Credential') | Out-Null
-    $ResourceConfigurationParams.Remove('ApplicationId') | Out-Null
-    $ResourceConfigurationParams.Remove('TenantId') | Out-Null
-    $ResourceConfigurationParams.Remove('CertificateThumbprint') | Out-Null
-    $ResourceConfigurationParams.Remove('CertificatePath') | Out-Null
-    $ResourceConfigurationParams.Remove('CertificatePassword') | Out-Null
-    $ResourceConfigurationParams.Remove('ManagedIdentity') | Out-Null
-    $ResourceConfigurationParams.Remove('Identity') | Out-Null
+    $ResourceConfigurationParams = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
+    $ResourceConfigurationParams.Remove('IsSingleInstance') | Out-Null
 
     if (('Present' -eq $Ensure ) -and ($Null -ne $ResourceConfigurationParams))
     {
@@ -199,9 +205,10 @@ function Test-TargetResource
     [OutputType([System.Boolean])]
     param
     (
-        [Parameter()]
+        [Parameter(Mandatory = $true)]
         [System.String]
-        $Identity,
+        [ValidateSet('Yes')]
+        $IsSingleInstance,
 
         [Parameter()]
         [System.String[]]
@@ -238,13 +245,15 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
 
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -252,30 +261,9 @@ function Test-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message 'Testing configuration of Resource Configuration '
-
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-
-    Write-Verbose -Message "Current Values: $(Convert-M365DscHashtableToString -Hashtable $CurrentValues)"
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('Credential') | Out-Null
-    $ValuesToCheck.Remove('ApplicationId') | Out-Null
-    $ValuesToCheck.Remove('TenantId') | Out-Null
-    $ValuesToCheck.Remove('CertificateThumbprint') | Out-Null
-    $ValuesToCheck.Remove('CertificatePath') | Out-Null
-    $ValuesToCheck.Remove('CertificatePassword') | Out-Null
-    $ValuesToCheck.Remove('ManagedIdentity') | Out-Null
-
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck $ValuesToCheck.Keys
-
-    Write-Verbose -Message "Test-TargetResource returned $($TestResult)"
-
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '')
+    return $result
 }
 
 function Export-TargetResource
@@ -285,19 +273,6 @@ function Export-TargetResource
     param
     (
         [Parameter()]
-        [System.String]
-        $Identity,
-
-        [Parameter()]
-        [System.String[]]
-        $ResourcePropertySchema,
-
-        [Parameter()]
-        [ValidateSet('Present', 'Absent')]
-        [System.String]
-        $Ensure = 'Present',
-
-        [Parameter()]
         [System.Management.Automation.PSCredential]
         $Credential,
 
@@ -323,8 +298,13 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' -InboundParameters $PSBoundParameters -SkipModuleReload $true
 
     #Ensure the proper dependencies are installed in the current environment.
@@ -342,30 +322,34 @@ function Export-TargetResource
     try
     {
         $ResourceConfiguration = Get-ResourceConfig 2>&1
-        if ($null -ne ($ResourceConfiguration | Where-Object { $_.gettype().Name -like '*ErrorRecord*' }))
+        if ($null -ne ($ResourceConfiguration | Where-Object { $_.GetType().Name -like '*ErrorRecord*' }))
         {
             throw $ResourceConfiguration
         }
 
         $dscContent = ''
-        Write-Host "`r`n" -NoNewline
+        Write-M365DSCHost -Message "`r`n" -DeferWrite
 
-        Write-Host "    |---[1/1] $($ResourceConfiguration.Identity)" -NoNewline
+        Write-M365DSCHost -Message  "    |---[1/1] $($ResourceConfiguration.Identity)" -DeferWrite
+
+        if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+        {
+            $Global:M365DSCExportResourceInstancesCount++
+        }
 
         $Params = @{
-            Identity              = $ResourceConfiguration.Identity
+            IsSingleInstance      = 'Yes'
             Credential            = $Credential
             ApplicationId         = $ApplicationId
             TenantId              = $TenantId
             CertificateThumbprint = $CertificateThumbprint
             CertificatePassword   = $CertificatePassword
-            Managedidentity       = $ManagedIdentity.IsPresent
+            ManagedIdentity       = $ManagedIdentity.IsPresent
             CertificatePath       = $CertificatePath
+            AccessTokens          = $AccessTokens
         }
 
         $Results = Get-TargetResource @Params
-        $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-            -Results $Results
         $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
             -ConnectionMode $ConnectionMode `
             -ModulePath $PSScriptRoot `
@@ -374,14 +358,14 @@ function Export-TargetResource
         $dscContent += $currentDSCBlock
         Save-M365DSCPartialExport -Content $currentDSCBlock `
             -FileName $Global:PartialExportFileName
-        Write-Host $Global:M365DSCEmojiGreenCheckMark
+        Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
-        New-M365DSCLogEntry -Message "Error during Export:" `
+        New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `
             -Source $($MyInvocation.MyCommand.Source) `
             -TenantId $TenantId `

@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_PPPowerAppsEnvironment'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -9,13 +11,31 @@ function Get-TargetResource
 
         [Parameter(Mandatory = $true)]
         [System.String]
-        [ValidateSet('canada', 'unitedstates', 'europe', 'asia', 'australia', 'india', 'japan', 'unitedkingdom', 'unitedstatesfirstrelease', 'southamerica', 'france', 'usgov')]
+        [ValidateSet('canada', 'unitedstates', 'europe', 'asia', 'australia', 'india', 'japan', 'unitedkingdom', 'unitedstatesfirstrelease', 'southamerica', 'france', 'usgov', 'unitedarabemirates', 'germany', 'switzerland', 'norway', 'korea', 'southafrica')]
         $Location,
+
+        [Parameter()]
+        [System.String]
+        $EnvironmentType,
 
         [Parameter(Mandatory = $true)]
         [System.String]
-        [ValidateSet('Production', 'Standard', 'Trial', 'Sandbox', 'SubscriptionBasedTrial', 'Teams')]
+        [ValidateSet("Production","Standard","Trial","Sandbox","SubscriptionBasedTrial","Teams","Developer","Basic","Default")]
         $EnvironmentSKU,
+
+        [Parameter()]
+        [Switch]
+        $ProvisionDatabase,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet('1033', '1025', '1069', '1026', '1027', '3076', '2052', '1028', '1050', '1029', '1030', '1043', '1061', '1035', '1036', '1110', '1031', '1032', '1037', '1081', '1038', '1040', '1041', '1087', '1042', '1062', '1063', '1044', '1045', '1046', '2070', '1048', '1049', '2074', '1051', '1060', '3082', '1053', '1054', '1055', '1058', '1066', '3098', '1086', '1057')]
+        $LanguageName,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet('KZT', 'ZAR', 'ETB', 'AED', 'BHD', 'DZD', 'EGP', 'IQD', 'JOD', 'KWD', 'LBP', 'LYD', 'MAD', 'OMR', 'QAR', 'SAR', 'SYP', 'TND', 'YER', 'CLP', 'INR', 'AZN', 'RUB', 'BYN', 'BGN', 'NGN', 'BDT', 'CNY', 'EUR', 'BAM', 'USD', 'CZK', 'GBP', 'DKK', 'CHF', 'MVR', 'BTN', 'XCD', 'AUD', 'BZD', 'CAD', 'HKD', 'IDR', 'JMD', 'MYR', 'NZD', 'PHP', 'SGD', 'TTD', 'XDR', 'ARS', 'BOB', 'COP', 'CRC', 'CUP', 'DOP', 'GTQ', 'HNL', 'MXN', 'NIO', 'PAB', 'PEN', 'PYG', 'UYU', 'VES', 'IRR', 'XOF', 'CDF', 'XAF', 'HTG', 'ILS', 'HUF', 'AMD', 'ISK', 'JPY', 'GEL', 'KHR', 'KRW', 'KGS', 'LAK', 'MKD', 'MNT', 'BND', 'MMK', 'NOK', 'NPR', 'PKR', 'PLN', 'AFN', 'BRL', 'MDL', 'RON', 'RWF', 'SEK', 'LKR', 'SOS', 'ALL', 'RSD', 'KES', 'TJS', 'THB', 'ERN', 'TMT', 'BWP', 'TRY', 'UAH', 'UZS', 'VND', 'MOP', 'TWD')]
+        $CurrencyName,
 
         [Parameter()]
         [ValidateSet('Present', 'Absent')]
@@ -24,31 +44,66 @@ function Get-TargetResource
 
         [Parameter()]
         [System.Management.Automation.PSCredential]
-        $Credential
+        $Credential,
+
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [System.Management.Automation.PSCredential]
+        $ApplicationSecret
     )
 
     Write-Verbose -Message "Getting configuration for PowerApps Environment {$DisplayName}"
-    $ConnectionMode = New-M365DSCConnection -Workload 'PowerPlatforms' `
-        -InboundParameters $PSBoundParameters
-
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
-
-    #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
-    $CommandName = $MyInvocation.MyCommand
-    $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
-        -CommandName $CommandName `
-        -Parameters $PSBoundParameters
-    Add-M365DSCTelemetryEvent -Data $data
-    #endregion
-
-    $nullReturn = $PSBoundParameters
-    $nullReturn.Ensure = 'Absent'
 
     try
     {
-        $environment = Get-AdminPowerAppEnvironment -ErrorAction Stop | Where-Object -FilterScript { $_.DisplayName -eq $DisplayName }
+        if (-not $Script:exportedInstance -or $Script:exportedInstance.properties.displayName -ne $DisplayName)
+        {
+            $null = New-M365DSCConnection -Workload 'PowerPlatformREST' `
+                -InboundParameters $PSBoundParameters
+
+            #Ensure the proper dependencies are installed in the current environment.
+            Confirm-M365DSCDependencies
+
+            #region Telemetry
+            $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+            $CommandName = $MyInvocation.MyCommand
+            $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
+                -CommandName $CommandName `
+                -Parameters $PSBoundParameters
+            Add-M365DSCTelemetryEvent -Data $data
+            #endregion
+
+            $nullReturn = $PSBoundParameters
+            $nullReturn.Ensure = 'Absent'
+
+            $uri = "https://" + (Get-MSCloudLoginConnectionProfile -Workload 'PowerPlatformREST').BapEndpoint + `
+                "/providers/Microsoft.BusinessAppPlatform/scopes/admin/environments?`$expand=permissions&api-version=2016-11-01"
+
+            $environments = (Invoke-M365DSCPowerPlatformRESTWebRequest -Uri $uri -Method 'GET').value
+            foreach ($environmentInfo in $environments)
+            {
+                if ($environmentInfo.properties.displayName -eq $DisplayName)
+                {
+                    $environment = $environmentInfo
+                    break
+                }
+            }
+        }
+        else
+        {
+            $environment = $Script:exportedInstance
+        }
 
         if ($null -eq $environment)
         {
@@ -57,12 +112,30 @@ function Get-TargetResource
         }
 
         Write-Verbose -Message "Found PowerApps Environment {$DisplayName}"
+        if ($null -ne $environment.properties.linkedEnvironmentMetadata)
+        {
+            $ProvisionDatabaseparam = $true
+            $LanguageNameparam = $environment.properties.linkedEnvironmentMetadata.baseLanguage
+        }
+
+        $envSku = $environment.properties.EnvironmentSKU
+        if ($envSku -eq 'Notspecified')
+        {
+            $envSku = 'Teams'
+        }
         return @{
-            DisplayName    = $DisplayName
-            Location       = $environment.Location
-            EnvironmentSKU = $environment.EnvironmentType
-            Ensure         = 'Present'
-            Credential     = $Credential
+            DisplayName           = $DisplayName
+            Location              = $environment.location
+            EnvironmentType       = $environment.properties.EnvironmentType
+            EnvironmentSKU        = $envSku
+            ProvisionDatabase     = $ProvisionDatabaseparam
+            LanguageName          = $LanguageNameparam
+            Ensure                = 'Present'
+            Credential            = $Credential
+            ApplicationId         = $ApplicationId
+            TenantId              = $TenantId
+            CertificateThumbprint = $CertificateThumbprint
+            ApplicationSecret     = $ApplicationSecret
         }
     }
     catch
@@ -87,13 +160,31 @@ function Set-TargetResource
 
         [Parameter(Mandatory = $true)]
         [System.String]
-        [ValidateSet('canada', 'unitedstates', 'europe', 'asia', 'australia', 'india', 'japan', 'unitedkingdom', 'unitedstatesfirstrelease', 'southamerica', 'france', 'usgov')]
+        [ValidateSet('canada', 'unitedstates', 'europe', 'asia', 'australia', 'india', 'japan', 'unitedkingdom', 'unitedstatesfirstrelease', 'southamerica', 'france', 'usgov', 'unitedarabemirates', 'germany', 'switzerland', 'norway', 'korea', 'southafrica')]
         $Location,
+
+        [Parameter()]
+        [System.String]
+        $EnvironmentType,
 
         [Parameter(Mandatory = $true)]
         [System.String]
-        [ValidateSet('Production', 'Standard', 'Trial', 'Sandbox', 'SubscriptionBasedTrial', 'Teams')]
+        [ValidateSet("Production","Standard","Trial","Sandbox","SubscriptionBasedTrial","Teams","Developer","Basic","Default")]
         $EnvironmentSKU,
+
+        [Parameter()]
+        [Switch]
+        $ProvisionDatabase,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet('1033', '1025', '1069', '1026', '1027', '3076', '2052', '1028', '1050', '1029', '1030', '1043', '1061', '1035', '1036', '1110', '1031', '1032', '1037', '1081', '1038', '1040', '1041', '1087', '1042', '1062', '1063', '1044', '1045', '1046', '2070', '1048', '1049', '2074', '1051', '1060', '3082', '1053', '1054', '1055', '1058', '1066', '3098', '1086', '1057')]
+        $LanguageName,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet('KZT', 'ZAR', 'ETB', 'AED', 'BHD', 'DZD', 'EGP', 'IQD', 'JOD', 'KWD', 'LBP', 'LYD', 'MAD', 'OMR', 'QAR', 'SAR', 'SYP', 'TND', 'YER', 'CLP', 'INR', 'AZN', 'RUB', 'BYN', 'BGN', 'NGN', 'BDT', 'CNY', 'EUR', 'BAM', 'USD', 'CZK', 'GBP', 'DKK', 'CHF', 'MVR', 'BTN', 'XCD', 'AUD', 'BZD', 'CAD', 'HKD', 'IDR', 'JMD', 'MYR', 'NZD', 'PHP', 'SGD', 'TTD', 'XDR', 'ARS', 'BOB', 'COP', 'CRC', 'CUP', 'DOP', 'GTQ', 'HNL', 'MXN', 'NIO', 'PAB', 'PEN', 'PYG', 'UYU', 'VES', 'IRR', 'XOF', 'CDF', 'XAF', 'HTG', 'ILS', 'HUF', 'AMD', 'ISK', 'JPY', 'GEL', 'KHR', 'KRW', 'KGS', 'LAK', 'MKD', 'MNT', 'BND', 'MMK', 'NOK', 'NPR', 'PKR', 'PLN', 'AFN', 'BRL', 'MDL', 'RON', 'RWF', 'SEK', 'LKR', 'SOS', 'ALL', 'RSD', 'KES', 'TJS', 'THB', 'ERN', 'TMT', 'BWP', 'TRY', 'UAH', 'UZS', 'VND', 'MOP', 'TWD')]
+        $CurrencyName,
 
         [Parameter()]
         [ValidateSet('Present', 'Absent')]
@@ -102,7 +193,23 @@ function Set-TargetResource
 
         [Parameter()]
         [System.Management.Automation.PSCredential]
-        $Credential
+        $Credential,
+
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [System.Management.Automation.PSCredential]
+        $ApplicationSecret
     )
 
     Write-Verbose -Message "Setting configuration for PowerApps Environment {$DisplayName}"
@@ -119,20 +226,53 @@ function Set-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'PowerPlatforms' `
-        -InboundParameters $PSBoundParameters
-
     $CurrentValues = Get-TargetResource @PSBoundParameters
-    $CurrentParameters = $PSBoundParameters
-    $CurrentParameters.Remove('Credential')
-    $CurrentParameters.Remove('Ensure')
+    $CurrentParameters = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
 
     if ($Ensure -eq 'Present' -and $CurrentValues.Ensure -eq 'Absent')
     {
+        # DEPRECATED
+        if ($EnvironmentSKU -in @("Basic", "Standard"))
+        {
+            throw "EnvironmentSKU {$($EnvironmentSKU)} is a legacy type and cannot be used to create new environments."
+        }
+
         Write-Verbose -Message "Creating new PowerApps environment {$DisplayName}"
         try
         {
-            New-AdminPowerAppEnvironment @CurrentParameters
+            $uri = "https://" + (Get-MSCloudLoginConnectionProfile -Workload 'PowerPlatformREST').BapEndpoint + `
+               "/providers/Microsoft.BusinessAppPlatform/environments?api-version=2020-08-01&id=/providers/Microsoft.BusinessAppPlatform/scopes/admin/environments"
+
+            $newParameters = @{
+                location   = $Location
+                properties = @{
+                    displayName     = $DisplayName
+                    description     = ''
+                    environmentSku  = $EnvironmentSku
+                    environmentType = $EnvironmentType
+                }
+            }
+
+            if ($ProvisionDatabase)
+            {
+                if ($null -ne $CurrencyName -and
+                    $null -ne $LanguageName)
+                {
+                    $newParameters.properties['linkedEnvironmentMetadata'] = @{
+                        baseLanguage = $LanguageName
+                        currency     = @{
+                            code = $CurrencyName
+                        }
+                    }
+                }
+                $newParameters.properties["databaseType"] = "CommonDataService"
+            }
+            if ($EnvironmentSku -eq "Developer" -and !$ProvisionDatabase)
+            {
+                Write-Error "Developer environments must always include Dataverse provisioning parameters."
+                throw $_
+            }
+            Invoke-M365DSCPowerPlatformRESTWebRequest -Uri $uri -Method 'POST' -Body $newParameters
         }
         catch
         {
@@ -147,7 +287,10 @@ function Set-TargetResource
     elseif ($Ensure -eq 'Absent' -and $CurrentValues.Ensure -eq 'Present')
     {
         Write-Verbose -Message "Removing existing instance of PowerApps environment {$DisplayName}"
-        Remove-AdminPowerAppEnvironment -EnvironmentName -$DisplayName | Out-Null
+        $uri = "https://" + (Get-MSCloudLoginConnectionProfile -Workload 'PowerPlatformREST').BapEndpoint + `
+               "/providers/Microsoft.BusinessAppPlatform/scopes/admin/environments/$($DisplayName)/validateDelete?api-version=2018-01-01"
+
+        Invoke-M365DSCPowerPlatformRESTWebRequest -Uri $uri -Method 'DELETE'
     }
 }
 
@@ -162,13 +305,31 @@ function Test-TargetResource
 
         [Parameter(Mandatory = $true)]
         [System.String]
-        [ValidateSet('canada', 'unitedstates', 'europe', 'asia', 'australia', 'india', 'japan', 'unitedkingdom', 'unitedstatesfirstrelease', 'southamerica', 'france', 'usgov')]
+        [ValidateSet('canada', 'unitedstates', 'europe', 'asia', 'australia', 'india', 'japan', 'unitedkingdom', 'unitedstatesfirstrelease', 'southamerica', 'france', 'usgov', 'unitedarabemirates', 'germany', 'switzerland', 'norway', 'korea', 'southafrica')]
         $Location,
+
+        [Parameter()]
+        [System.String]
+        $EnvironmentType,
 
         [Parameter(Mandatory = $true)]
         [System.String]
-        [ValidateSet('Production', 'Standard', 'Trial', 'Sandbox', 'SubscriptionBasedTrial', 'Teams')]
+        [ValidateSet("Production","Standard","Trial","Sandbox","SubscriptionBasedTrial","Teams","Developer","Basic","Default")]
         $EnvironmentSKU,
+
+        [Parameter()]
+        [Switch]
+        $ProvisionDatabase,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet('1033', '1025', '1069', '1026', '1027', '3076', '2052', '1028', '1050', '1029', '1030', '1043', '1061', '1035', '1036', '1110', '1031', '1032', '1037', '1081', '1038', '1040', '1041', '1087', '1042', '1062', '1063', '1044', '1045', '1046', '2070', '1048', '1049', '2074', '1051', '1060', '3082', '1053', '1054', '1055', '1058', '1066', '3098', '1086', '1057')]
+        $LanguageName,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet('KZT', 'ZAR', 'ETB', 'AED', 'BHD', 'DZD', 'EGP', 'IQD', 'JOD', 'KWD', 'LBP', 'LYD', 'MAD', 'OMR', 'QAR', 'SAR', 'SYP', 'TND', 'YER', 'CLP', 'INR', 'AZN', 'RUB', 'BYN', 'BGN', 'NGN', 'BDT', 'CNY', 'EUR', 'BAM', 'USD', 'CZK', 'GBP', 'DKK', 'CHF', 'MVR', 'BTN', 'XCD', 'AUD', 'BZD', 'CAD', 'HKD', 'IDR', 'JMD', 'MYR', 'NZD', 'PHP', 'SGD', 'TTD', 'XDR', 'ARS', 'BOB', 'COP', 'CRC', 'CUP', 'DOP', 'GTQ', 'HNL', 'MXN', 'NIO', 'PAB', 'PEN', 'PYG', 'UYU', 'VES', 'IRR', 'XOF', 'CDF', 'XAF', 'HTG', 'ILS', 'HUF', 'AMD', 'ISK', 'JPY', 'GEL', 'KHR', 'KRW', 'KGS', 'LAK', 'MKD', 'MNT', 'BND', 'MMK', 'NOK', 'NPR', 'PKR', 'PLN', 'AFN', 'BRL', 'MDL', 'RON', 'RWF', 'SEK', 'LKR', 'SOS', 'ALL', 'RSD', 'KES', 'TJS', 'THB', 'ERN', 'TMT', 'BWP', 'TRY', 'UAH', 'UZS', 'VND', 'MOP', 'TWD')]
+        $CurrencyName,
 
         [Parameter()]
         [ValidateSet('Present', 'Absent')]
@@ -177,13 +338,27 @@ function Test-TargetResource
 
         [Parameter()]
         [System.Management.Automation.PSCredential]
-        $Credential
+        $Credential,
+
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [System.Management.Automation.PSCredential]
+        $ApplicationSecret
     )
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
 
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -191,22 +366,10 @@ function Test-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message "Testing configuration for PowerApps Environment {$DisplayName}"
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-
-    Write-Verbose -Message "Current Values: $(Convert-M365DscHashtableToString -Hashtable $CurrentValues)"
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('Credential') | Out-Null
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck $ValuesToCheck.Keys
-
-    Write-Verbose -Message "Test-TargetResource returned $TestResult"
-
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '') `
+                                         -ExcludedProperties @('CurrencyName')
+    return $result
 }
 
 function Export-TargetResource
@@ -217,9 +380,26 @@ function Export-TargetResource
     (
         [Parameter()]
         [System.Management.Automation.PSCredential]
-        $Credential
+        $Credential,
+
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [System.Management.Automation.PSCredential]
+        $ApplicationSecret
     )
-    $ConnectionMode = New-M365DSCConnection -Workload 'PowerPlatforms' `
+
+    $ConnectionMode = New-M365DSCConnection -Workload 'PowerPlatformREST' `
         -InboundParameters $PSBoundParameters
 
     #Ensure the proper dependencies are installed in the current environment.
@@ -236,32 +416,50 @@ function Export-TargetResource
 
     try
     {
-        [array]$environments = Get-AdminPowerAppEnvironment -ErrorAction Stop
+        $uri = "https://" + (Get-MSCloudLoginConnectionProfile -Workload 'PowerPlatformREST').BapEndpoint + `
+               "/providers/Microsoft.BusinessAppPlatform/scopes/admin/environments?`$expand=permissions&api-version=2016-11-01"
+
+        [array]$environments = Invoke-M365DSCPowerPlatformRESTWebRequest -Uri $uri -Method 'GET'
         $dscContent = ''
         $i = 1
 
         if ($environments.Length -eq 0)
         {
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         }
         else
         {
-            Write-Host "`r`n" -NoNewline
+            Write-M365DSCHost -Message "`r`n" -DeferWrite
         }
-        foreach ($environment in $environments)
+        foreach ($environment in $environments.value)
         {
-            Write-Host "    |---[$i/$($environments.Count)] $($environment.DisplayName)" -NoNewline
-            if ($environment.EnvironmentType -ne 'Default' -and $environment.EnvironmentType -ne 'NotSpecified' -and $environment.EnvironmentType -ne 'Developer')
+            if ($environment.properties.environmentType -ne 'Default')
             {
-                $Params = @{
-                    DisplayName    = $environment.DisplayName
-                    Location       = $environment.Location
-                    EnvironmentSku = $environment.EnvironmentType
-                    Credential     = $Credential
+                if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+                {
+                    $Global:M365DSCExportResourceInstancesCount++
                 }
+
+                Write-M365DSCHost -Message "    |---[$i/$($environments.value.Count)] $($environment.properties.displayName)" -DeferWrite
+                $environmentType = $environment.properties.environmentType
+                if ($environmentType -eq 'Notspecified')
+                {
+                    $environmentType = 'Teams'
+                }
+                $Params = @{
+                    DisplayName           = $environment.properties.displayName
+                    Location              = $environment.location
+                    EnvironmentSku        = $environmentType
+                    Credential            = $Credential
+                    ApplicationId         = $ApplicationId
+                    TenantId              = $TenantId
+                    CertificateThumbprint = $CertificateThumbprint
+                    ApplicationSecret     = $ApplicationSecret
+                }
+
+                $Script:exportedInstance = $environment
                 $Results = Get-TargetResource @Params
-                $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                    -Results $Results
+
                 $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                     -ConnectionMode $ConnectionMode `
                     -ModulePath $PSScriptRoot `
@@ -271,12 +469,12 @@ function Export-TargetResource
 
                 Save-M365DSCPartialExport -Content $currentDSCBlock `
                     -FileName $Global:PartialExportFileName
-                Write-Host $Global:M365DSCEmojiGreenCheckMark
+                Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
             }
             else
             {
-                Write-Host "`r`n    |---Skipping $($environment.DisplayName) because of environment sku $($environment.EnvironmentType) " -NoNewline
-                Write-Host $Global:M365DSCEmojiRedX
+                Write-M365DSCHost -Message "    |---[$i/$($environments.Count)] Skipping Default Environment $($environment.DisplayName)" -DeferWrite
+                Write-M365DSCHost -Message $Global:M365DSCEmojiInformation
             }
             $i++
         }
@@ -284,9 +482,9 @@ function Export-TargetResource
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
-        New-M365DSCLogEntry -Message "Error during Export:" `
+        New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `
             -Source $($MyInvocation.MyCommand.Source) `
             -TenantId $TenantId `

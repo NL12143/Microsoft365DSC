@@ -22,7 +22,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
 
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'Pass@word1' -AsPlainText -Force
+            $secpasswd = ConvertTo-SecureString ((New-Guid).ToString()) -AsPlainText -Force
             $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
             Mock -CommandName Confirm-M365DSCDependencies -MockWith {
@@ -34,40 +34,104 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             Mock -CommandName Update-IntuneDeviceConfigurationPolicy -MockWith {
             }
-            Mock -CommandName New-IntuneDeviceConfigurationPolicy -MockWith {
+            Mock -CommandName New-MgBetaDeviceManagementConfigurationPolicy -MockWith {
                 return @{
                     Id = '619bd4a4-3b3b-4441-bd6f-3f4c0c444870'
                 }
             }
-            Mock -CommandName Remove-MgDeviceManagementConfigurationPolicy -MockWith {
+            Mock -CommandName Remove-MgBetaDeviceManagementConfigurationPolicy -MockWith {
             }
 
-            Mock -CommandName Get-MgDeviceManagementConfigurationPolicyTemplate -MockWith {
-                return @{
-                    TemplateId = 'd02f2162-fcac-48db-9b7b-b0a3f160d2c2_1'
-                }
+            Mock -CommandName Get-IntuneSettingCatalogPolicySetting -MockWith {
             }
-            Mock -CommandName Get-MgDeviceManagementConfigurationPolicyAssignment -MockWith {
+
+            Mock -CommandName Get-MgBetaDeviceManagementConfigurationPolicySetting -MockWith {
                 return @{
-                    Id       = '12345-12345-12345-12345-12345'
-                    Source   = 'direct'
-                    SourceId = '12345-12345-12345-12345-12345'
-                    Target   = @{
-                        DeviceAndAppManagementAssignmentFilterId   = '12345-12345-12345-12345-12345'
-                        DeviceAndAppManagementAssignmentFilterType = 'none'
-                        AdditionalProperties                       = @(
-                            @{
-                                '@odata.type' = '#microsoft.graph.exclusionGroupAssignmentTarget'
-                                groupId       = '26d60dd1-fab6-47bf-8656-358194c1a49d'
+                    Id                   = 0
+                    SettingDefinitions   = @(
+                        @{
+                            Id = 'device_vendor_msft_policy_config_defender_allowarchivescanning'
+                            Name = 'AllowArchiveScanning'
+                            OffsetUri = '/Config/Defender/AllowArchiveScanning'
+                            AdditionalProperties = @{
+                                '@odata.type' = '#microsoft.graph.deviceManagementConfigurationChoiceSettingDefinition'
+                                options = @(
+                                    @{
+                                        itemId = 'device_vendor_msft_policy_config_defender_allowarchivescanning_1'
+                                        name = 'Allowed. Scans the archive files.'
+                                        optionValue = @{
+                                            '@odata.type' = '#microsoft.graph.deviceManagementConfigurationIntegerSettingValue'
+                                            value = 1
+                                        }
+                                    }
+                                )
                             }
-                        )
+                        }
+                    )
+                    SettingInstance      = @{
+                        SettingDefinitionId              = 'device_vendor_msft_policy_config_defender_allowarchivescanning'
+                        SettingInstanceTemplateReference = @{
+                            SettingInstanceTemplateId = '7c5c9cde-f74d-4d11-904f-de4c27f72d89'
+                            AdditionalProperties      = $null
+                        }
+                        AdditionalProperties             = @{
+                            '@odata.type'      = '#microsoft.graph.deviceManagementConfigurationChoiceSettingInstance'
+                            choiceSettingValue = @{
+                                value                         = 'device_vendor_msft_policy_config_defender_allowarchivescanning_1'
+                                settingValueTemplateReference = @{
+                                    settingValueTemplateId = '9ead75d4-6f30-4bc5-8cc5-ab0f999d79f0'
+                                    useTemplateDefault     = $false
+                                }
+                                children                   = @()
+                            }
+                        }
                     }
                 }
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            Mock -CommandName Get-MgBetaDeviceManagementConfigurationPolicy -MockWith {
+                return @{
+                    Id                = '619bd4a4-3b3b-4441-bd6f-3f4c0c444870'
+                    Description       = 'My Test Description'
+                    Name              = 'My Test'
+                    TemplateReference = @{
+                        TemplateId     = 'd948ff9b-99cb-4ee0-8012-1fbc09685377_1'
+                        TemplateFamily = 'endpointSecurityAntivirus'
+                    }
+                }
             }
+
+            Mock -CommandName Get-MgBetaDeviceManagementConfigurationPolicyAssignment -MockWith {
+                return @(
+                    @{
+                        Id       = '12345-12345-12345-12345-12345'
+                        Source   = 'direct'
+                        SourceId = '12345-12345-12345-12345-12345'
+                        Target   = @{
+                            DeviceAndAppManagementAssignmentFilterId   = '12345-12345-12345-12345-12345'
+                            DeviceAndAppManagementAssignmentFilterType = 'none'
+                            AdditionalProperties                       = @(
+                                @{
+                                    '@odata.type' = '#microsoft.graph.exclusionGroupAssignmentTarget'
+                                    groupId       = '26d60dd1-fab6-47bf-8656-358194c1a49d'
+                                }
+                            )
+                        }
+                    }
+                )
+            }
+
+            Mock -CommandName Update-DeviceConfigurationPolicyAssignment -MockWith {
+            }
+
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            Mock -CommandName Write-Warning -MockWith {
+            }
+
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -75,11 +139,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             BeforeAll {
                 $testParams = @{
                     allowarchivescanning = '1'
-                    Assignments          = @(
+                    Assignments          = [CimInstance[]]@(
                         (New-CimInstance -ClassName MSFT_DeviceManagementConfigurationPolicyAssignments -Property @{
                             DataType                                   = '#microsoft.graph.exclusionGroupAssignmentTarget'
                             DeviceAndAppManagementAssignmentFilterType = 'none'
-                            DeviceAndAppManagementAssignmentFilterId   = '12345-12345-12345-12345-12345'
                             GroupId                                    = '26d60dd1-fab6-47bf-8656-358194c1a49d'
                         } -ClientOnly)
                     )
@@ -91,7 +154,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     templateId           = 'd948ff9b-99cb-4ee0-8012-1fbc09685377_1'
                 }
 
-                Mock -CommandName Get-MgDeviceManagementConfigurationPolicy -MockWith {
+                Mock -CommandName Get-MgBetaDeviceManagementConfigurationPolicy -MockWith {
                     return $null
                 }
             }
@@ -106,19 +169,18 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should create the instance from the Set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName New-IntuneDeviceConfigurationPolicy -Exactly 1
+                Should -Invoke -CommandName New-MgBetaDeviceManagementConfigurationPolicy -Exactly 1
             }
         }
 
         Context -Name 'When the instance already exists and is NOT in the Desired State' -Fixture {
             BeforeAll {
                 $testParams = @{
-                    allowarchivescanning = '1'
-                    Assignments          = @(
+                    allowarchivescanning = '0' # Drift
+                    Assignments          = [CimInstance[]]@(
                         (New-CimInstance -ClassName MSFT_DeviceManagementConfigurationPolicyAssignments -Property @{
                             DataType                                   = '#microsoft.graph.exclusionGroupAssignmentTarget'
                             DeviceAndAppManagementAssignmentFilterType = 'none'
-                            DeviceAndAppManagementAssignmentFilterId   = '12345-12345-12345-12345-12345'
                             GroupId                                    = '26d60dd1-fab6-47bf-8656-358194c1a49d'
                         } -ClientOnly)
                     )
@@ -128,41 +190,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Ensure               = 'Present'
                     templateId           = 'd948ff9b-99cb-4ee0-8012-1fbc09685377_1'
                     Identity             = '619bd4a4-3b3b-4441-bd6f-3f4c0c444870'
-                }
-
-                Mock -CommandName Get-MgDeviceManagementConfigurationPolicy -MockWith {
-                    return @{
-                        Id          = '619bd4a4-3b3b-4441-bd6f-3f4c0c444870'
-                        Description = 'My Test Description'
-                        Name        = 'My Test'
-                    }
-                }
-
-                Mock -CommandName Get-MgDeviceManagementConfigurationPolicySetting -MockWith {
-                    return @{
-                        Id                   = 0
-                        SettingDefinitions   = $null
-                        SettingInstance      = @{
-                            SettingDefinitionId              = 'device_vendor_msft_policy_config_defender_allowarchivescanning'
-                            SettingInstanceTemplateReference = @{
-                                SettingInstanceTemplateId = '7c5c9cde-f74d-4d11-904f-de4c27f72d89'
-                                AdditionalProperties      = $null
-                            }
-                            AdditionalProperties             = @{
-                                '@odata.type'      = '#microsoft.graph.deviceManagementConfigurationChoiceSettingInstance'
-                                choiceSettingValue = @{
-                                    value                         = 'device_vendor_msft_policy_config_defender_allowarchivescanning_0' #drift
-                                    settingValueTemplateReference = @{
-                                        settingValueTemplateId = '9ead75d4-6f30-4bc5-8cc5-ab0f999d79f0'
-                                        useTemplateDefault     = $false
-                                    }
-                                    children                      = $null
-                                }
-                            }
-
-                        }
-                        AdditionalProperties = $null
-                    }
                 }
             }
 
@@ -184,11 +211,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             BeforeAll {
                 $testParams = @{
                     allowarchivescanning = '1'
-                    Assignments          = @(
+                    Assignments          = [CimInstance[]]@(
                         (New-CimInstance -ClassName MSFT_DeviceManagementConfigurationPolicyAssignments -Property @{
                             DataType                                   = '#microsoft.graph.exclusionGroupAssignmentTarget'
                             DeviceAndAppManagementAssignmentFilterType = 'none'
-                            DeviceAndAppManagementAssignmentFilterId   = '12345-12345-12345-12345-12345'
                             GroupId                                    = '26d60dd1-fab6-47bf-8656-358194c1a49d'
                         } -ClientOnly)
                     )
@@ -198,42 +224,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Ensure               = 'Present'
                     templateId           = 'd948ff9b-99cb-4ee0-8012-1fbc09685377_1'
                     Identity             = '619bd4a4-3b3b-4441-bd6f-3f4c0c444870'
-                }
-
-                Mock -CommandName Get-MgDeviceManagementConfigurationPolicy -MockWith {
-                    return @{
-                        Id                = '619bd4a4-3b3b-4441-bd6f-3f4c0c444870'
-                        Description       = 'My Test Description'
-                        Name              = 'My Test'
-                        TemplateReference = @{templateId = 'd948ff9b-99cb-4ee0-8012-1fbc09685377_1' }
-                    }
-                }
-
-                Mock -CommandName Get-MgDeviceManagementConfigurationPolicySetting -MockWith {
-                    return @{
-                        Id                   = 0
-                        SettingDefinitions   = $null
-                        SettingInstance      = @{
-                            SettingDefinitionId              = 'device_vendor_msft_policy_config_defender_allowarchivescanning'
-                            SettingInstanceTemplateReference = @{
-                                SettingInstanceTemplateId = '7c5c9cde-f74d-4d11-904f-de4c27f72d89'
-                                AdditionalProperties      = $null
-                            }
-                            AdditionalProperties             = @{
-                                '@odata.type'      = '#microsoft.graph.deviceManagementConfigurationChoiceSettingInstance'
-                                choiceSettingValue = @{
-                                    value                         = 'device_vendor_msft_policy_config_defender_allowarchivescanning_1'
-                                    settingValueTemplateReference = @{
-                                        settingValueTemplateId = '9ead75d4-6f30-4bc5-8cc5-ab0f999d79f0'
-                                        useTemplateDefault     = $false
-                                    }
-                                    children                      = $null
-                                }
-                            }
-
-                        }
-                        AdditionalProperties = $null
-                    }
                 }
             }
 
@@ -245,12 +235,11 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Context -Name 'When the instance exists and it SHOULD NOT' -Fixture {
             BeforeAll {
                 $testParams = @{
-                    allowarchivescanning = '1'
-                    Assignments          = @(
+                    allowarchivescanning = '0'
+                    Assignments          = [CimInstance[]]@(
                         (New-CimInstance -ClassName MSFT_DeviceManagementConfigurationPolicyAssignments -Property @{
                             DataType                                   = '#microsoft.graph.exclusionGroupAssignmentTarget'
                             DeviceAndAppManagementAssignmentFilterType = 'none'
-                            DeviceAndAppManagementAssignmentFilterId   = '12345-12345-12345-12345-12345'
                             GroupId                                    = '26d60dd1-fab6-47bf-8656-358194c1a49d'
                         } -ClientOnly)
                     )
@@ -260,42 +249,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Ensure               = 'Absent'
                     templateId           = 'd948ff9b-99cb-4ee0-8012-1fbc09685377_1'
                     Identity             = '619bd4a4-3b3b-4441-bd6f-3f4c0c444870'
-                }
-
-                Mock -CommandName Get-MgDeviceManagementConfigurationPolicy -MockWith {
-                    return @{
-                        Id                = '619bd4a4-3b3b-4441-bd6f-3f4c0c444870'
-                        Description       = 'My Test Description'
-                        Name              = 'My Test'
-                        TemplateReference = @{templateId = 'd948ff9b-99cb-4ee0-8012-1fbc09685377_1' }
-                    }
-                }
-
-                Mock -CommandName Get-MgDeviceManagementConfigurationPolicySetting -MockWith {
-                    return @{
-                        Id                   = 0
-                        SettingDefinitions   = $null
-                        SettingInstance      = @{
-                            SettingDefinitionId              = 'device_vendor_msft_policy_config_defender_allowarchivescanning'
-                            SettingInstanceTemplateReference = @{
-                                SettingInstanceTemplateId = '7c5c9cde-f74d-4d11-904f-de4c27f72d89'
-                                AdditionalProperties      = $null
-                            }
-                            AdditionalProperties             = @{
-                                '@odata.type'      = '#microsoft.graph.deviceManagementConfigurationChoiceSettingInstance'
-                                choiceSettingValue = @{
-                                    value                         = 'device_vendor_msft_policy_config_defender_allowarchivescanning_1'
-                                    settingValueTemplateReference = @{
-                                        settingValueTemplateId = '9ead75d4-6f30-4bc5-8cc5-ab0f999d79f0'
-                                        useTemplateDefault     = $false
-                                    }
-                                    children                      = $null
-                                }
-                            }
-
-                        }
-                        AdditionalProperties = $null
-                    }
                 }
             }
 
@@ -309,59 +262,22 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should remove the instance from the Set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName Remove-MgDeviceManagementConfigurationPolicy -Exactly 1
+                Should -Invoke -CommandName Remove-MgBetaDeviceManagementConfigurationPolicy -Exactly 1
             }
         }
 
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
-                }
-
-                Mock -CommandName Get-MgDeviceManagementConfigurationPolicy -MockWith {
-                    return @{
-                        Id                = '619bd4a4-3b3b-4441-bd6f-3f4c0c444870'
-                        Description       = 'My Test Description'
-                        Name              = 'My Test policy'
-                        TemplateReference = @{
-                            templateId     = 'd948ff9b-99cb-4ee0-8012-1fbc09685377_1'
-                            templateFamily = 'endpointSecurityAntivirus'
-                        }
-                    }
-                }
-
-                Mock -CommandName Get-MgDeviceManagementConfigurationPolicySetting -MockWith {
-                    return @{
-                        Id                   = 0
-                        SettingDefinitions   = $null
-                        SettingInstance      = @{
-                            SettingDefinitionId              = 'device_vendor_msft_policy_config_defender_allowarchivescanning'
-                            SettingInstanceTemplateReference = @{
-                                SettingInstanceTemplateId = '7c5c9cde-f74d-4d11-904f-de4c27f72d89'
-                                AdditionalProperties      = $null
-                            }
-                            AdditionalProperties             = @{
-                                '@odata.type'      = '#microsoft.graph.deviceManagementConfigurationChoiceSettingInstance'
-                                choiceSettingValue = @{
-                                    value                         = 'device_vendor_msft_policy_config_defender_allowarchivescanning_1'
-                                    settingValueTemplateReference = @{
-                                        settingValueTemplateId = '9ead75d4-6f30-4bc5-8cc5-ab0f999d79f0'
-                                        useTemplateDefault     = $false
-                                    }
-                                    children                      = $null
-                                }
-                            }
-
-                        }
-                        AdditionalProperties = $null
-                    }
                 }
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

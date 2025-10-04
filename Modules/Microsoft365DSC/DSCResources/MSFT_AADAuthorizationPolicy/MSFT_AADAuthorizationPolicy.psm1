@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_AADAuthorizationPolicy'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -48,6 +50,14 @@ function Get-TargetResource
 
         [Parameter()]
         [System.Boolean]
+        $DefaultUserRoleAllowedToReadBitlockerKeysForOwnedDevice,
+
+        [Parameter()]
+        [System.Boolean]
+        $DefaultUserRoleAllowedToCreateTenants,
+
+        [Parameter()]
+        [System.Boolean]
         $DefaultUserRoleAllowedToReadOtherUsers,
 
         [Parameter()]
@@ -87,13 +97,17 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message 'Getting configuration of AzureAD Authorization Policy'
-    $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftGraph' `
-        -InboundParameters $PSBoundParameters `
-        -ProfileName 'v1.0'
+
+    $null = New-M365DSCConnection -Workload 'MicrosoftGraph' `
+        -InboundParameters $PSBoundParameters
 
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
@@ -107,50 +121,66 @@ function Get-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
+    $nullReturn = @{
+        IsSingleInstance = 'Yes'
+    }
+
     try
     {
-        $Policy = Get-MgPolicyAuthorizationPolicy -ErrorAction Stop
+        $Policy = Get-MgBetaPolicyAuthorizationPolicy -ErrorAction Stop
     }
     catch
     {
-        Write-Verbose -Message "Couldn't find existing authorization policy"
-        throw "Cannot retrieve authorization policy, $($_.Exception.Message)"
+        $message = 'Could not find existing authorization policy'
+
+        New-M365DSCLogEntry -Message $message `
+            -Exception $_ `
+            -Source $($MyInvocation.MyCommand.Source) `
+            -TenantId $TenantId `
+            -Credential $Credential
+
+        return $nullReturn
     }
 
     if ($null -eq $Policy)
     {
-        Write-Verbose -Message 'Existing Authorization Policy was not found'
-        throw 'authorization policy was not found'
+        $message = 'Existing Authorization Policy was not found'
+
+        New-M365DSCLogEntry -Message $message `
+            -Source $($MyInvocation.MyCommand.Source) `
+            -TenantId $TenantId `
+            -Credential $Credential
+
+        return $nullReturn
     }
     else
     {
         Write-Verbose -Message 'Get-TargetResource: Found existing authorization policy'
 
         $result = @{
-            IsSingleInstance                                  = 'Yes'
-            DisplayName                                       = $Policy.DisplayName
-            Description                                       = $Policy.Description
-            AllowedToSignUpEmailBasedSubscriptions            = $Policy.AllowedToSignUpEmailBasedSubscriptions
-            AllowedToUseSSPR                                  = $Policy.AllowedToUseSSPR
-            AllowEmailVerifiedUsersToJoinOrganization         = $Policy.AllowEmailVerifiedUsersToJoinOrganization
-            AllowInvitesFrom                                  = $Policy.AllowInvitesFrom
-            BlockMsolPowerShell                               = $Policy.BlockMsolPowerShell
-            DefaultUserRoleAllowedToCreateApps                = $Policy.DefaultUserRolePermissions.AllowedToCreateApps
-            DefaultUserRoleAllowedToCreateSecurityGroups      = $Policy.DefaultUserRolePermissions.AllowedToCreateSecurityGroups
-            DefaultUserRoleAllowedToReadOtherUsers            = $Policy.DefaultUserRolePermissions.AllowedToReadOtherUsers
-            #v1.0 profile
-            PermissionGrantPolicyIdsAssignedToDefaultUserRole = $Policy.DefaultUserRolePermissions.PermissionGrantPoliciesAssigned
-            #beta-profile
-            #PermissionGrantPolicyIdsAssignedToDefaultUserRole = $Policy.PermissionGrantPolicyIdsAssignedToDefaultUserRole
-            GuestUserRole                                     = Get-GuestUserRoleNameFromId -GuestUserRoleId $Policy.GuestUserRoleId
-            #Standard part
-            Ensure                                            = 'Present'
-            Credential                                        = $Credential
-            ApplicationSecret                                 = $ApplicationSecret
-            ApplicationId                                     = $ApplicationId
-            TenantId                                          = $TenantId
-            CertificateThumbprint                             = $CertificateThumbprint
-            Managedidentity                                   = $ManagedIdentity.IsPresent
+            IsSingleInstance                                        = 'Yes'
+            DisplayName                                             = $Policy.DisplayName
+            Description                                             = $Policy.Description
+            AllowedToSignUpEmailBasedSubscriptions                  = $Policy.AllowedToSignUpEmailBasedSubscriptions
+            AllowedToUseSSPR                                        = $Policy.AllowedToUseSSPR
+            AllowEmailVerifiedUsersToJoinOrganization               = $Policy.AllowEmailVerifiedUsersToJoinOrganization
+            AllowInvitesFrom                                        = $Policy.AllowInvitesFrom
+            BlockMsolPowerShell                                     = $Policy.BlockMsolPowerShell
+            DefaultUserRoleAllowedToCreateApps                      = $Policy.DefaultUserRolePermissions.AllowedToCreateApps
+            DefaultUserRoleAllowedToCreateSecurityGroups            = $Policy.DefaultUserRolePermissions.AllowedToCreateSecurityGroups
+            DefaultUserRoleAllowedToReadOtherUsers                  = $Policy.DefaultUserRolePermissions.AllowedToReadOtherUsers
+            DefaultUserRoleAllowedToReadBitlockerKeysForOwnedDevice = $Policy.DefaultUserRolePermissions.AllowedToReadBitlockerKeysForOwnedDevice
+            DefaultUserRoleAllowedToCreateTenants                   = $Policy.DefaultUserRolePermissions.AllowedToCreateTenants
+            PermissionGrantPolicyIdsAssignedToDefaultUserRole       = $Policy.PermissionGrantPolicyIdsAssignedToDefaultUserRole
+            GuestUserRole                                           = Get-GuestUserRoleNameFromId -GuestUserRoleId $Policy.GuestUserRoleId
+            Ensure                                                  = 'Present'
+            Credential                                              = $Credential
+            ApplicationSecret                                       = $ApplicationSecret
+            ApplicationId                                           = $ApplicationId
+            TenantId                                                = $TenantId
+            CertificateThumbprint                                   = $CertificateThumbprint
+            ManagedIdentity                                         = $ManagedIdentity.IsPresent
+            AccessTokens                                            = $AccessTokens
         }
 
         Write-Verbose -Message "Get-TargetResource Result: `n $(Convert-M365DscHashtableToString -Hashtable $result)"
@@ -207,6 +237,14 @@ function Set-TargetResource
 
         [Parameter()]
         [System.Boolean]
+        $DefaultUserRoleAllowedToReadBitlockerKeysForOwnedDevice,
+
+        [Parameter()]
+        [System.Boolean]
+        $DefaultUserRoleAllowedToCreateTenants,
+
+        [Parameter()]
+        [System.Boolean]
         $DefaultUserRoleAllowedToReadOtherUsers,
 
         [Parameter()]
@@ -246,8 +284,13 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     Write-Verbose -Message 'Setting configuration of AzureAD Authorization Policy'
 
     #Ensure the proper dependencies are installed in the current environment.
@@ -266,43 +309,38 @@ function Set-TargetResource
     $currentPolicy = Get-TargetResource @PSBoundParameters
 
     Write-Verbose -Message 'Set-Targetresource: Cleaning up parameters'
-    $currentParameters = ([hashtable]$PSBoundParameters).Clone()
-    $currentParameters.Remove('IsSingleInstance') | Out-Null
-    $currentParameters.Remove('ApplicationId') | Out-Null
-    $currentParameters.Remove('TenantId') | Out-Null
-    $currentParameters.Remove('CertificateThumbprint') | Out-Null
-    $currentParameters.Remove('ApplicationSecret') | Out-Null
-    $currentParameters.Remove('Ensure') | Out-Null
-    $currentParameters.Remove('Credential') | Out-Null
-    $currentParameters.Remove('ManagedIdentity') | Out-Null
+    $desiredParameters = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
+    $desiredParameters.Remove('IsSingleInstance') | Out-Null
 
     Write-Verbose -Message 'Set-Targetresource: Authorization Policy Ensure Present'
-    $UpdateParameters = @{}
+    $UpdateParameters = @{
+        AuthorizationPolicyId = 'authorizationPolicy'
+    }
     # update policy with supplied parameters that are different from existing policy
 
     # prepare object for default user role permissions
     $defaultUserRolePermissions = @{}
 
-    foreach ($param in $currentParameters.Keys)
+    foreach ($param in $desiredParameters.Keys)
     {
-        if ($currentParameters.$param -ne $currentPolicy.$param -or
-            ($null -eq $currentParementers.$param -and $null -ne $currentPolicy.$param) -or
-            ($null -ne $currentParementers.$param -and $null -eq $currentPolicy.$param))
+        $desiredParam = $desiredParameters.$param
+        $currentParam = $currentPolicy.$param
+
+        if (($desiredParam -is [System.Array] -and (Compare-Object -ReferenceObject $desiredParam -DifferenceObject $currentParam)) -or
+            ($desiredParam -isnot [System.Array] -and $desiredParam -ne $currentParam) -or
+           ($null -eq $desiredParam -and $null -ne $currentParam) -or
+           ($null -ne $desiredParam -and $null -eq $currentParam))
         {
             if ($param.ToLower() -match 'defaultuserrole')
             {
                 if ($param -like 'Permission*')
                 {
-                    #beta profile
-                    #$UpdateParameters.Add($param, $currentParameters.$param)
-                    #Write-Verbose -Message "Added '$param' to UpdateParameters"
-                    #v1.0 profile
-                    $defaultUserRolePermissions.Add('PermissionGrantPoliciesAssigned', $currentParameters.$param)
-                    Write-Verbose -Message "Added 'PermissionGrantPoliciesAssigned' ($param) to defaultUserRolePermissions"
+                    $UpdateParameters.Add($param, $desiredParam)
+                    Write-Verbose -Message "Added '$param' to UpdateParameters"
                 }
                 else
                 {
-                    $defaultUserRolePermissions.Add(($param -replace '^DefaultUserRole'), $currentParameters.$param)
+                    $defaultUserRolePermissions.Add(($param -replace '^DefaultUserRole'), $desiredParam)
                     Write-Verbose -Message "Added '$($param -replace '^DefaultUserRole')' ($param) to defaultUserRolePermissions"
                 }
             }
@@ -311,14 +349,14 @@ function Set-TargetResource
                 if ($param -eq 'GuestUserRole')
                 {
                     # translate displayvalue to corresponding GUID
-                    $guestUserRoleId = Get-GuestUserRoleIdFromName -GuestUserRole $currentParameters.$param
+                    $guestUserRoleId = Get-GuestUserRoleIdFromName -GuestUserRole $desiredParam
                     Write-Verbose -Message "Translated GuestUserRole '$param' to '$guestUserRoleId'"
                     $UpdateParameters.Add($param, $guestUserRoleId)
                     Write-Verbose -Message "Added '$param' to UpdateParameters"
                 }
                 else
                 {
-                    $UpdateParameters.Add($param, $currentParameters.$param)
+                    $UpdateParameters.Add($param, $desiredParam)
                     Write-Verbose -Message "added '$param' to UpdateParameters"
                 }
             }
@@ -338,7 +376,7 @@ function Set-TargetResource
     try
     {
         Write-Verbose -Message "Updating existing authorization policy with values: $(Convert-M365DscHashtableToString -Hashtable $UpdateParameters)"
-        $response = Update-MgPolicyAuthorizationPolicy @updateParameters -ErrorAction Stop
+        $response = Update-MgBetaPolicyAuthorizationPolicy @updateParameters -ErrorAction Stop
     }
     catch
     {
@@ -349,6 +387,7 @@ function Set-TargetResource
             -Credential $Credential
 
         Write-Verbose -Message "Set-Targetresource: Failed change policy $DisplayName"
+        throw $_
     }
     Write-Verbose -Message "Set-Targetresource: finished processing Policy $Displayname"
 }
@@ -403,6 +442,14 @@ function Test-TargetResource
 
         [Parameter()]
         [System.Boolean]
+        $DefaultUserRoleAllowedToReadBitlockerKeysForOwnedDevice,
+
+        [Parameter()]
+        [System.Boolean]
+        $DefaultUserRoleAllowedToCreateTenants,
+
+        [Parameter()]
+        [System.Boolean]
         $DefaultUserRoleAllowedToReadOtherUsers,
 
         [Parameter()]
@@ -441,27 +488,25 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
-    Write-Verbose -Message 'Testing configuration of AzureAD Authorization Policy'
+    #region Telemetry
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
+    $CommandName = $MyInvocation.MyCommand
+    $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
+        -CommandName $CommandName `
+        -Parameters $PSBoundParameters
+    Add-M365DSCTelemetryEvent -Data $data
+    #endregion
 
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('IsSingleInstance') | Out-Null
-    $ValuesToCheck.Remove('ManagedIdentity') | Out-Null
-
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck $ValuesToCheck.Keys
-
-    Write-Verbose -Message "Test-TargetResource returned $TestResult"
-
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '')
+    return $result
 }
 
 function Export-TargetResource
@@ -492,7 +537,11 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     #Ensure the proper dependencies are installed in the current environment.
@@ -508,38 +557,57 @@ function Export-TargetResource
     #endregion
 
     $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftGraph' `
-        -InboundParameters $PSBoundParameters `
-        -ProfileName 'v1.0'
+        -InboundParameters $PSBoundParameters
 
     try
     {
-        $results = Get-TargetResource -IsSingleInstance 'Yes' @PSBoundParameters
-        $dscContent = ''
+        if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+        {
+            $Global:M365DSCExportResourceInstancesCount++
+        }
 
-        Write-Host "`r`n" -NoNewline
-        Write-Host "    |---[1/1] $($results.DisplayName)" -NoNewline
-        $results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-            -Results $results
-        $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
-            -ConnectionMode $ConnectionMode `
-            -ModulePath $PSScriptRoot `
-            -Results $results `
-            -Credential $Credential
-        Save-M365DSCPartialExport -Content $currentDSCBlock `
-            -FileName $Global:PartialExportFileName
-        Write-Host $Global:M365DSCEmojiGreenCheckMark
+        $params = @{
+            IsSingleInstance      = 'Yes'
+            Credential            = $Credential
+            ApplicationId         = $ApplicationId
+            TenantId              = $TenantId
+            ApplicationSecret     = $ApplicationSecret
+            CertificateThumbprint = $CertificateThumbprint
+            ManagedIdentity       = $ManagedIdentity
+            AccessTokens          = $AccessTokens
+        }
+        $Results = Get-TargetResource @Params
+        if ($Results -is [System.Collections.Hashtable] -and $Results.Count -gt 1)
+        {
+            Write-M365DSCHost -Message "`r`n" -DeferWrite
+            Write-M365DSCHost -Message "    |---[1/1] $($results.DisplayName)" -DeferWrite
+            $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
+                -ConnectionMode $ConnectionMode `
+                -ModulePath $PSScriptRoot `
+                -Results $results `
+                -Credential $Credential
+            Save-M365DSCPartialExport -Content $currentDSCBlock `
+                -FileName $Global:PartialExportFileName
+
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
+        }
+        else
+        {
+            Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
+        }
 
         return $currentDSCBlock
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `
             -Source $($MyInvocation.MyCommand.Source) `
             -TenantId $TenantId `
             -Credential $Credential
+
         return ''
     }
 }

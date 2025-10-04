@@ -1,26 +1,44 @@
-﻿{
-    "resourceName": "EXOPolicyTipConfig",
-    "description": "",
-    "permissions": {
-        "graph": {
-            "delegated": {
-                "read": [],
-                "update": []
-            },
-            "application": {
-                "read": [],
-                "update": []
-            }
-        },
-        "exchange": {
-            "requiredroles": [
-                "Data Loss Prevention",
-                "View-Only Configuration"
-            ],
-            "requiredrolegroups": [
-                "Organization Management",
-                "Compliance Management"
-            ]
-        }
+{
+  "resourceName": "EXOPolicyTipConfig",
+  "description": "",
+  "roles": {
+    "read": [
+      "Global Reader"
+    ],
+    "update": [
+      "Exchange Administrator"
+    ]
+  },
+  "permissions": {
+    "Office 365 Exchange Online": {
+      "application": {
+        "read": [
+          {
+            "name": "Exchange.ManageAsApp"
+          }
+        ],
+        "update": [
+          {
+            "name": "Exchange.ManageAsApp"
+          }
+        ]
+      }
+    },
+    "exchange": {
+      "requiredroles": [
+        "Data Loss Prevention",
+        "View-Only Configuration"
+      ],
+      "requiredrolegroups": [
+        "Organization Management",
+        "Compliance Management"
+      ]
     }
+  },
+  "requiredModules": [],
+  "supportedEnvironments": [
+    "Global",
+    "USGov"
+  ],
+  "mode": "Configuration"
 }

@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_AADGroupsSettings'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -12,6 +14,10 @@ function Get-TargetResource
         [Parameter()]
         [System.Boolean]
         $EnableGroupCreation,
+
+        [Parameter()]
+        [System.Boolean]
+        $EnableMIPLabels,
 
         [Parameter()]
         [System.Boolean]
@@ -36,6 +42,10 @@ function Get-TargetResource
         [Parameter()]
         [System.String]
         $UsageGuidelinesUrl,
+
+        [Parameter()]
+        [System.Boolean]
+        $NewUnifiedGroupWritebackDefault,
 
         [Parameter()]
         [ValidateSet('Present', 'Absent')]
@@ -64,15 +74,16 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message 'Getting configuration of AzureAD Groups Settings'
-    $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftGraph' `
-        -InboundParameters $PSBoundParameters `
-        -ProfileName 'beta'
-
-    Select-MgProfile -Name 'beta'
+    $null = New-M365DSCConnection -Workload 'MicrosoftGraph' `
+        -InboundParameters $PSBoundParameters
 
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
@@ -90,7 +101,7 @@ function Get-TargetResource
     $nullReturn.Ensure = 'Absent'
     try
     {
-        $Policy = Get-MgDirectorySetting | Where-Object -FilterScript { $_.DisplayName -eq 'Group.Unified' }
+        $Policy = Get-MgBetaDirectorySetting | Where-Object -FilterScript { $_.DisplayName -eq 'Group.Unified' }
 
         if ($null -eq $Policy)
         {
@@ -98,7 +109,7 @@ function Get-TargetResource
         }
         else
         {
-            Write-Verbose -Message 'Found existing AzureAD Groups Settings'
+            Write-Verbose -Message 'Found existing AzureAD DirectorySetting for Group.Unified'
             $AllowedGroupName = $null
             $GroupCreationValue = $Policy.Values | Where-Object -FilterScript { $_.Name -eq 'GroupCreationAllowedGroupId' }
             if (-not [System.String]::IsNullOrEmpty($GroupCreationValue.Value))
@@ -112,15 +123,18 @@ function Get-TargetResource
             }
 
             $valueEnableGroupCreation = $Policy.Values | Where-Object -FilterScript { $_.Name -eq 'EnableGroupCreation' }
+            $valueEnableMIPLabels = $Policy.Values | Where-Object -FilterScript { $_.Name -eq 'EnableMIPLabels' }
             $valueAllowGuestsToBeGroupOwner = $Policy.Values | Where-Object -FilterScript { $_.Name -eq 'AllowGuestsToBeGroupOwner' }
             $valueAllowGuestsToAccessGroups = $Policy.Values | Where-Object -FilterScript { $_.Name -eq 'AllowGuestsToAccessGroups' }
             $valueGuestUsageGuidelinesUrl = $Policy.Values | Where-Object -FilterScript { $_.Name -eq 'GuestUsageGuidelinesUrl' }
             $valueAllowToAddGuests = $Policy.Values | Where-Object -FilterScript { $_.Name -eq 'AllowToAddGuests' }
             $valueUsageGuidelinesUrl = $Policy.Values | Where-Object -FilterScript { $_.Name -eq 'UsageGuidelinesUrl' }
+            $valueNewUnifiedGroupWritebackDefault = $Policy.Values | Where-Object -FilterScript { $_.Name -eq 'NewUnifiedGroupWritebackDefault' }
 
             $result = @{
                 IsSingleInstance          = 'Yes'
                 EnableGroupCreation       = [Boolean]::Parse($valueEnableGroupCreation.Value)
+                EnableMIPLabels           = [Boolean]::Parse($valueEnableMIPLabels.Value)
                 AllowGuestsToBeGroupOwner = [Boolean]::Parse($valueAllowGuestsToBeGroupOwner.Value)
                 AllowGuestsToAccessGroups = [Boolean]::Parse($valueAllowGuestsToAccessGroups.Value)
                 GuestUsageGuidelinesUrl   = $valueGuestUsageGuidelinesUrl.Value
@@ -132,7 +146,12 @@ function Get-TargetResource
                 ApplicationSecret         = $ApplicationSecret
                 CertificateThumbprint     = $CertificateThumbprint
                 Credential                = $Credential
-                Managedidentity           = $ManagedIdentity.IsPresent
+                ManagedIdentity           = $ManagedIdentity.IsPresent
+                AccessTokens              = $AccessTokens
+            }
+            if (-not [System.String]::IsNullOrEmpty($valueNewUnifiedGroupWritebackDefault.Value))
+            {
+                $result.Add('NewUnifiedGroupWritebackDefault', [Boolean]::Parse($valueNewUnifiedGroupWritebackDefault.Value))
             }
 
             if (-not [System.String]::IsNullOrEmpty($AllowedGroupName))
@@ -172,6 +191,10 @@ function Set-TargetResource
 
         [Parameter()]
         [System.Boolean]
+        $EnableMIPLabels,
+
+        [Parameter()]
+        [System.Boolean]
         $AllowGuestsToBeGroupOwner,
 
         [Parameter()]
@@ -193,6 +216,10 @@ function Set-TargetResource
         [Parameter()]
         [System.String]
         $UsageGuidelinesUrl,
+
+        [Parameter()]
+        [System.Boolean]
+        $NewUnifiedGroupWritebackDefault,
 
         [Parameter()]
         [ValidateSet('Present', 'Absent')]
@@ -221,7 +248,11 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message 'Setting configuration of Azure AD Groups Settings'
@@ -244,67 +275,82 @@ function Set-TargetResource
     $needToUpdate = $false
     if ($Ensure -eq 'Present' -and $currentPolicy.Ensure -eq 'Absent')
     {
-        $Policy = New-MgDirectorySetting -TemplateId '62375ab9-6b52-47ed-826b-58e47e0e304b' | Out-Null
+        $Policy = New-MgBetaDirectorySetting -TemplateId '62375ab9-6b52-47ed-826b-58e47e0e304b' | Out-Null
         $needToUpdate = $true
     }
 
-    $Policy = Get-MgDirectorySetting | Where-Object -FilterScript { $_.DisplayName -eq 'Group.Unified' }
+    $Policy = Get-MgBetaDirectorySetting | Where-Object -FilterScript { $_.DisplayName -eq 'Group.Unified' }
 
     if (($Ensure -eq 'Present' -and $currentPolicy.Ensure -eq 'Present') -or $needToUpdate)
     {
         $groupObject = $null
         if (-not [System.String]::IsNullOrEmpty($GroupCreationAllowedGroupName))
         {
-            $groupObject = Get-MgGroup -Filter "DisplayName eq '$GroupCreationAllowedGroupName'"
+            $groupObject = Get-MgGroup -Filter "DisplayName eq '$($GroupCreationAllowedGroupName -replace "'", "''")'"
         }
         $groupId = $null
         if ($null -ne $groupObject)
         {
             $groupId = $groupObject.Id
         }
+
+        # Filtering Deprecated value that sometimes causes issues
+        # https://learn.microsoft.com/en-us/graph/group-directory-settings?tabs=http#groupunified
+        $newValues = $Policy.Values | Where-Object { $_.Name -ne "EnableMSStandardBlockedWords"}
+
         $index = 0
-        foreach ($property in $Policy.Values)
+        foreach ($property in $newValues)
         {
             if ($property.Name -eq 'EnableGroupCreation')
             {
-                $entry = $Policy.Values | Where-Object -FilterScript { $_.Name -eq 'EnableGroupCreation' }
+                $entry = $newValues | Where-Object -FilterScript { $_.Name -eq 'EnableGroupCreation' }
                 $entry.Value = [System.Boolean]$EnableGroupCreation
+            }
+            elseif ($property.Name -eq 'EnableMIPLabels')
+            {
+                $entry = $newValues | Where-Object -FilterScript { $_.Name -eq 'EnableMIPLabels' }
+                $entry.Value = [System.Boolean]$EnableMIPLabels
             }
             elseif ($property.Name -eq 'AllowGuestsToBeGroupOwner')
             {
-                $entry = $Policy.Values | Where-Object -FilterScript { $_.Name -eq 'AllowGuestsToBeGroupOwner' }
+                $entry = $newValues | Where-Object -FilterScript { $_.Name -eq 'AllowGuestsToBeGroupOwner' }
                 $entry.Value = [System.Boolean]$AllowGuestsToBeGroupOwner
             }
             elseif ($property.Name -eq 'AllowGuestsToAccessGroups')
             {
-                $entry = $Policy.Values | Where-Object -FilterScript { $_.Name -eq 'AllowGuestsToAccessGroups' }
+                $entry = $newValues | Where-Object -FilterScript { $_.Name -eq 'AllowGuestsToAccessGroups' }
                 $entry.Value = [System.Boolean]$AllowGuestsToAccessGroups
             }
             elseif ($property.Name -eq 'GuestUsageGuidelinesUrl')
             {
-                $entry = $Policy.Values | Where-Object -FilterScript { $_.Name -eq 'GuestUsageGuidelinesUrl' }
+                $entry = $newValues | Where-Object -FilterScript { $_.Name -eq 'GuestUsageGuidelinesUrl' }
                 $entry.Value = $GuestUsageGuidelinesUrl
             }
             elseif ($property.Name -eq 'GroupCreationAllowedGroupId')
             {
-                $entry = $Policy.Values | Where-Object -FilterScript { $_.Name -eq 'GroupCreationAllowedGroupId' }
+                $entry = $newValues | Where-Object -FilterScript { $_.Name -eq 'GroupCreationAllowedGroupId' }
                 $entry.Value = $groupId
             }
             elseif ($property.Name -eq 'AllowToAddGuests')
             {
-                $entry = $Policy.Values | Where-Object -FilterScript { $_.Name -eq 'AllowToAddGuests' }
+                $entry = $newValues | Where-Object -FilterScript { $_.Name -eq 'AllowToAddGuests' }
                 $entry.Value = [System.Boolean]$AllowToAddGuests
             }
             elseif ($property.Name -eq 'UsageGuidelinesUrl')
             {
-                $entry = $Policy.Values | Where-Object -FilterScript { $_.Name -eq 'UsageGuidelinesUrl' }
+                $entry = $newValues | Where-Object -FilterScript { $_.Name -eq 'UsageGuidelinesUrl' }
                 $entry.Value = $UsageGuidelinesUrl
             }
-            $index++;
+            elseif ($property.Name -eq 'NewUnifiedGroupWritebackDefault')
+            {
+                $entry = $newValues | Where-Object -FilterScript { $_.Name -eq 'NewUnifiedGroupWritebackDefault' }
+                $entry.Value = [System.Boolean]$NewUnifiedGroupWritebackDefault
+            }
+            $index++
         }
 
-        Write-Verbose -Message "Updating Policy's Values with $($Policy.Values | Out-String)"
-        Update-MgDirectorySetting -DirectorySettingId $Policy.id -Values $Policy.Values | Out-Null
+        Write-Verbose -Message "Updating Policy's Values with $($newValues | Out-String)"
+        Update-MgBetaDirectorySetting -DirectorySettingId $Policy.id -Values $newValues | Out-Null
     }
     elseif ($Ensure -eq 'Absent' -and $currentPolicy.Ensure -eq 'Present')
     {
@@ -330,6 +376,10 @@ function Test-TargetResource
 
         [Parameter()]
         [System.Boolean]
+        $EnableMIPLabels,
+
+        [Parameter()]
+        [System.Boolean]
         $AllowGuestsToBeGroupOwner,
 
         [Parameter()]
@@ -351,6 +401,10 @@ function Test-TargetResource
         [Parameter()]
         [System.String]
         $UsageGuidelinesUrl,
+
+        [Parameter()]
+        [System.Boolean]
+        $NewUnifiedGroupWritebackDefault,
 
         [Parameter()]
         [ValidateSet('Present', 'Absent')]
@@ -379,15 +433,15 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
-
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
-
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -395,25 +449,9 @@ function Test-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message 'Testing configuration of AzureAD Groups Settings'
-
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('ApplicationId') | Out-Null
-    $ValuesToCheck.Remove('TenantId') | Out-Null
-    $ValuesToCheck.Remove('ApplicationSecret') | Out-Null
-
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck $ValuesToCheck.Keys
-
-    Write-Verbose -Message "Test-TargetResource returned $TestResult"
-
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '')
+    return $result
 }
 
 function Export-TargetResource
@@ -444,14 +482,15 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftGraph' `
-        -InboundParameters $PSBoundParameters `
-        -ProfileName 'beta'
-    $MaximumFunctionCount = 32000
-    Select-MgProfile -Name 'beta'
+        -InboundParameters $PSBoundParameters
 
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
@@ -467,6 +506,11 @@ function Export-TargetResource
 
     try
     {
+        if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+        {
+            $Global:M365DSCExportResourceInstancesCount++
+        }
+
         $Params = @{
             ApplicationId         = $ApplicationId
             TenantId              = $TenantId
@@ -474,12 +518,11 @@ function Export-TargetResource
             IsSingleInstance      = 'Yes'
             ApplicationSecret     = $ApplicationSecret
             Credential            = $Credential
-            Managedidentity       = $ManagedIdentity.IsPresent
+            ManagedIdentity       = $ManagedIdentity.IsPresent
+            AccessTokens          = $AccessTokens
         }
         $dscContent = ''
         $Results = Get-TargetResource @Params
-        $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-            -Results $Results
         $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
             -ConnectionMode $ConnectionMode `
             -ModulePath $PSScriptRoot `
@@ -488,12 +531,12 @@ function Export-TargetResource
         $dscContent += $currentDSCBlock
         Save-M365DSCPartialExport -Content $currentDSCBlock `
             -FileName $Global:PartialExportFileName
-        Write-Host $Global:M365DSCEmojiGreenCheckMark
+        Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `

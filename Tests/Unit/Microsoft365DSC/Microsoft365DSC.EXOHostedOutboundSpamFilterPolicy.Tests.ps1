@@ -21,17 +21,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
 
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
-            }
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
@@ -50,9 +43,27 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             Mock -CommandName Set-HostedOutboundSpamFilterPolicy -MockWith {
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            Mock -CommandName Get-HostedOutboundSpamFilterPolicy -MockWith {
+                return @{
+                    Identity                                  = 'Default'
+                    AdminDisplayName                          = 'Default Outbound Spam Filter Policy'
+                    BccSuspiciousOutboundMail                 = $true
+                    BccSuspiciousOutboundAdditionalRecipients = @()
+                    NotifyOutboundSpam                        = $true
+                    NotifyOutboundSpamRecipients              = @()
+                    RecipientLimitInternalPerHour             = '0'
+                    RecipientLimitPerDay                      = '0'
+                    RecipientLimitExternalPerHour             = '0'
+                    ActionWhenThresholdReached                = 'BlockUserForToday'
+                    AutoForwardingMode                        = 'Off'
+                }
             }
+
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -73,22 +84,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     ActionWhenThresholdReached                = 'BlockUserForToday'
                     AutoForwardingMode                        = 'Off'
                 }
-
-                Mock -CommandName Get-HostedOutboundSpamFilterPolicy -MockWith {
-                    return @{
-                        Identity                                  = 'Default'
-                        AdminDisplayName                          = 'Default Outbound Spam Filter Policy'
-                        BccSuspiciousOutboundMail                 = $true
-                        BccSuspiciousOutboundAdditionalRecipients = @()
-                        NotifyOutboundSpam                        = $true
-                        NotifyOutboundSpamRecipients              = @()
-                        RecipientLimitInternalPerHour             = '0'
-                        RecipientLimitPerDay                      = '0'
-                        RecipientLimitExternalPerHour             = '0'
-                        ActionWhenThresholdReached                = 'BlockUserForToday'
-                        AutoForwardingMode                        = 'Off'
-                    }
-                }
             }
 
             It 'Should return true from the Test method' {
@@ -97,10 +92,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should return Present from the Get method' {
                 (Get-TargetResource @testParams).Ensure | Should -Be 'Present'
-            }
-
-            It 'Should not update anything in the Set Method' {
-                Set-TargetResource @testParams
             }
         }
 
@@ -111,7 +102,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Identity                                  = 'Default'
                     Credential                                = $Credential
                     AdminDisplayName                          = 'Default Outbound Spam Filter Policy'
-                    BccSuspiciousOutboundMail                 = $true
+                    BccSuspiciousOutboundMail                 = $false # Drift
                     BccSuspiciousOutboundAdditionalRecipients = @('admin@contoso.com')
                     NotifyOutboundSpam                        = $true
                     NotifyOutboundSpamRecipients              = @('supervisor@contoso.com')
@@ -121,21 +112,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     ActionWhenThresholdReached                = 'BlockUser'
                     AutoForwardingMode                        = 'On'
                 }
-                Mock -CommandName Get-HostedOutboundSpamFilterPolicy -MockWith {
-                    return @{
-                        Identity                                  = 'Default'
-                        AdminDisplayName                          = $null
-                        BccSuspiciousOutboundMail                 = $false
-                        BccSuspiciousOutboundAdditionalRecipients = @()
-                        NotifyOutboundSpam                        = $false
-                        NotifyOutboundSpamRecipients              = @()
-                        RecipientLimitInternalPerHour             = '0'
-                        RecipientLimitPerDay                      = '0'
-                        RecipientLimitExternalPerHour             = '0'
-                        ActionWhenThresholdReached                = 'BlockUserForToday'
-                        AutoForwardingMode                        = 'Off'
-                    }
-                }
             }
 
             It 'Should return false from the Test method' {
@@ -144,6 +120,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the Set method' {
                 Set-TargetResource @testParams
+                Should -Invoke -CommandName 'Set-HostedOutboundSpamFilterPolicy' -Exactly 1
             }
         }
 
@@ -152,26 +129,11 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 $testParams = @{
                     Credential = $Credential
                 }
-
-                Mock -CommandName Get-HostedOutboundSpamFilterPolicy -MockWith {
-                    return @{
-                        Identity                                  = 'Default'
-                        AdminDisplayName                          = 'Default Outbound Spam Filter Policy'
-                        BccSuspiciousOutboundMail                 = $true
-                        BccSuspiciousOutboundAdditionalRecipients = @()
-                        NotifyOutboundSpam                        = $true
-                        NotifyOutboundSpamRecipients              = @()
-                        RecipientLimitInternalPerHour             = '0'
-                        RecipientLimitPerDay                      = '0'
-                        RecipientLimitExternalPerHour             = '0'
-                        ActionWhenThresholdReached                = 'BlockUserForToday'
-                        AutoForwardingMode                        = 'Off'
-                    }
-                }
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

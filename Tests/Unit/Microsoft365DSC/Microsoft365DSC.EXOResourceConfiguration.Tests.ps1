@@ -20,17 +20,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
     InModuleScope -ModuleName $Global:DscHelper.ModuleName -ScriptBlock {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
-            }
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
@@ -46,26 +39,28 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             Mock -CommandName Set-ResourceConfig -MockWith {
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            Mock -CommandName Get-ResourceConfig -MockWith {
+                return @{
+                    Identity               = 'Resource Schema'
+                    ResourcePropertySchema = @('Room/TV', 'Equipment/Laptop')
+                }
             }
+
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
         Context -Name 'Config is not in the desired state' -Fixture {
             BeforeAll {
                 $testParams = @{
+                    IsSingleInstance       = 'Yes'
                     Credential             = $Credential
                     Ensure                 = 'Present'
-                    Identity               = 'Resource Schema'
-                    ResourcePropertySchema = @('Room/TV', 'Equipment/Laptop')
-                }
-
-                Mock -CommandName Get-ResourceConfig -MockWith {
-                    return @{
-                        Identity               = 'Resource Schema'
-                        ResourcePropertySchema = @('Room/Phones', 'Equipment/Laptop'); #drift
-                    }
+                    ResourcePropertySchema = @('Room/Phones', 'Equipment/Laptop') # Drift
                 }
             }
 
@@ -83,17 +78,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Context -Name 'Config is already in the desired state' -Fixture {
             BeforeAll {
                 $testParams = @{
+                    IsSingleInstance       = 'Yes'
                     Credential             = $Credential
                     Ensure                 = 'Present'
-                    Identity               = 'Resource Schema'
                     ResourcePropertySchema = @('Room/TV', 'Equipment/Laptop')
-                }
-
-                Mock -CommandName Get-ResourceConfig -MockWith {
-                    return @{
-                        Identity               = 'Resource Schema'
-                        ResourcePropertySchema = @('Room/TV', 'Equipment/Laptop')
-                    }
                 }
             }
 
@@ -105,20 +93,15 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
-                }
-
-                Mock -CommandName Get-ResourceConfig -MockWith {
-                    return @{
-                        Identity               = 'Resource Schema'
-                        ResourcePropertySchema = @('Room/TV', 'Equipment/Laptop')
-                    }
                 }
             }
 
             It 'Should Reverse Engineer resource from the Export' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

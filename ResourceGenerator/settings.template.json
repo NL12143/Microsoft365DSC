@@ -1,6 +1,7 @@
 {
     "resourceName": "<ResourceFriendlyName>",
     "description": "This resource configures an <ResourceDescription>.",
-    "permissions":<ResourcePermissions>
-
+    "permissions":<ResourcePermissions>,
+    "requiredModules": [],
+    "mode": "Configuration"
 }

@@ -21,17 +21,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
 
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
-            }
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
@@ -44,9 +37,38 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             Mock -CommandName Remove-PSSession -MockWith {
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            Mock -CommandName Set-AvailabilityConfig -MockWith {
             }
+
+            Mock -CommandName New-AvailabilityConfig -MockWith {
+            }
+
+            Mock -CommandName Remove-AvailabilityConfig -MockWith {
+            }
+
+            Mock -CommandName Get-AvailabilityConfig -MockWith {
+                return @{
+                    OrgWideAccount = 'johndoe'
+                }
+            }
+
+            Mock -CommandName Get-MgUser -MockWith {
+                return @{
+                    UserPrincipalName = 'johndoe'
+                }
+            }
+
+            Mock -CommandName Get-User -MockWith {
+                return @{
+                    UserPrincipalName = 'john.smith@contoso.com'
+                }
+            }
+
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -59,17 +81,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 }
 
                 Mock -CommandName Get-AvailabilityConfig -MockWith {
-                    return @{
-                        OrgWideAccount = 'meganb'
-                    }
-                }
-
-                Mock -CommandName Set-AvailabilityConfig -MockWith {
-                    return @{
-                        OrgWideAccount = 'johndoe'
-                        Ensure         = 'Present'
-                        Credential     = $Credential
-                    }
+                    return $null
                 }
             }
 
@@ -79,6 +91,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the Set method' {
                 Set-TargetResource @testParams
+                Should -Invoke -CommandName New-AvailabilityConfig -Exactly 1
             }
 
             It 'Should return Absent from the Get method' {
@@ -95,9 +108,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 }
 
                 Mock -CommandName Get-AvailabilityConfig -MockWith {
-                    return @{
-                        OrgWideAccount = 'meganb'
-                    }
+                    return $null
                 }
             }
 
@@ -113,12 +124,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Ensure         = 'Present'
                     Credential     = $Credential
                 }
-
-                Mock -CommandName Get-AvailabilityConfig -MockWith {
-                    return @{
-                        OrgWideAccount = 'johndoe'
-                    }
-                }
             }
 
             It 'Should return true from the Test method' {
@@ -133,20 +138,15 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
-                }
-
-                $AvailabilityConfig = @{
-                    OrgWideAccount = 'johndoe'
-                }
-                Mock -CommandName Get-AvailabilityConfig -MockWith {
-                    return $AvailabilityConfig
                 }
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

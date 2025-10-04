@@ -7,7 +7,7 @@ Configuration Example
     param(
         [Parameter(Mandatory = $true)]
         [PSCredential]
-        $credsGlobalAdmin
+        $Credscredential
     )
     Import-DscResource -ModuleName Microsoft365DSC
 
@@ -18,8 +18,11 @@ Configuration Example
             DisplayName        = "My Demo Environment"
             EnvironmentSKU     = "Production"
             Location           = "canada"
+            ProvisionDatabase  = $true
+            LanguageName       = 1033;
+            CurrencyName	   = "CAD";
             Ensure             = "Present"
-            Credential         = $credsGlobalAdmin
+            Credential         = $Credscredential
         }
     }
 }

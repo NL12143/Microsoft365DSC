@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_TeamsMessagingPolicy'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -10,7 +12,66 @@ function Get-TargetResource
 
         [Parameter()]
         [System.Boolean]
+        $AllowChatWithGroup,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowCustomGroupChatAvatars,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowFullChatPermissionUserToDeleteAnyMessage,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowGiphyDisplay,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowGroupChatJoinLinks,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowPasteInternetImage,
+
+        [Parameter()]
+        [ValidateSet('Full', 'Limited', 'Restricted')]
+        [System.String]
+        $ChatPermissionRole,
+
+        [Parameter()]
+        [System.Boolean]
+        $CreateCustomEmojis,
+
+        [Parameter()]
+        [System.Boolean]
+        $DeleteCustomEmojis,
+
+        [Parameter()]
+        [ValidateSet('Enabled', 'Disabled')]
+        [System.String]
+        $DesignerForBackgroundsAndImages,
+
+        [Parameter()]
+        [ValidateSet('BlockingDisallowed', 'BlockingAllowed')]
+        [System.String]
+        $InOrganizationChatControl,
+
+        [Parameter()]
+        [System.Boolean]
+        $UsersCanDeleteBotMessages,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowCommunicationComplianceEndUserReporting,
+
+        [Parameter()]
+        [System.Boolean]
         $AllowGiphy,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowFluidCollaborate,
 
         [Parameter()]
         [System.Boolean]
@@ -19,6 +80,10 @@ function Get-TargetResource
         [Parameter()]
         [System.Boolean]
         $AllowOwnerDeleteMessage,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowSecurityEndUserReporting,
 
         [Parameter()]
         [System.Boolean]
@@ -42,6 +107,14 @@ function Get-TargetResource
 
         [Parameter()]
         [System.Boolean]
+        $AllowSmartCompose,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowSmartReply,
+
+        [Parameter()]
+        [System.Boolean]
         $AllowUserTranslation,
 
         [Parameter()]
@@ -55,6 +128,14 @@ function Get-TargetResource
         [Parameter()]
         [System.Boolean]
         $AllowPriorityMessages,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowUserDeleteChat,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowVideoMessages,
 
         [Parameter()]
         [System.String]
@@ -103,32 +184,48 @@ function Get-TargetResource
 
         [Parameter()]
         [System.String]
-        $CertificateThumbprint
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [Switch]
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message 'Getting configuration of Teams Messaging Policy'
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftTeams' `
-        -InboundParameters $PSBoundParameters
-
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
-
-    #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
-    $CommandName = $MyInvocation.MyCommand
-    $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
-        -CommandName $CommandName `
-        -Parameters $PSBoundParameters
-    Add-M365DSCTelemetryEvent -Data $data
-    #endregion
-
-    $nullReturn = $PSBoundParameters
-    $nullReturn.Ensure = 'Absent'
     try
     {
-        $policy = Get-CsTeamsMessagingPolicy -Identity $Identity `
-            -ErrorAction SilentlyContinue
+        if (-not $Script:exportedInstance -or $Script:exportedInstance.Identity -ne $Identity)
+        {
+            $null = New-M365DSCConnection -Workload 'MicrosoftTeams' `
+                -InboundParameters $PSBoundParameters
+
+            #Ensure the proper dependencies are installed in the current environment.
+            Confirm-M365DSCDependencies
+
+            #region Telemetry
+            $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+            $CommandName = $MyInvocation.MyCommand
+            $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
+                -CommandName $CommandName `
+                -Parameters $PSBoundParameters
+            Add-M365DSCTelemetryEvent -Data $data
+            #endregion
+
+            $nullReturn = $PSBoundParameters
+            $nullReturn.Ensure = 'Absent'
+
+            $policy = Get-CsTeamsMessagingPolicy -Identity $Identity `
+                -ErrorAction SilentlyContinue
+        }
+        else
+        {
+            $policy = $Script:exportedInstance
+        }
 
         if ($null -eq $policy)
         {
@@ -143,30 +240,51 @@ function Get-TargetResource
                 $currentPolicy = $currentPolicy.Split(':')[1]
             }
             return @{
-                Identity                      = $currentPolicy
-                AllowGiphy                    = $policy.AllowGiphy
-                AllowMemes                    = $policy.AllowMemes
-                AllowOwnerDeleteMessage       = $policy.AllowOwnerDeleteMessage
-                AllowStickers                 = $policy.AllowStickers
-                AllowUrlPreviews              = $policy.AllowUrlPreviews
-                AllowUserChat                 = $policy.AllowUserChat
-                AllowUserDeleteMessage        = $policy.AllowUserDeleteMessage
-                AllowUserEditMessage          = $policy.AllowUserEditMessage
-                AllowUserTranslation          = $policy.AllowUserTranslation
-                GiphyRatingType               = $policy.GiphyRatingType
-                ReadReceiptsEnabledType       = $policy.ReadReceiptsEnabledType
-                AllowImmersiveReader          = $policy.AllowImmersiveReader
-                AllowRemoveUser               = $policy.AllowRemoveUser
-                AllowPriorityMessages         = $policy.AllowPriorityMessages
-                ChannelsInChatListEnabledType = $policy.ChannelsInChatListEnabledType
-                AudioMessageEnabledType       = $policy.AudioMessageEnabledType
-                Description                   = $policy.Description
-                Tenant                        = $policy.Tenant
-                Ensure                        = 'Present'
-                Credential                    = $Credential
-                ApplicationId                 = $ApplicationId
-                TenantId                      = $TenantId
-                CertificateThumbprint         = $CertificateThumbprint
+                Identity                                      = $currentPolicy
+                AllowChatWithGroup                            = $policy.AllowChatWithGroup
+                AllowCustomGroupChatAvatars                   = $policy.AllowCustomGroupChatAvatars
+                AllowFullChatPermissionUserToDeleteAnyMessage = $policy.AllowFullChatPermissionUserToDeleteAnyMessage
+                AllowGiphyDisplay                             = $policy.AllowGiphyDisplay
+                AllowGroupChatJoinLinks                       = $policy.AllowGroupChatJoinLinks
+                AllowPasteInternetImage                       = $policy.AllowPasteInternetImage
+                ChatPermissionRole                            = $policy.ChatPermissionRole
+                CreateCustomEmojis                            = $policy.CreateCustomEmojis
+                DeleteCustomEmojis                            = $policy.DeleteCustomEmojis
+                DesignerForBackgroundsAndImages               = $policy.DesignerForBackgroundsAndImages
+                InOrganizationChatControl                     = $policy.InOrganizationChatControl
+                UsersCanDeleteBotMessages                     = $policy.UsersCanDeleteBotMessages
+                AllowCommunicationComplianceEndUserReporting  = $policy.AllowCommunicationComplianceEndUserReporting
+                AllowGiphy                                    = $policy.AllowGiphy
+                AllowFluidCollaborate                         = $policy.AllowFluidCollaborate
+                AllowMemes                                    = $policy.AllowMemes
+                AllowOwnerDeleteMessage                       = $policy.AllowOwnerDeleteMessage
+                AllowSecurityEndUserReporting                 = $policy.AllowSecurityEndUserReporting
+                AllowStickers                                 = $policy.AllowStickers
+                AllowUrlPreviews                              = $policy.AllowUrlPreviews
+                AllowUserChat                                 = $policy.AllowUserChat
+                AllowUserDeleteMessage                        = $policy.AllowUserDeleteMessage
+                AllowUserEditMessage                          = $policy.AllowUserEditMessage
+                AllowSmartCompose                             = $policy.AllowSmartCompose
+                AllowSmartReply                               = $policy.AllowSmartReply
+                AllowUserTranslation                          = $policy.AllowUserTranslation
+                GiphyRatingType                               = $policy.GiphyRatingType
+                ReadReceiptsEnabledType                       = $policy.ReadReceiptsEnabledType
+                AllowImmersiveReader                          = $policy.AllowImmersiveReader
+                AllowRemoveUser                               = $policy.AllowRemoveUser
+                AllowPriorityMessages                         = $policy.AllowPriorityMessages
+                AllowUserDeleteChat                           = $policy.AllowUserDeleteChat
+                AllowVideoMessages                            = $policy.AllowVideoMessages
+                ChannelsInChatListEnabledType                 = $policy.ChannelsInChatListEnabledType
+                AudioMessageEnabledType                       = $policy.AudioMessageEnabledType
+                Description                                   = $policy.Description
+                Tenant                                        = $policy.Tenant
+                Ensure                                        = 'Present'
+                Credential                                    = $Credential
+                ApplicationId                                 = $ApplicationId
+                TenantId                                      = $TenantId
+                CertificateThumbprint                         = $CertificateThumbprint
+                ManagedIdentity                               = $ManagedIdentity.IsPresent
+                AccessTokens                                  = $AccessTokens
             }
         }
     }
@@ -193,7 +311,66 @@ function Set-TargetResource
 
         [Parameter()]
         [System.Boolean]
+        $AllowChatWithGroup,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowCustomGroupChatAvatars,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowFullChatPermissionUserToDeleteAnyMessage,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowGiphyDisplay,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowGroupChatJoinLinks,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowPasteInternetImage,
+
+        [Parameter()]
+        [ValidateSet('Full', 'Limited', 'Restricted')]
+        [System.String]
+        $ChatPermissionRole,
+
+        [Parameter()]
+        [System.Boolean]
+        $CreateCustomEmojis,
+
+        [Parameter()]
+        [System.Boolean]
+        $DeleteCustomEmojis,
+
+        [Parameter()]
+        [ValidateSet('Enabled', 'Disabled')]
+        [System.String]
+        $DesignerForBackgroundsAndImages,
+
+        [Parameter()]
+        [ValidateSet('BlockingDisallowed', 'BlockingAllowed')]
+        [System.String]
+        $InOrganizationChatControl,
+
+        [Parameter()]
+        [System.Boolean]
+        $UsersCanDeleteBotMessages,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowCommunicationComplianceEndUserReporting,
+
+        [Parameter()]
+        [System.Boolean]
         $AllowGiphy,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowFluidCollaborate,
 
         [Parameter()]
         [System.Boolean]
@@ -202,6 +379,10 @@ function Set-TargetResource
         [Parameter()]
         [System.Boolean]
         $AllowOwnerDeleteMessage,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowSecurityEndUserReporting,
 
         [Parameter()]
         [System.Boolean]
@@ -225,6 +406,14 @@ function Set-TargetResource
 
         [Parameter()]
         [System.Boolean]
+        $AllowSmartCompose,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowSmartReply,
+
+        [Parameter()]
+        [System.Boolean]
         $AllowUserTranslation,
 
         [Parameter()]
@@ -238,6 +427,14 @@ function Set-TargetResource
         [Parameter()]
         [System.Boolean]
         $AllowPriorityMessages,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowUserDeleteChat,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowVideoMessages,
 
         [Parameter()]
         [System.String]
@@ -286,7 +483,15 @@ function Set-TargetResource
 
         [Parameter()]
         [System.String]
-        $CertificateThumbprint
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [Switch]
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message 'Setting configuration of Teams Messaging Policy'
@@ -303,17 +508,8 @@ function Set-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftTeams' `
-        -InboundParameters $PSBoundParameters
-
     $curPolicy = Get-TargetResource @PSBoundParameters
-
-    $SetParams = $PSBoundParameters
-    $SetParams.Remove('Credential') | Out-Null
-    $SetParams.Remove('ApplicationId') | Out-Null
-    $SetParams.Remove('TenantId') | Out-Null
-    $SetParams.Remove('CertificateThumbprint') | Out-Null
-    $SetParams.Remove('Ensure') | Out-Null
+    $SetParams = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
 
     if ($curPolicy.Ensure -eq 'Absent' -and 'Present' -eq $Ensure )
     {
@@ -341,7 +537,66 @@ function Test-TargetResource
 
         [Parameter()]
         [System.Boolean]
+        $AllowChatWithGroup,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowCustomGroupChatAvatars,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowFullChatPermissionUserToDeleteAnyMessage,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowGiphyDisplay,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowGroupChatJoinLinks,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowPasteInternetImage,
+
+        [Parameter()]
+        [ValidateSet('Full', 'Limited', 'Restricted')]
+        [System.String]
+        $ChatPermissionRole,
+
+        [Parameter()]
+        [System.Boolean]
+        $CreateCustomEmojis,
+
+        [Parameter()]
+        [System.Boolean]
+        $DeleteCustomEmojis,
+
+        [Parameter()]
+        [ValidateSet('Enabled', 'Disabled')]
+        [System.String]
+        $DesignerForBackgroundsAndImages,
+
+        [Parameter()]
+        [ValidateSet('BlockingDisallowed', 'BlockingAllowed')]
+        [System.String]
+        $InOrganizationChatControl,
+
+        [Parameter()]
+        [System.Boolean]
+        $UsersCanDeleteBotMessages,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowCommunicationComplianceEndUserReporting,
+
+        [Parameter()]
+        [System.Boolean]
         $AllowGiphy,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowFluidCollaborate,
 
         [Parameter()]
         [System.Boolean]
@@ -350,6 +605,10 @@ function Test-TargetResource
         [Parameter()]
         [System.Boolean]
         $AllowOwnerDeleteMessage,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowSecurityEndUserReporting,
 
         [Parameter()]
         [System.Boolean]
@@ -373,6 +632,14 @@ function Test-TargetResource
 
         [Parameter()]
         [System.Boolean]
+        $AllowSmartCompose,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowSmartReply,
+
+        [Parameter()]
+        [System.Boolean]
         $AllowUserTranslation,
 
         [Parameter()]
@@ -386,6 +653,14 @@ function Test-TargetResource
         [Parameter()]
         [System.Boolean]
         $AllowPriorityMessages,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowUserDeleteChat,
+
+        [Parameter()]
+        [System.Boolean]
+        $AllowVideoMessages,
 
         [Parameter()]
         [System.String]
@@ -434,13 +709,19 @@ function Test-TargetResource
 
         [Parameter()]
         [System.String]
-        $CertificateThumbprint
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [Switch]
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
 
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -448,25 +729,9 @@ function Test-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message 'Testing configuration of Teams messaging policy'
-
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-
-    Write-Verbose -Message "Current Values: $(Convert-M365DscHashtableToString -Hashtable $CurrentValues)"
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $ValuesToCheck = $PSBoundParameters
-
-    $ValuesToCheck.Remove('Tenant') | Out-Null
-    $TestResult = Test-M365DSCParameterState `
-        -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck $ValuesToCheck.Keys
-
-    Write-Verbose -Message "Test-TargetResource returned $TestResult"
-
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '')
+    return $result
 }
 
 function Export-TargetResource
@@ -489,8 +754,17 @@ function Export-TargetResource
 
         [Parameter()]
         [System.String]
-        $CertificateThumbprint
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [Switch]
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftTeams' `
         -InboundParameters $PSBoundParameters
 
@@ -511,30 +785,29 @@ function Export-TargetResource
         $i = 1
         [array]$policies = Get-CsTeamsMessagingPolicy -ErrorAction Stop
         $dscContent = ''
-        Write-Host "`r`n" -NoNewline
+        Write-M365DSCHost -Message "`r`n" -DeferWrite
         foreach ($policy in $policies)
         {
-            Write-Host "    |---[$i/$($policies.Count)] $($policy.Identity)" -NoNewline
-            if ($policy.Identity.ToString().contains(':'))
+            if ($null -ne $Global:M365DSCExportResourceInstancesCount)
             {
-                $currentIdentity = $policy.Identity.split(':')[1]
-            }
-            else
-            {
-                $currentIdentity = $policy.Identity
+                $Global:M365DSCExportResourceInstancesCount++
             }
 
+            Write-M365DSCHost -Message "    |---[$i/$($policies.Count)] $($policy.Identity)" -DeferWrite
+
             $params = @{
-                Identity              = $currentIdentity
+                Identity              = $policy.Identity
                 Ensure                = 'Present'
                 Credential            = $Credential
                 ApplicationId         = $ApplicationId
                 TenantId              = $TenantId
                 CertificateThumbprint = $CertificateThumbprint
+                ManagedIdentity       = $ManagedIdentity.IsPresent
+                AccessTokens          = $AccessTokens
             }
+
+            $Script:exportedInstance = $policy
             $Results = Get-TargetResource @Params
-            $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                -Results $Results
             $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                 -ConnectionMode $ConnectionMode `
                 -ModulePath $PSScriptRoot `
@@ -544,13 +817,13 @@ function Export-TargetResource
             Save-M365DSCPartialExport -Content $currentDSCBlock `
                 -FileName $Global:PartialExportFileName
             $i++
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         }
         return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `

@@ -1,0 +1,46 @@
+{
+  "resourceName": "EXOMailboxAuditBypassAssociation",
+  "description": "",
+  "roles": {
+    "read": [
+      "Global Reader"
+    ],
+    "update": [
+      "Exchange Administrator"
+    ]
+  },
+  "permissions": {
+    "Office 365 Exchange Online": {
+      "application": {
+        "read": [
+          {
+            "name": "Exchange.ManageAsApp"
+          }
+        ],
+        "update": [
+          {
+            "name": "Exchange.ManageAsApp"
+          }
+        ]
+      }
+    },
+    "exchange": {
+      "requiredroles": [
+        "Compliance Admin",
+        "View-Only Configuration",
+        "Journaling"
+      ],
+      "requiredrolegroups": [
+        "Organization Management",
+        "Compliance Management",
+        "Records Management"
+      ]
+    }
+  },
+  "requiredModules": [],
+  "supportedEnvironments": [
+    "Global",
+    "USGov"
+  ],
+  "mode": "Configuration"
+}

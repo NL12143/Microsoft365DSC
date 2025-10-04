@@ -22,16 +22,12 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
 
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'Pass@word1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString ((New-Guid).ToString()) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
             $Global:PartialExportFileName = 'c:\TestPath'
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
-            }
 
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-                return 'FakeDSCContent'
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName Save-M365DSCPartialExport -MockWith {
@@ -44,9 +40,11 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             Mock -CommandName Set-CsPhoneNumberAssignment -MockWith {
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
             }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -60,7 +58,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Credential      = $Credential
                 }
 
-                Mock -CommandName Get-CsOnlineVOiceUser -MockWith {
+                Mock -CommandName Get-CsOnlineUser -MockWith {
                     return $null
                 }
             }
@@ -83,16 +81,22 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             BeforeAll {
                 $testParams = @{
                     Identity        = 'John.Smith@Contoso.com'
-                    TelephoneNumber = '+14255043920'
+                    TelephoneNumber = '14255043920'
                     LocationId      = 'c7c5a17f-00d7-47c0-9ddb-3383229d606b'
                     Ensure          = 'Present'
                     Credential      = $Credential
                 }
 
-                Mock -CommandName Get-CsOnlineVOiceUser -MockWith {
+                Mock -CommandName Get-CsOnlineUser -MockWith {
                     return @{
-                        Number   = '+14255043920'
-                        Location = 'c7c5a17f-00d7-47c0-9ddb-3383229d606b'
+                        LineUri           = 'tel:+14255043920'
+                        UserPrincipalName = 'John.Smith@Contoso.com'
+                    }
+                }
+
+                Mock -CommandName Get-CsPhoneNumberAssignment -MockWith {
+                    return @{
+                        LocationId = 'c7c5a17f-00d7-47c0-9ddb-3383229d606b'
                     }
                 }
             }
@@ -112,10 +116,16 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Credential      = $Credential
                 }
 
-                Mock -CommandName Get-CsOnlineVOiceUser -MockWith {
+                Mock -CommandName Get-CsOnlineUser -MockWith {
                     return @{
-                        Number   = '+15555555555' #Drift
-                        Location = 'c7c5a17f-00d7-47c0-9ddb-3383229d606b'
+                        LineUri           = 'tel:+15555555555'
+                        UserPrincipalName = 'John.Smith@Contoso.com'
+                    }
+                }
+
+                Mock -CommandName Get-CsPhoneNumberAssignment -MockWith {
+                    return @{
+                        LocationId = 'c7c5a17f-00d7-47c0-9ddb-3383229d606b'
                     }
                 }
             }
@@ -140,16 +150,23 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Credential = $Credential
                 }
 
-                Mock -CommandName Get-CsOnlineVOiceUser -MockWith {
+                Mock -CommandName Get-CsOnlineUser -MockWith {
                     return @{
-                        Number   = '+14255043920'
-                        Location = 'c7c5a17f-00d7-47c0-9ddb-3383229d606b'
+                        LineUri           = 'tel:+15555555555'
+                        UserPrincipalName = 'John.Smith@Contoso.com'
+                    }
+                }
+
+                Mock -CommandName Get-CsPhoneNumberAssignment -MockWith {
+                    return @{
+                        LocationId = 'c7c5a17f-00d7-47c0-9ddb-3383229d606b'
                     }
                 }
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

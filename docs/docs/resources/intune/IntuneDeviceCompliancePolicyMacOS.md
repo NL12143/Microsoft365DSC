@@ -4,46 +4,55 @@
 
 | Parameter | Attribute | DataType | Description | Allowed Values |
 | --- | --- | --- | --- | --- |
-| **dataType** | Write | String | The type of the target assignment. |#microsoft.graph.groupAssignmentTarget, #microsoft.graph.allLicensedUsersAssignmentTarget, #microsoft.graph.allDevicesAssignmentTarget, #microsoft.graph.exclusionGroupAssignmentTarget, #microsoft.graph.configurationManagerCollectionAssignmentTarget|
-| **deviceAndAppManagementAssignmentFilterType** | Write | String | The type of filter of the target assignment i.e. Exclude or Include. Possible values are:none, include, exclude. |none, include, exclude|
-| **deviceAndAppManagementAssignmentFilterId** | Write | String | The Id of the filter for the target assignment. ||
-| **groupId** | Write | String | The group Id that is the target of the assignment. ||
-| **collectionId** | Write | String | The collection Id that is the target of the assignment.(ConfigMgr) ||
-| **DisplayName** | Key | String | Display name of the MacOS device compliance policy. ||
-| **Description** | Write | String | Description of the MacOS device compliance policy. ||
-| **Assignments** | Write | InstanceArray[] | Assignments of the Intune Policy. ||
-| **PasswordRequired** | Write | Boolean | PasswordRequired of the MacOS device compliance policy. ||
-| **PasswordBlockSimple** | Write | Boolean | PasswordBlockSimple of the MacOS device compliance policy. ||
-| **PasswordExpirationDays** | Write | UInt32 | PasswordExpirationDays of the MacOS device compliance policy. ||
-| **PasswordMinimumLength** | Write | UInt32 | PasswordMinimumLength of the MacOS device compliance policy. ||
-| **PasswordMinutesOfInactivityBeforeLock** | Write | UInt32 | PasswordMinutesOfInactivityBeforeLock of the MacOS device compliance policy. ||
-| **PasswordPreviousPasswordBlockCount** | Write | UInt32 | PasswordPreviousPasswordBlockCount of the MacOS device compliance policy. ||
-| **PasswordMinimumCharacterSetCount** | Write | UInt32 | PasswordMinimumCharacterSetCount of the MacOS device compliance policy. ||
-| **PasswordRequiredType** | Write | String | PasswordRequiredType of the MacOS device compliance policy. |DeviceDefault, Alphanumeric, Numeric|
-| **OsMinimumVersion** | Write | String | OsMinimumVersion of the MacOS device compliance policy. ||
-| **OsMaximumVersion** | Write | String | OsMaximumVersion of the MacOS device compliance policy. ||
-| **OsMinimumBuildVersion** | Write | String | Minimum MacOS build version. ||
-| **OsMaximumBuildVersion** | Write | String | Maximum MacOS build version. ||
-| **SystemIntegrityProtectionEnabled** | Write | Boolean | SystemIntegrityProtectionEnabled of the MacOS device compliance policy. ||
-| **DeviceThreatProtectionEnabled** | Write | Boolean | DeviceThreatProtectionEnabled of the MacOS device compliance policy. ||
-| **DeviceThreatProtectionRequiredSecurityLevel** | Write | String | DeviceThreatProtectionRequiredSecurityLevel of the MacOS device compliance policy. |Unavailable, Secured, Low, Medium, High, NotSet|
-| **AdvancedThreatProtectionRequiredSecurityLevel** | Write | String | AdvancedThreatProtectionRequiredSecurityLevel of the MacOS device compliance policy. |Unavailable, Secured, Low, Medium, High, NotSet|
-| **StorageRequireEncryption** | Write | Boolean | StorageRequireEncryption of the MacOS device compliance policy. ||
-| **GatekeeperAllowedAppSource** | Write | String | System and Privacy setting that determines which download locations apps can be run from on a macOS device. |notConfigured, macAppStore, macAppStoreAndIdentifiedDevelopers, anywhere|
-| **FirewallEnabled** | Write | Boolean | FirewallEnabled of the MacOS device compliance policy. ||
-| **FirewallBlockAllIncoming** | Write | Boolean | FirewallBlockAllIncoming of the MacOS device compliance policy. ||
-| **FirewallEnableStealthMode** | Write | Boolean | FirewallEnableStealthMode of the MacOS device compliance policy. ||
-| **Ensure** | Write | String | Present ensures the policy exists, absent ensures it is removed. |Present, Absent|
-| **Credential** | Write | PSCredential | Credentials of the Intune Admin ||
-| **ApplicationId** | Write | String | Id of the Azure Active Directory application to authenticate with. ||
-| **TenantId** | Write | String | Id of the Azure Active Directory tenant used for authentication. ||
-| **ApplicationSecret** | Write | PSCredential | Secret of the Azure Active Directory tenant used for authentication. ||
-| **CertificateThumbprint** | Write | String | Thumbprint of the Azure Active Directory application's authentication certificate to use for authentication. ||
-| **ManagedIdentity** | Write | Boolean | Managed ID being used for authentication. ||
+| **DisplayName** | Key | String | Display name of the MacOS device compliance policy. | |
+| **Description** | Write | String | Description of the MacOS device compliance policy. | |
+| **RoleScopeTagIds** | Write | StringArray[] | List of Scope Tags for this Entity instance. | |
+| **Assignments** | Write | MSFT_DeviceManagementConfigurationPolicyAssignments[] | Assignments of the Intune Policy. | |
+| **PasswordRequired** | Write | Boolean | PasswordRequired of the MacOS device compliance policy. | |
+| **PasswordBlockSimple** | Write | Boolean | PasswordBlockSimple of the MacOS device compliance policy. | |
+| **PasswordExpirationDays** | Write | UInt32 | PasswordExpirationDays of the MacOS device compliance policy. | |
+| **PasswordMinimumLength** | Write | UInt32 | PasswordMinimumLength of the MacOS device compliance policy. | |
+| **PasswordMinutesOfInactivityBeforeLock** | Write | UInt32 | PasswordMinutesOfInactivityBeforeLock of the MacOS device compliance policy. | |
+| **PasswordPreviousPasswordBlockCount** | Write | UInt32 | PasswordPreviousPasswordBlockCount of the MacOS device compliance policy. | |
+| **PasswordMinimumCharacterSetCount** | Write | UInt32 | PasswordMinimumCharacterSetCount of the MacOS device compliance policy. | |
+| **PasswordRequiredType** | Write | String | PasswordRequiredType of the MacOS device compliance policy. | `DeviceDefault`, `Alphanumeric`, `Numeric` |
+| **OsMinimumVersion** | Write | String | OsMinimumVersion of the MacOS device compliance policy. | |
+| **OsMaximumVersion** | Write | String | OsMaximumVersion of the MacOS device compliance policy. | |
+| **OsMinimumBuildVersion** | Write | String | Minimum MacOS build version. | |
+| **OsMaximumBuildVersion** | Write | String | Maximum MacOS build version. | |
+| **SystemIntegrityProtectionEnabled** | Write | Boolean | SystemIntegrityProtectionEnabled of the MacOS device compliance policy. | |
+| **DeviceThreatProtectionEnabled** | Write | Boolean | DeviceThreatProtectionEnabled of the MacOS device compliance policy. | |
+| **DeviceThreatProtectionRequiredSecurityLevel** | Write | String | DeviceThreatProtectionRequiredSecurityLevel of the MacOS device compliance policy. | `Unavailable`, `Secured`, `Low`, `Medium`, `High`, `NotSet` |
+| **AdvancedThreatProtectionRequiredSecurityLevel** | Write | String | AdvancedThreatProtectionRequiredSecurityLevel of the MacOS device compliance policy. | `Unavailable`, `Secured`, `Low`, `Medium`, `High`, `NotSet` |
+| **StorageRequireEncryption** | Write | Boolean | StorageRequireEncryption of the MacOS device compliance policy. | |
+| **GatekeeperAllowedAppSource** | Write | String | System and Privacy setting that determines which download locations apps can be run from on a macOS device. | `notConfigured`, `macAppStore`, `macAppStoreAndIdentifiedDevelopers`, `anywhere` |
+| **FirewallEnabled** | Write | Boolean | FirewallEnabled of the MacOS device compliance policy. | |
+| **FirewallBlockAllIncoming** | Write | Boolean | FirewallBlockAllIncoming of the MacOS device compliance policy. | |
+| **FirewallEnableStealthMode** | Write | Boolean | FirewallEnableStealthMode of the MacOS device compliance policy. | |
+| **Ensure** | Write | String | Present ensures the policy exists, absent ensures it is removed. | `Present`, `Absent` |
+| **Credential** | Write | PSCredential | Credentials of the Intune Admin | |
+| **ApplicationId** | Write | String | Id of the Azure Active Directory application to authenticate with. | |
+| **TenantId** | Write | String | Id of the Azure Active Directory tenant used for authentication. | |
+| **ApplicationSecret** | Write | PSCredential | Secret of the Azure Active Directory tenant used for authentication. | |
+| **CertificateThumbprint** | Write | String | Thumbprint of the Azure Active Directory application's authentication certificate to use for authentication. | |
+| **ManagedIdentity** | Write | Boolean | Managed ID being used for authentication. | |
+| **AccessTokens** | Write | StringArray[] | Access token used for authentication. | |
 
-# IntuneDeviceCompliancePolicyMacOS
+### MSFT_DeviceManagementConfigurationPolicyAssignments
 
-### Description
+#### Parameters
+
+| Parameter | Attribute | DataType | Description | Allowed Values |
+| --- | --- | --- | --- | --- |
+| **dataType** | Write | String | The type of the target assignment. | `#microsoft.graph.cloudPcManagementGroupAssignmentTarget`, `#microsoft.graph.groupAssignmentTarget`, `#microsoft.graph.allLicensedUsersAssignmentTarget`, `#microsoft.graph.allDevicesAssignmentTarget`, `#microsoft.graph.exclusionGroupAssignmentTarget`, `#microsoft.graph.configurationManagerCollectionAssignmentTarget` |
+| **deviceAndAppManagementAssignmentFilterType** | Write | String | The type of filter of the target assignment i.e. Exclude or Include. Possible values are:none, include, exclude. | `none`, `include`, `exclude` |
+| **deviceAndAppManagementAssignmentFilterId** | Write | String | The Id of the filter for the target assignment. | |
+| **deviceAndAppManagementAssignmentFilterDisplayName** | Write | String | The display name of the filter for the target assignment. | |
+| **groupId** | Write | String | The group Id that is the target of the assignment. | |
+| **groupDisplayName** | Write | String | The group Display Name that is the target of the assignment. | |
+| **collectionId** | Write | String | The collection Id that is the target of the assignment.(ConfigMgr) | |
+
+## Description
 
 This resource configures the settings of MacOS compliance policies
 in your cloud-based organization.
@@ -128,6 +137,32 @@ For more information, see Gatekeeper on macOS.
   * Mac App Store and identified developers - Install apps for the Mac app store and from identified developers. macOS checks the identity of developers, and does some other checks to verify app integrity. If a user selects Gatekeeper to install apps outside these options, then the device is considered not compliant.
   * Anywhere - Apps can be installed from anywhere, and by any developer. This option is the least secure.
 
+## Permissions
+
+### Microsoft Graph
+
+To authenticate with the Microsoft Graph API, this resource required the following permissions:
+
+#### Delegated permissions
+
+- **Read**
+
+    - Group.Read.All, DeviceManagementConfiguration.Read.All
+
+- **Update**
+
+    - Group.Read.All, DeviceManagementConfiguration.ReadWrite.All
+
+#### Application permissions
+
+- **Read**
+
+    - Group.Read.All, DeviceManagementConfiguration.Read.All
+
+- **Update**
+
+    - Group.Read.All, DeviceManagementConfiguration.ReadWrite.All
+
 ## Examples
 
 ### Example 1
@@ -138,9 +173,17 @@ This example creates a new Device Comliance Policy for MacOS.
 Configuration Example
 {
     param(
-        [Parameter(Mandatory = $true)]
-        [PSCredential]
-        $credsGlobalAdmin
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint
     )
     Import-DscResource -ModuleName Microsoft365DSC
 
@@ -148,8 +191,8 @@ Configuration Example
     {
         IntuneDeviceCompliancePolicyMacOS 'ConfigureDeviceCompliancePolicyMacOS'
         {
-            DisplayName                                 = "MacOS DSC Policy"
-            Description                                 = "Test policy"
+            DisplayName                                 = 'MacOS DSC Policy'
+            Description                                 = 'Test policy'
             PasswordRequired                            = $False
             PasswordBlockSimple                         = $False
             PasswordExpirationDays                      = 365
@@ -157,18 +200,20 @@ Configuration Example
             PasswordMinutesOfInactivityBeforeLock       = 5
             PasswordPreviousPasswordBlockCount          = 13
             PasswordMinimumCharacterSetCount            = 1
-            PasswordRequiredType                        = "DeviceDefault"
+            PasswordRequiredType                        = 'DeviceDefault'
             OsMinimumVersion                            = 10
             OsMaximumVersion                            = 13
             SystemIntegrityProtectionEnabled            = $False
             DeviceThreatProtectionEnabled               = $False
-            DeviceThreatProtectionRequiredSecurityLevel = "Unavailable"
+            DeviceThreatProtectionRequiredSecurityLevel = 'Unavailable'
             StorageRequireEncryption                    = $False
             FirewallEnabled                             = $False
             FirewallBlockAllIncoming                    = $False
             FirewallEnableStealthMode                   = $False
             Ensure                                      = 'Present'
-            Credential                                  = $credsGlobalAdmin
+            ApplicationId         = $ApplicationId;
+            TenantId              = $TenantId;
+            CertificateThumbprint = $CertificateThumbprint;
         }
     }
 }
@@ -176,25 +221,89 @@ Configuration Example
 
 ### Example 2
 
-This example removes an existing Device Compliance Policy for MacOS devices
+This example creates a new Device Comliance Policy for MacOS.
 
 ```powershell
 Configuration Example
 {
     param(
-        [Parameter(Mandatory = $true)]
-        [PSCredential]
-        $credsGlobalAdmin
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint
     )
     Import-DscResource -ModuleName Microsoft365DSC
 
     node localhost
     {
-        IntuneDeviceCompliancePolicyMacOS 'RemoveDeviceCompliancePolicyMacOS'
+        IntuneDeviceCompliancePolicyMacOS 'ConfigureDeviceCompliancePolicyMacOS'
         {
-            DisplayName          = 'Demo MacOS Device Compliance Policy'
-            Ensure               = 'Absent'
-            Credential           = $credsGlobalAdmin
+            DisplayName                                 = 'MacOS DSC Policy'
+            Description                                 = 'Test policy'
+            PasswordRequired                            = $False
+            PasswordBlockSimple                         = $False
+            PasswordExpirationDays                      = 365
+            PasswordMinimumLength                       = 8 # Updated Property
+            PasswordMinutesOfInactivityBeforeLock       = 5
+            PasswordPreviousPasswordBlockCount          = 13
+            PasswordMinimumCharacterSetCount            = 1
+            PasswordRequiredType                        = 'DeviceDefault'
+            OsMinimumVersion                            = 10
+            OsMaximumVersion                            = 13
+            SystemIntegrityProtectionEnabled            = $False
+            DeviceThreatProtectionEnabled               = $False
+            DeviceThreatProtectionRequiredSecurityLevel = 'Unavailable'
+            StorageRequireEncryption                    = $False
+            FirewallEnabled                             = $False
+            FirewallBlockAllIncoming                    = $False
+            FirewallEnableStealthMode                   = $False
+            Ensure                                      = 'Present'
+            ApplicationId         = $ApplicationId;
+            TenantId              = $TenantId;
+            CertificateThumbprint = $CertificateThumbprint;
+        }
+    }
+}
+```
+
+### Example 3
+
+This example creates a new Device Comliance Policy for MacOS.
+
+```powershell
+Configuration Example
+{
+    param(
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint
+    )
+    Import-DscResource -ModuleName Microsoft365DSC
+
+    node localhost
+    {
+        IntuneDeviceCompliancePolicyMacOS 'ConfigureDeviceCompliancePolicyMacOS'
+        {
+            DisplayName                                 = 'MacOS DSC Policy'
+            Ensure                                      = 'Absent'
+            ApplicationId         = $ApplicationId;
+            TenantId              = $TenantId;
+            CertificateThumbprint = $CertificateThumbprint;
         }
     }
 }

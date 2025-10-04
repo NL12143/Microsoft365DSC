@@ -22,36 +22,38 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
 
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'Pass@word1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString ((New-Guid).ToString()) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
             $Global:PartialExportFileName = 'c:\TestPath'
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
+
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-                return 'FakeDSCContent'
-            }
             Mock -CommandName Save-M365DSCPartialExport -MockWith {
+            }
+
+            Mock -CommandName Get-MSCloudLoginConnectionProfile -MockWith {
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
                 return 'Credentials'
             }
 
-            Mock -CommandName New-M365DSCTeamsChannelTab -MockWith {
+            Mock -CommandName New-MgBetaTeamChannelTab -MockWith {
             }
 
-            Mock -CommandName Set-M365DSCTeamsChannelTab -MockWith {
+            Mock -CommandName Update-MgBetaTeamChannelTab -MockWith {
             }
 
-            Mock -CommandName Remove-MgTeamChannelTab -MockWith {
+            Mock -CommandName Remove-MgBetaTeamChannelTab -MockWith {
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
             }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -71,21 +73,21 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     WebSiteUrl            = 'https://contoso.com'
                 }
 
-                Mock -CommandName Get-Team -MockWith {
+                Mock -CommandName Get-MgGroup -MockWith {
                     return @{
-                        GroupId     = '12345-12345-12345-12345-12345'
+                        Id     = '12345-12345-12345-12345-12345'
                         DisplayName = 'Contoso Team'
                     }
                 }
 
-                Mock -CommandName Get-MgTeamChannel -MockWith {
+                Mock -CommandName Get-MgBetaTeamChannel -MockWith {
                     return @{
                         Id          = '67890-67890-67890-67890-67890'
                         DisplayName = 'General'
                     }
                 }
 
-                Mock -CommandName Get-M365DSCTeamChannelTab -MockWith {
+                Mock -CommandName Get-MgBetaTeamChannelTab -MockWith {
                     return $null
                 }
             }
@@ -100,7 +102,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should create the tab in the Set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName New-M365DSCTeamsChannelTab -Exactly 1
+                Should -Invoke -CommandName New-MgBetaTeamChannelTab -Exactly 1
             }
         }
 
@@ -120,27 +122,21 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     WebSiteUrl            = 'https://contoso.com'
                 }
 
-                Mock -CommandName Get-Team -MockWith {
+                Mock -CommandName Get-MgGroup -MockWith {
                     return @{
-                        GroupId     = '12345-12345-12345-12345-12345'
+                        Id     = '12345-12345-12345-12345-12345'
                         DisplayName = 'Contoso Team'
                     }
                 }
 
-                Mock -CommandName Get-MgTeamChannel -MockWith {
+                Mock -CommandName Get-MgBetaTeamChannel -MockWith {
                     return @{
                         Id          = '67890-67890-67890-67890-67890'
                         DisplayName = 'General'
                     }
                 }
 
-                Mock -CommandName Get-MgTeamChannelTab -MockWith {
-                    return @{
-
-                    }
-                }
-
-                Mock -CommandName Get-M365DSCTeamChannelTab -MockWith {
+                Mock -CommandName Get-MgBetaTeamChannelTab -MockWith {
                     return @{
                         id             = '12345-12345-12345-12345-12345'
                         displayName    = 'TestTab'
@@ -169,7 +165,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should update the settings from the Set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName Set-M365DSCTeamsChannelTab -Exactly 1
+                Should -Invoke -CommandName Update-MgBetaTeamChannelTab -Exactly 1
             }
         }
 
@@ -189,21 +185,21 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     WebSiteUrl            = 'https://contoso.com'
                 }
 
-                Mock -CommandName Get-Team -MockWith {
+                Mock -CommandName Get-MgGroup -MockWith {
                     return @{
-                        GroupId     = '12345-12345-12345-12345-12345'
+                        Id     = '12345-12345-12345-12345-12345'
                         DisplayName = 'Contoso Team'
                     }
                 }
 
-                Mock -CommandName Get-MgTeamChannel -MockWith {
+                Mock -CommandName Get-MgBetaTeamChannel -MockWith {
                     return @{
                         Id          = '67890-67890-67890-67890-67890'
                         DisplayName = 'General'
                     }
                 }
 
-                Mock -CommandName Get-M365DSCTeamChannelTab -MockWith {
+                Mock -CommandName Get-MgBetaTeamChannelTab -MockWith {
                     return @{
                         id             = '12345-12345-12345-12345-12345'
                         displayName    = 'TestTab'
@@ -247,21 +243,21 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     WebSiteUrl            = 'https://contoso.com'
                 }
 
-                Mock -CommandName Get-Team -MockWith {
+                Mock -CommandName Get-MgGroup -MockWith {
                     return @{
-                        GroupId     = '12345-12345-12345-12345-12345'
                         DisplayName = 'Contoso Team'
+                        Id          = '12345-12345-12345-12345-12345'
                     }
                 }
 
-                Mock -CommandName Get-MgTeamChannel -MockWith {
+                Mock -CommandName Get-MgBetaTeamChannel -MockWith {
                     return @{
                         Id          = '67890-67890-67890-67890-67890'
                         DisplayName = 'General'
                     }
                 }
 
-                Mock -CommandName Get-M365DSCTeamChannelTab -MockWith {
+                Mock -CommandName Get-MgBetaTeamChannelTab -MockWith {
                     return @{
                         id             = '12345-12345-12345-12345-12345'
                         displayName    = 'TestTab'
@@ -290,40 +286,40 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should remove the policy from the Set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName Remove-MgTeamChannelTab -Exactly 1
+                Should -Invoke -CommandName Remove-MgBetaTeamChannelTab -Exactly 1
             }
         }
 
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
-                    ApplicationId         = '12345-12345-12345-12345-12345'
-                    TenantID              = '11111-11111-22222-22222-22222'
-                    CertificateThumbprint = '111111111111'
+                    Credential = $Credential
                 }
 
-                Mock -CommandName Get-Team -MockWith {
+                Mock -CommandName Get-MgBetaTeam -MockWith {
                     return @{
-                        GroupId     = '12345-12345-12345-12345-12345'
+                        Id          = '12345-12345-12345-12345-12345'
                         DisplayName = 'Contoso Team'
                     }
                 }
 
-                Mock -CommandName Get-MgTeamChannel -MockWith {
+                Mock -CommandName Get-MgGroup -MockWith {
+                    return @{
+                        Id          = '12345-12345-12345-12345-12345'
+                        DisplayName = 'Contoso Team'
+                    }
+                }
+
+                Mock -CommandName Get-MgBetaTeamChannel -MockWith {
                     return @{
                         Id          = '67890-67890-67890-67890-67890'
                         DisplayName = 'General'
                     }
                 }
 
-                Mock -CommandName Get-MgTeamChannelTab -MockWith {
-                    return @{
-                        DisplayName = 'General'
-                    }
-                }
-
-                Mock -CommandName Get-M365DSCTeamChannelTab -MockWith {
+                Mock -CommandName Get-MgBetaTeamChannelTab -MockWith {
                     return @{
                         id             = '12345-12345-12345-12345-12345'
                         displayName    = 'TestTab'
@@ -343,7 +339,8 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

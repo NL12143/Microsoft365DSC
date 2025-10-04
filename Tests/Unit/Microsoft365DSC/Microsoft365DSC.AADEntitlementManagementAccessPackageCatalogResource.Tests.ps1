@@ -21,10 +21,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
         BeforeAll {
 
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
             $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName Get-PSSession -MockWith {
@@ -33,22 +33,51 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             Mock -CommandName Remove-PSSession -MockWith {
             }
 
-            Mock -CommandName New-MgEntitlementManagementAccessPackageResourceRequest -MockWith {
+            Mock -CommandName New-MgBetaEntitlementManagementAccessPackageResourceRequest -MockWith {
             }
 
-            Mock -CommandName Get-MgEntitlementManagementAccessPackageCatalog -MockWith {
+            Mock -CommandName Get-MgBetaEntitlementManagementAccessPackageCatalog -MockWith {
                 return @{
                     id          = 'f34c2d92-9e9d-4703-ba9b-955b6ac8dcb3'
                     displayName = 'MyCatalog'
                 }
             }
-            Mock -CommandName New-M365DSCConnection -MockWith {
-                return 'Credential'
+
+            Mock -CommandName Get-MgBetaEntitlementManagementAccessPackageCatalogAccessPackageResource -MockWith {
+                return @{
+                    AddedBy             = 'myAdmin'
+                    AddedOn             = '25/10/2022 18:47:28'
+                    CatalogId           = 'f34c2d92-9e9d-4703-ba9b-955b6ac8dcb3'
+                    Description         = 'https://001q1.sharepoint.com/'
+                    DisplayName         = 'Communication site'
+                    Id                  = '6a636d76-5025-44d4-9a80-78618f00c16d'
+                    IsPendingOnboarding = $False
+                    ManagedIdentity     = $False
+                    OriginId            = 'https://001q1.sharepoint.com/'
+                    OriginSystem        = 'SharePointOnline'
+                    ResourceType        = 'SharePoint Online Site'
+                    Url                 = 'https://001q1.sharepoint.com/'
+                }
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            Mock -CommandName Get-MgBetaEntitlementManagementAccessPackageCatalog -MockWith {
+                return @(
+                    @{
+                        Id = 'f34c2d92-9e9d-4703-ba9b-955b6ac8dcb3'
+                        displayName = 'MyCatalog'
+                    }
+                )
             }
+
+            Mock -CommandName New-M365DSCConnection -MockWith {
+                return 'Credentials'
+            }
+
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -71,7 +100,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Credential          = $Credential
                 }
 
-                Mock -CommandName Get-MgEntitlementManagementAccessPackageCatalogAccessPackageResource -MockWith {
+                Mock -CommandName Get-MgBetaEntitlementManagementAccessPackageCatalogAccessPackageResource -MockWith {
                     return $null
                 }
             }
@@ -83,7 +112,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             }
             It 'Should Create the group from the Set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName New-MgEntitlementManagementAccessPackageResourceRequest -Exactly 1
+                Should -Invoke -CommandName New-MgBetaEntitlementManagementAccessPackageResourceRequest -Exactly 1
             }
         }
 
@@ -105,24 +134,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Ensure              = 'Absent'
                     Credential          = $Credential
                 }
-
-                Mock -CommandName Get-MgEntitlementManagementAccessPackageCatalogAccessPackageResource -MockWith {
-                    return @{
-                        AddedBy             = 'myAdmin'
-                        AddedOn             = '25/10/2022 18:47:28'
-                        CatalogId           = 'f34c2d92-9e9d-4703-ba9b-955b6ac8dcb3'
-                        Description         = 'https://001q1.sharepoint.com/'
-                        DisplayName         = 'Communication site'
-                        Id                  = '6a636d76-5025-44d4-9a80-78618f00c16d'
-                        IsPendingOnboarding = $False
-                        ManagedIdentity     = $False
-                        OriginId            = 'https://001q1.sharepoint.com/'
-                        OriginSystem        = 'SharePointOnline'
-                        ResourceType        = 'SharePoint Online Site'
-                        Url                 = 'https://001q1.sharepoint.com/'
-                    }
-
-                }
             }
 
             It 'Should return Values from the Get method' {
@@ -135,7 +146,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should Remove the group from the Set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName New-MgEntitlementManagementAccessPackageResourceRequest -Exactly 1
+                Should -Invoke -CommandName New-MgBetaEntitlementManagementAccessPackageResourceRequest -Exactly 1
             }
         }
 
@@ -157,23 +168,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Url                 = 'https://001q1.sharepoint.com/'
                     Credential          = $Credential
                 }
-
-                Mock -CommandName Get-MgEntitlementManagementAccessPackageCatalogAccessPackageResource -MockWith {
-                    return @{
-                        AddedBy             = 'myAdmin'
-                        AddedOn             = '25/10/2022 18:47:28'
-                        CatalogId           = 'f34c2d92-9e9d-4703-ba9b-955b6ac8dcb3'
-                        Description         = 'https://001q1.sharepoint.com/'
-                        DisplayName         = 'Communication site'
-                        Id                  = '6a636d76-5025-44d4-9a80-78618f00c16d'
-                        IsPendingOnboarding = $False
-                        ManagedIdentity     = $False
-                        OriginId            = 'https://001q1.sharepoint.com/'
-                        OriginSystem        = 'SharePointOnline'
-                        ResourceType        = 'SharePoint Online Site'
-                        Url                 = 'https://001q1.sharepoint.com/'
-                    }
-                }
             }
 
 
@@ -188,34 +182,17 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     AddedBy             = 'myAdmin'
                     AddedOn             = '25/10/2022 18:47:28'
                     CatalogId           = 'f34c2d92-9e9d-4703-ba9b-955b6ac8dcb3'
-                    Description         = 'https://001q1.sharepoint.com/'
+                    Description         = 'https://001q2.sharepoint.com/' # Drift
                     DisplayName         = 'Communication site'
                     Ensure              = 'Present'
                     Id                  = '6a636d76-5025-44d4-9a80-78618f00c16d'
                     IsPendingOnboarding = $False
                     ManagedIdentity     = $False
-                    OriginId            = 'https://001q1.sharepoint.com/'
+                    OriginId            = 'https://001q2.sharepoint.com/' # Drift
                     OriginSystem        = 'SharePointOnline'
                     ResourceType        = 'SharePoint Online Site'
-                    Url                 = 'https://001q1.sharepoint.com/'
+                    Url                 = 'https://001q2.sharepoint.com/' # Drift
                     Credential          = $Credential
-                }
-
-                Mock -CommandName Get-MgEntitlementManagementAccessPackageCatalogAccessPackageResource -MockWith {
-                    return @{
-                        AddedBy             = 'myAdmin'
-                        AddedOn             = '25/10/2022 18:47:28'
-                        CatalogId           = 'f34c2d92-9e9d-4703-ba9b-955b6ac8dcb3'
-                        Description         = 'https://001q1.sharepoint.com/'
-                        DisplayName         = 'Communication site - drifted' #Drift
-                        Id                  = '6a636d76-5025-44d4-9a80-78618f00c16d'
-                        IsPendingOnboarding = $False
-                        ManagedIdentity     = $False
-                        OriginId            = 'https://001q1.sharepoint.com/'
-                        OriginSystem        = 'SharePointOnline'
-                        ResourceType        = 'SharePoint Online Site'
-                        Url                 = 'https://001q1.sharepoint.com/'
-                    }
                 }
             }
 
@@ -229,36 +206,21 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the Set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName New-MgEntitlementManagementAccessPackageResourceRequest -Exactly 1
+                Should -Invoke -CommandName New-MgBetaEntitlementManagementAccessPackageResourceRequest -Exactly 1
             }
         }
 
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
                 }
-
-                Mock -CommandName Get-MgEntitlementManagementAccessPackageCatalogAccessPackageResource -MockWith {
-                    return @{
-                        AddedBy             = 'myAdmin'
-                        AddedOn             = '25/10/2022 18:47:28'
-                        CatalogId           = 'f34c2d92-9e9d-4703-ba9b-955b6ac8dcb3'
-                        Description         = 'https://001q1.sharepoint.com/'
-                        DisplayName         = 'Communication site'
-                        Id                  = '6a636d76-5025-44d4-9a80-78618f00c16d'
-                        IsPendingOnboarding = $False
-                        ManagedIdentity     = $False
-                        OriginId            = 'https://001q1.sharepoint.com/'
-                        OriginSystem        = 'SharePointOnline'
-                        ResourceType        = 'SharePoint Online Site'
-                        Url                 = 'https://001q1.sharepoint.com/'
-                    }
-                }
             }
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

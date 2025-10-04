@@ -22,23 +22,20 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
 
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
             Mock -CommandName New-M365DSCConnection -MockWith {
                 return 'Credentials'
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
             }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -60,11 +57,12 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     DisableBingVideoSearch                         = $false
                     DisableShareWithEveryone                       = $false
                     EnableGuestsToMake                             = $false
+                    EnableDesktopFlowDataPolicyManagement          = $false
                     ShareWithColleaguesUserLimit                   = 10000
                     Credential                                     = $Credential
                 }
 
-                Mock -CommandName Set-TenantSettings -MockWith {
+                Mock -CommandName Invoke-M365DSCPowerPlatformRESTWebRequest -MockWith {
                     return @{
                         TenantSettings = @{
                             WalkMeOptOut                                   = $testParams.WalkMeOptOut
@@ -76,42 +74,8 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                             DisableTrialEnvironmentCreationByNonAdminUsers = $testParams.DisableTrialEnvironmentCreationByNonAdminUsers
                             DisableCapacityAllocationByEnvironmentAdmins   = $testParams.DisableCapacityAllocationByEnvironmentAdmins
                             DisableSupportTicketsVisibleByAllUsers         = $testParams.DisableSupportTicketsVisibleByAllUsers
+                            EnableDesktopFlowDataPolicyManagement          = $false
                             powerPlatform                                  = @(
-                                @{
-                                    search = @{
-                                        DisableDocsSearch      = $testParams.DisableDocsSearch
-                                        DisableCommunitySearch = $testParams.DisableCommunitySearch
-                                        DisableBingVideoSearch = $testParams.DisableBingVideoSearch
-                                    }
-                                },
-                                @{
-                                    powerApps = @{
-                                        DisableShareWithEveryone = $testParams.DisableShareWithEveryone
-                                        EnableGuestsToMake       = $testParams.EnableGuestsToMake
-                                    }
-                                },
-                                @{
-                                    teamsIntegration = @{
-                                        ShareWithColleaguesUserLimit = $testParams.ShareWithColleaguesUserLimit
-                                    }
-                                }
-                            )
-                        }
-                    }
-
-                    Mock -CommandName Get-TenantSettings -MockWith {
-                        return @{
-                            TenantSettings = @{
-                                WalkMeOptOut                                   = $testParams.WalkMeOptOut
-                                DisableNPSCommentsReachout                     = $testParams.DisableNPSCommentsReachout
-                                DisableNewsletterSendout                       = $testParams.DisableNewsletterSendout
-                                DisableEnvironmentCreationByNonAdminUsers      = $testParams.DisableEnvironmentCreationByNonAdminUsers
-                                DisablePortalsCreationByNonAdminUsers          = $testParams.DisablePortalsCreationByNonAdminUsers
-                                DisableSurveyFeedback                          = $testParams.DisableSurveyFeedback
-                                DisableTrialEnvironmentCreationByNonAdminUsers = $testParams.DisableTrialEnvironmentCreationByNonAdminUsers
-                                DisableCapacityAllocationByEnvironmentAdmins   = $testParams.DisableCapacityAllocationByEnvironmentAdmins
-                                DisableSupportTicketsVisibleByAllUsers         = $testParams.DisableSupportTicketsVisibleByAllUsers
-                                powerPlatform                                  = @(
                                     @{
                                         search = @{
                                             DisableDocsSearch      = $testParams.DisableDocsSearch
@@ -136,61 +100,62 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     }
                 }
 
-                It 'Should return false from the Test method' {
-                    Test-TargetResource @testParams | Should -Be $false
-                }
 
-                It 'Sets the tenant settings in Set method' {
-                    Set-TargetResource @testParams
-                }
+            It 'Should return false from the Test method' {
+                Test-TargetResource @testParams | Should -Be $false
+            }
+
+            It 'Sets the tenant settings in Set method' {
+                Set-TargetResource @testParams
             }
         }
 
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
+                $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
                 }
 
-                Mock -CommandName Get-TenantSettings -MockWith {
+                Mock -CommandName Invoke-M365DSCPowerPlatformRESTWebRequest -MockWith {
                     return @{
-                        TenantSettings = @{
-                            WalkMeOptOut                                   = $testParams.WalkMeOptOut
-                            DisableNPSCommentsReachout                     = $testParams.DisableNPSCommentsReachout
-                            DisableNewsletterSendout                       = $testParams.DisableNewsletterSendout
-                            DisableEnvironmentCreationByNonAdminUsers      = $testParams.DisableEnvironmentCreationByNonAdminUsers
-                            DisablePortalsCreationByNonAdminUsers          = $testParams.DisablePortalsCreationByNonAdminUsers
-                            DisableSurveyFeedback                          = $testParams.DisableSurveyFeedback
-                            DisableTrialEnvironmentCreationByNonAdminUsers = $testParams.DisableTrialEnvironmentCreationByNonAdminUsers
-                            DisableCapacityAllocationByEnvironmentAdmins   = $testParams.DisableCapacityAllocationByEnvironmentAdmins
-                            DisableSupportTicketsVisibleByAllUsers         = $testParams.DisableSupportTicketsVisibleByAllUsers
-                            powerPlatform                                  = @(
-                                @{
-                                    search = @{
-                                        DisableDocsSearch      = $testParams.DisableDocsSearch
-                                        DisableCommunitySearch = $testParams.DisableCommunitySearch
-                                        DisableBingVideoSearch = $testParams.DisableBingVideoSearch
-                                    }
-                                },
-                                @{
-                                    powerApps = @{
-                                        DisableShareWithEveryone = $testParams.DisableShareWithEveryone
-                                        EnableGuestsToMake       = $testParams.EnableGuestsToMake
-                                    }
-                                },
-                                @{
-                                    teamsIntegration = @{
-                                        ShareWithColleaguesUserLimit = $testParams.ShareWithColleaguesUserLimit
-                                    }
+                        WalkMeOptOut                                   = $false
+                        DisableNPSCommentsReachout                     = $false
+                        DisableNewsletterSendout                       = $false
+                        DisableEnvironmentCreationByNonAdminUsers      = $false
+                        DisablePortalsCreationByNonAdminUsers          = $false
+                        DisableSurveyFeedback                          = $false
+                        DisableTrialEnvironmentCreationByNonAdminUsers = $false
+                        DisableCapacityAllocationByEnvironmentAdmins   = $false
+                        DisableSupportTicketsVisibleByAllUsers         = $false
+                        powerPlatform                                  = @(
+                            @{
+                                search = @{
+                                    DisableDocsSearch      = $false
+                                    DisableCommunitySearch = $false
+                                    DisableBingVideoSearch = $false
                                 }
-                            )
-                        }
+                            },
+                            @{
+                                powerApps = @{
+                                    DisableShareWithEveryone = $false
+                                    EnableGuestsToMake       = $false
+                                }
+                            },
+                            @{
+                                teamsIntegration = @{
+                                    ShareWithColleaguesUserLimit = 10000
+                                }
+                            }
+                        )
                     }
                 }
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }#inmodulescope

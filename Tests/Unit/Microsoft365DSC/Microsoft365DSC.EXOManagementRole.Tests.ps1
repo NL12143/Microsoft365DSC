@@ -21,17 +21,14 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
 
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
             $Global:PartialExportFileName = 'c:\TestPath'
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
+
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-                return 'FakeDSCContent'
-            }
             Mock -CommandName Save-M365DSCPartialExport -MockWith {
             }
 
@@ -45,9 +42,26 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             Mock -CommandName Remove-PSSession -MockWith {
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            Mock -CommandName New-ManagementRole -MockWith {
             }
+
+            Mock -CommandName Remove-ManagementRole -MockWith {
+            }
+
+            Mock -CommandName Get-ManagementRole -MockWith {
+                return @{
+                    Name                = 'Contoso Management Role'
+                    Parent              = 'Journaling'
+                    Description         = 'This is the Contoso Management Role'
+                    FreeBusyAccessLevel = 'AvailabilityOnly'
+                }
+            }
+
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -62,22 +76,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 }
 
                 Mock -CommandName Get-ManagementRole -MockWith {
-                    return @{
-                        Name                = 'Contoso Differet Management Role'
-                        Parent              = 'Journaling'
-                        Description         = 'This is the Different Contoso Management Role'
-                        FreeBusyAccessLevel = 'AvailabilityOnly'
-                    }
-                }
-
-                Mock -CommandName New-ManagementRole -MockWith {
-                    return @{
-                        Name        = 'Contoso Management Role'
-                        Parent      = 'Journaling'
-                        Description = 'This is the Contoso Management Role'
-                        Ensure      = 'Present'
-                        Credential  = $Credential
-                    }
+                    return $null
                 }
             }
 
@@ -87,6 +86,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the Set method' {
                 Set-TargetResource @testParams
+                Should -Invoke -CommandName New-ManagementRole -Exactly 1
             }
 
             It 'Should return Absent from the Get method' {
@@ -102,14 +102,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Description = 'This is the Contoso Management Role'
                     Ensure      = 'Present'
                     Credential  = $Credential
-                }
-
-                Mock -CommandName Get-ManagementRole -MockWith {
-                    return @{
-                        Name        = 'Contoso Management Role'
-                        Parent      = 'Journaling'
-                        Description = 'This is the Contoso Management Role'
-                    }
                 }
             }
 
@@ -127,27 +119,9 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 $testParams = @{
                     Name        = 'Contoso Management Role'
                     Parent      = 'Journaling'
-                    Description = 'This is the Contoso Management Role'
+                    Description = 'This is the updated Contoso Management Role' # Drift
                     Ensure      = 'Present'
                     Credential  = $Credential
-                }
-
-                Mock -CommandName Get-ManagementRole -MockWith {
-                    return @{
-                        Name        = 'Contoso Management Role'
-                        Parent      = 'Journaling'
-                        Description = 'This is the Different Contoso Management Role'
-                    }
-                }
-
-                Mock -CommandName New-ManagementRole -MockWith {
-                    return @{
-                        Name        = 'Contoso Management Role'
-                        Parent      = 'Journaling'
-                        Description = 'This is the Contoso Management Role'
-                        Ensure      = 'Present'
-                        Credential  = $Credential
-                    }
                 }
             }
 
@@ -157,28 +131,23 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the Set method' {
                 Set-TargetResource @testParams
+                Should -Invoke -CommandName Remove-ManagementRole -Exactly 1
+                Should -Invoke -CommandName New-ManagementRole -Exactly 1
             }
         }
 
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
-                }
-
-                $ManagementRole = @{
-                    Name        = 'Contoso Management Role'
-                    Parent      = 'Journaling'
-                    Description = 'This is the Contoso Management Role'
-                }
-                Mock -CommandName Get-ManagementRole -MockWith {
-                    return $ManagementRole
                 }
             }
 
             It 'Should Reverse Engineer resource from the Export method when single' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

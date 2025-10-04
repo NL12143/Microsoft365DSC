@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_PlannerTask'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -37,7 +39,6 @@ function Get-TargetResource
         $DueDateTime,
 
         [Parameter()]
-        [ValidateSet('Pink', 'Red', 'Yellow', 'Green', 'Blue', 'Purple')]
         [System.String[]]
         $Categories,
 
@@ -92,6 +93,7 @@ function Get-TargetResource
         [Switch]
         $ManagedIdentity
     )
+
     Write-Verbose -Message "Getting configuration of Planner Task {$Title}"
 
     #Ensure the proper dependencies are installed in the current environment.
@@ -111,7 +113,7 @@ function Get-TargetResource
 
     try
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftGraph' `
+        $null = New-M365DSCConnection -Workload 'MicrosoftGraph' `
             -InboundParameters $PSBoundParameters
 
         # If no TaskId were passed, automatically assume that this is a new task;
@@ -120,72 +122,108 @@ function Get-TargetResource
             return $nullReturn
         }
 
-        try
-        {
-            [PlannerTaskObject].GetType() | Out-Null
-        }
-        catch
-        {
-            $ModulePath = Join-Path -Path $PSScriptRoot `
-                -ChildPath '../../Modules/GraphHelpers/PlannerTaskObject.psm1'
-            $usingScriptBody = "using module '$ModulePath'"
-            $usingScript = [ScriptBlock]::Create($usingScriptBody)
-            . $usingScript
-        }
-        $task = [PlannerTaskObject]::new()
-        Write-Verbose -Message "Populating task {$taskId} from the Get method"
-        $task.PopulateById($Credential, $TaskId)
+        $taskResponse = Get-MgPlannerTask -PlannerTaskId $TaskId
+        $taskDetailsResponse = Get-MgPlannerTaskDetail -PlannerTaskId $taskResponse.Id
 
-        if ($null -eq $task)
+        #region Assignments
+        $assignmentsValue = @()
+        if ($null -ne $taskResponse.Assignments)
+        {
+            foreach ($assignmentKey in $taskResponse.Assignments.AdditionalProperties.Keys)
+            {
+                $assignedUser = Get-MgUser -UserId $assignmentKey -ErrorAction SilentlyContinue
+                if ($null -eq $assignedUser)
+                {
+                    Write-Warning -Message "Skipping user with Id [$assignmentKey] because it could not be found."
+                    continue
+                }
+                $assignmentsValue += $assignedUser.UserPrincipalName
+            }
+        }
+        #endregion
+
+        #region Attachments
+        $attachmentsValue = @()
+        if ($null -ne $taskDetailsResponse.References)
+        {
+            foreach ($attachment in $taskDetailsResponse.References.AdditionalProperties.Keys)
+            {
+                $entry = $taskDetailsResponse.References.AdditionalProperties."$attachment"
+                $hashEntry = @{
+                    Uri   = $attachment
+                    Alias = $entry.alias
+                    Type  = $entry.type
+                }
+                $attachmentsValue += $hashEntry
+            }
+        }
+        #endregion
+
+        #region Categories
+        $categoriesValue = @()
+        if ($null -ne $taskResponse.appliedCategories)
+        {
+            foreach ($category in $taskResponse.appliedCategories.AdditionalProperties.Keys)
+            {
+                $categoryValue = $Script:AppliedCategories.$category
+                if ([String]::IsNullOrEmpty($categoryValue))
+                {
+                    $categoryValue = Get-TaskColorNameByCategory -CategoryName $category
+                }
+                $categoriesValue += $categoryValue
+            }
+        }
+        #endregion
+
+        #region Checklist
+        $checklistValue = @()
+        if ($null -ne $taskDetailsResponse.CheckList)
+        {
+            foreach ($checkListItem in $taskDetailsResponse.CheckList.AdditionalProperties.Keys)
+            {
+                $hashEntry = @{
+                    Title     = $taskDetailsResponse.CheckList.AdditionalProperties."$checkListItem".title
+                    Completed = [bool]$taskDetailsResponse.CheckList.AdditionalProperties."$checkListItem".isChecked
+                }
+                $checklistValue += $hashEntry
+            }
+        }
+        #endregion
+
+        if ($null -eq $taskResponse)
         {
             return $nullReturn
         }
         else
         {
-            $NotesValue = $task.Notes
-
-            #region Task Assignment
-            if ($task.Assignments.Length -gt 0)
+            $NotesValue = ''
+            if (-not [System.String]::IsNullOrEmpty($taskResponse))
             {
-                $assignedValues = @()
-                foreach ($assignee in $task.Assignments)
-                {
-                    $user = Get-MgUser -UserId $assignee
-                    $assignedValues += $user.UserPrincipalName
-                }
+                $NotesValue = $taskDetailsResponse.Description
             }
-            #endregion
-
-            #region Task Categories
-            $categoryValues = @()
-            foreach ($category in $task.Categories)
-            {
-                $categoryValues += $category
-            }
-            #endregion
 
             $StartDateTimeValue = $null
-            if ($null -ne $task.StartDateTime)
+            if ($null -ne $taskResponse.StartDateTime)
             {
-                $StartDateTimeValue = $task.StartDateTime
+                $StartDateTimeValue = $taskResponse.StartDateTime
             }
             $DueDateTimeValue = $null
-            if ($null -ne $task.DueDateTime)
+            if ($null -ne $taskResponse.DueDateTime)
             {
-                $DueDateTimeValue = $task.DueDateTime
+                $DueDateTimeValue = $taskResponse.DueDateTime
             }
             $results = @{
                 PlanId                = $PlanId
                 Title                 = $Title
-                AssignedUsers         = $assignedValues
-                TaskId                = $task.TaskId
-                Categories            = $categoryValues
-                Attachments           = $task.Attachments
-                Checklist             = $task.Checklist
-                Bucket                = $task.BucketId
-                Priority              = $task.Priority
-                ConversationThreadId  = $task.ConversationThreadId
-                PercentComplete       = $task.PercentComplete
+                AssignedUsers         = $assignmentsValue
+                TaskId                = $taskResponse.Id
+                Categories            = $categoriesValue
+                Attachments           = $attachmentsValue
+                Checklist             = $checklistValue
+                Bucket                = $taskResponse.BucketId
+                Priority              = $taskResponse.Priority
+                ConversationThreadId  = $taskResponse.ConversationThreadId
+                PercentComplete       = $taskResponse.PercentComplete
                 StartDateTime         = $StartDateTimeValue
                 DueDateTime           = $DueDateTimeValue
                 Notes                 = $NotesValue
@@ -251,7 +289,6 @@ function Set-TargetResource
         $DueDateTime,
 
         [Parameter()]
-        [ValidateSet('Pink', 'Red', 'Yellow', 'Green', 'Blue', 'Purple')]
         [System.String[]]
         $Categories,
 
@@ -306,6 +343,7 @@ function Set-TargetResource
         [Switch]
         $ManagedIdentity
     )
+
     Write-Verbose -Message "Setting configuration of Planner Task {$Title}"
 
     #Ensure the proper dependencies are installed in the current environment.
@@ -320,118 +358,196 @@ function Set-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftGraph' `
-        -InboundParameters $PSBoundParameters
-
     $currentValues = Get-TargetResource @PSBoundParameters
 
-    try
-    {
-        [PlannerTaskObject].GetType() | Out-Null
-    }
-    catch
-    {
-        $ModulePath = Join-Path -Path $PSScriptRoot `
-            -ChildPath '../../Modules/GraphHelpers/PlannerTaskObject.psm1'
-        $usingScriptBody = "using module '$ModulePath'"
-        $usingScript = [ScriptBlock]::Create($usingScriptBody)
-        . $usingScript
-    }
-    $task = [PlannerTaskObject]::new()
-
-    if (-not [System.String]::IsNullOrEmpty($TaskId))
-    {
-        Write-Verbose -Message "Populating Task {$TaskId} from the Set method"
-        $task.PopulateById($Credential, $TaskId)
-    }
-
-    $task.BucketId = $Bucket
-    $task.Title = $Title
-    $task.PlanId = $PlanId
-    $task.StartDateTime = $StartDateTime
-    $task.DueDateTime = $DueDateTime
-    $task.Priority = $Priority
-    $task.Notes = $Notes
-    $task.ConversationThreadId = $ConversationThreadId
+    $setParams = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
 
     #region Assignments
-    if ($AssignedUsers.Length -gt 0)
+    Write-Verbose -Message 'Converting Assignments into the proper format'
+    $assignmentsValue = @{}
+    foreach ($assignment in $setParams.AssignedUsers)
     {
-        $AssignmentsValue = @()
-        foreach ($userName in $AssignedUsers)
+        $user = Get-MgUser -UserId $assignment -ErrorAction SilentlyContinue
+
+        if ($null -ne $user)
         {
-            $user = Get-MgUser -UserId $userName
-            if ($null -ne $user)
-            {
-                $AssignmentsValue += $user.Id
+            $currentValue += @{
+                '@odata.type' = '#microsoft.graph.plannerAssignment'
+                orderHint     = ' !'
             }
+            $assignmentsValue.Add($user.Id, $currentValue)
         }
-        $task.Assignments = $AssignmentsValue
     }
+    $setParams.Assignments = $assignmentsValue
+    $setParams.Remove('AssignedUsers') | Out-Null
+    #endregion
+
+    $DetailsValue = @{
+        id          = (New-Guid).ToString()
+        checklist   = @()
+        description = $Notes
+        references  = @()
+    }
+
+    #region CheckList
+    $checklistValues = @{}
+    foreach ($checkListItem in $setParams.Checklist)
+    {
+        $currentValue = @{
+            '@odata.type' = '#microsoft.graph.plannerChecklistItem'
+            isChecked     = $checkListItem.Completed
+            title         = $checkListItem.Title
+        }
+        $checkListValues.Add((New-Guid).ToString(), $currentValue)
+    }
+    $DetailsValue.checklist = $checkListValues
+    $setParams.Remove('Checklist') | Out-Null
     #endregion
 
     #region Attachments
-    if ($Attachments.Length -gt 0)
+    $attachmentsValues = @{}
+    foreach ($attachment in $setParams.Attachments)
     {
-        $attachmentsArray = @()
-        foreach ($attachment in $Attachments)
-        {
-            $attachmentsValue = @{
-                Uri   = $attachment.Uri
-                Alias = $attachment.Alias
-                Type  = $attachment.Type
-            }
-            $attachmentsArray += $AttachmentsValue
+        $currentValue = @{
+            '@odata.type' = '#microsoft.graph.plannerExternalReference'
+            alias         = $attachment.Alias
+            type          = $attachment.Type
         }
-        $task.Attachments = $attachmentsArray
+        $attachmentsValues.Add($attachment.Uri, $currentValue)
     }
+    $DetailsValue.references = $attachmentsValues
+    $setParams.Remove('Attachments') | Out-Null
     #endregion
+
+    $setParams.Remove('Description') | Out-Null
+    $setParams.Add('Details', $DetailsValue)
+    $setParams.Remove('Notes') | Out-Null
 
     #region Categories
-    if ($Categories.Length -gt 0)
-    {
-        $CategoriesValue = @()
-        foreach ($category in $Categories)
-        {
-            $CategoriesValue += $category
-        }
-        $task.Categories = $CategoriesValue
+    $categoriesValue = @{
+        category1 = $false
+        category2 = $false
+        category3 = $false
+        category4 = $false
+        category5 = $false
+        category6 = $false
+        category7 = $false
+        category8 = $false
+        category9 = $false
+        category10 = $false
+        category11 = $false
+        category12 = $false
+        category13 = $false
+        category14 = $false
+        category15 = $false
+        category16 = $false
+        category17 = $false
+        category18 = $false
+        category19 = $false
+        category20 = $false
+        category21 = $false
+        category22 = $false
+        category23 = $false
+        category24 = $false
+        category25 = $false
     }
+
+    $planDetails = (Get-MgPlannerPlanDetail -PlannerPlanId $PlanId).CategoryDescriptions
+    $appliedCategoriesInverse = $planDetails | ConvertTo-Json | ConvertFrom-Json # Convert to PSObject instead of Graph type
+    foreach ($category in $setParams.Categories)
+    {
+        $categoryName = $appliedCategoriesInverse.PSObject.Properties | Where-Object { $_.Value -eq $category } | Select-Object -ExpandProperty Name
+        if ([String]::IsNullOrEmpty($categoryName))
+        {
+            $categoryName = Get-TaskCategoryNameByColor -ColorName $category
+        }
+        $categoriesValue.$categoryName = $true
+    }
+    $setParams.Add('AppliedCategories', $categoriesValue)
+    $setParams.Remove('Categories') | Out-Null
     #endregion
 
-    #region Checklist
-    if ($Checklist.Length -gt 0)
-    {
-        $checklistArray = @()
-        foreach ($checkListItem in $Checklist)
-        {
-            $checklistItemValue = @{
-                Title     = $checkListItem.Title
-                Completed = $checkListItem.Completed
-            }
-            $checklistArray += $checklistItemValue
-        }
-        $task.Checklist = $checklistArray
-    }
-    #endregion
+    $setParams.Add('BucketId', $setParams.Bucket)
+    $setParams.Remove('Bucket') | Out-Null
 
     if ($Ensure -eq 'Present' -and $currentValues.Ensure -eq 'Absent')
     {
-        Write-Verbose -Message "Planner Task {$Title} doesn't already exist. Creating it."
-        $task.Create($Credential)
+        $setParams.Remove('TaskId') | Out-Null
+        Write-Verbose -Message "Planner Task {$Title} doesn't already exist. Creating it with`r`n:$(Convert-M365DscHashtableToString -Hashtable $setParams)"
+        $newTask = New-MgPlannerTask @setParams
     }
     elseif ($Ensure -eq 'Present' -and $currentValues.Ensure -eq 'Present')
     {
+        $taskId = $setParams.TaskId
+        $setParams.Remove('TaskId') | Out-Null
+        $details = $setParams.Details
+        $setParams.Remove('Details') | Out-Null
+        $setParams.Remove('Verbose') | Out-Null
+
+        # Fix Casing
+        $setParams.Add('assignments', $setParams.Assignments)
+        $setParams.Remove('Assignments') | Out-Null
+
+        $setParams.Add('appliedCategories', $setParams.AppliedCategories)
+        $setParams.Remove('AppliedCategories') | Out-Null
+
+        $setParams.Add('title', $setParams.Title)
+        $setParams.Remove('Title') | Out-Null
+
+        $setParams.Add('bucketId', $setParams.BucketId)
+        $setParams.Remove('BucketId') | Out-Null
+
+        $setParams.Add('dueDateTime', [DateTime]::Parse($setParams.DueDateTime).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffK'))
+        $setParams.Remove('DueDateTime') | Out-Null
+
+        $setParams.Add('percentComplete', $setParams.PercentComplete)
+        $setParams.Remove('PercentComplete') | Out-Null
+
+        $setParams.Remove('PlanId') | Out-Null
+
+        $setParams.Add('priority', $setParams.Priority)
+        $setParams.Remove('Priority') | Out-Null
+
+        if ($null -ne $setParams.StartDateTime)
+        {
+            $setParams.Add('startDateTime', [DateTime]::Parse($setParams.StartDateTime).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffK'))
+        }
+        $setParams.Remove('StartDateTime') | Out-Null
+
         Write-Verbose -Message "Planner Task {$Title} already exists, but is not in the `
             Desired State. Updating it."
-        $task.Update($Credential)
+        $currentTask = Get-MgPlannerTask -PlannerTaskId $taskId
+        $Headers = @{}
+        $etag = $currentTask.AdditionalProperties.'@odata.etag'
+
+        $Headers.Add('If-Match', $etag)
+        $JSONDetails = (ConvertTo-Json $setParams)
+        Write-Verbose -Message "Updating Task with:`r`n$JSONDetails"
+        # Need to continue to rely on Invoke-MgGraphRequest
+        Invoke-MgGraphRequest -Method PATCH `
+            -Uri "$((Get-MSCloudLoginConnectionProfile -Workload MicrosoftGraph).ResourceUrl)v1.0/planner/tasks/$taskId" `
+            -Headers $Headers `
+            -Body $JSONDetails
+
+        # Update Details
+        $Headers = @{}
+        $currentTaskDetails = Get-MgPlannerTaskDetail -PlannerTaskId $taskId
+        $Headers.Add('If-Match', $currentTaskDetails.AdditionalProperties.'@odata.etag')
+        $details.Remove('id') | Out-Null
+        $JSONDetails = (ConvertTo-Json $details)
+        Write-Verbose -Message "Updating Task's details with:`r`n$JSONDetails"
+        Invoke-MgGraphRequest -Method PATCH `
+            -Uri "$((Get-MSCloudLoginConnectionProfile -Workload MicrosoftGraph).ResourceUrl)v1.0/planner/tasks/$taskId/details" `
+            -Headers $Headers `
+            -Body $JSONDetails
+
         #endregion
     }
     elseif ($Ensure -eq 'Absent' -and $currentValues.Ensure -eq 'Present')
     {
         Write-Verbose -Message "Planner Task {$Title} exists, but is should not. `
             Removing it."
-        $task.Delete($Credential, $TaskId)
+        Remove-MgPlannerTask -PlannerTaskId $setParams.TaskId
     }
 }
 
@@ -474,7 +590,6 @@ function Test-TargetResource
         $DueDateTime,
 
         [Parameter()]
-        [ValidateSet('Pink', 'Red', 'Yellow', 'Green', 'Blue', 'Purple')]
         [System.String[]]
         $Categories,
 
@@ -582,6 +697,10 @@ function Export-TargetResource
     param
     (
         [Parameter()]
+        [System.String]
+        $Filter,
+
+        [Parameter()]
         [System.Management.Automation.PSCredential]
         $Credential,
 
@@ -622,14 +741,14 @@ function Export-TargetResource
         $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftGraph' `
             -InboundParameters $PSBoundParameters
 
-        [array]$groups = Get-MgGroup -All:$true
+        [array]$groups = Get-MgGroup -All:$true -ErrorAction Stop -Filter $filter
 
         $i = 1
         $dscContent = ''
-        Write-Host "`r`n" -NoNewline
+        Write-M365DSCHost -Message "`r`n" -DeferWrite
         foreach ($group in $groups)
         {
-            Write-Host "    |---[$i/$($groups.Length)] $($group.DisplayName) - {$($group.Id)}"
+            Write-M365DSCHost -Message "    |---[$i/$($groups.Length)] $($group.DisplayName) - {$($group.Id)}"
             try
             {
                 [Array]$plans = Get-MgGroupPlannerPlan -GroupId $group.Id -ErrorAction 'SilentlyContinue'
@@ -637,14 +756,20 @@ function Export-TargetResource
                 $j = 1
                 foreach ($plan in $plans)
                 {
-                    Write-Host "        |---[$j/$($plans.Length)] $($plan.Title)"
+                    Write-M365DSCHost -Message "        |---[$j/$($plans.Length)] $($plan.Title)"
 
                     [Array]$tasks = Get-MgGroupPlannerPlanTask -GroupId $group.Id -PlannerPlanId $plan.Id -ErrorAction 'SilentlyContinue'
+                    $Script:AppliedCategories = (Get-MgPlannerPlanDetail -PlannerPlanId $plan.Id).CategoryDescriptions
 
                     $k = 1
                     foreach ($task in $tasks)
                     {
-                        Write-Host "            |---[$k/$($tasks.Length)] $($task.Title)" -NoNewline
+                        if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+                        {
+                            $Global:M365DSCExportResourceInstancesCount++
+                        }
+
+                        Write-M365DSCHost -Message "            |---[$k/$($tasks.Length)] $($task.Title)" -DeferWrite
                         $currentDSCBlock = ''
 
                         $params = @{
@@ -665,64 +790,63 @@ function Export-TargetResource
                         {
                             $result.Remove('AssignedUsers') | Out-Null
                         }
-                        $result = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                            -Results $Result
-                        if ($result.Attachments.Length -gt 0)
+
+                        if ($result.Attachments)
                         {
-                            $result.Attachments = [Array](Convert-M365DSCPlannerTaskAssignmentToCIMArray `
-                                    -Attachments $result.Attachments)
-                        }
-                        else
-                        {
-                            $result.Remove('Attachments') | Out-Null
+                            $complexTypeStringResult = Get-M365DSCDRGComplexTypeToString `
+                                -ComplexObject $result.Attachments `
+                                -CIMInstanceName 'PlannerTaskAttachment'
+                            if (-not [String]::IsNullOrWhiteSpace($complexTypeStringResult))
+                            {
+                                $result.Attachments = $complexTypeStringResult
+                            }
+                            else
+                            {
+                                $result.Remove('Attachments') | Out-Null
+                            }
                         }
 
-                        if ($result.Checklist.Length -gt 0)
+                        if ($result.Checklist)
                         {
-                            $result.Checklist = [Array](Convert-M365DSCPlannerTaskChecklistToCIMArray `
-                                    -Checklist $result.Checklist)
-                        }
-                        else
-                        {
-                            $result.Remove('Checklist') | Out-Null
+                            $complexTypeStringResult = Get-M365DSCDRGComplexTypeToString `
+                                -ComplexObject $result.Checklist `
+                                -CIMInstanceName 'PlannerTaskChecklistItem'
+                            if (-not [String]::IsNullOrWhiteSpace($complexTypeStringResult))
+                            {
+                                $result.Checklist = $complexTypeStringResult
+                            }
+                            else
+                            {
+                                $result.Remove('Checklist') | Out-Null
+                            }
                         }
 
                         # Fix Notes which can have multiple lines
-                        $result.Notes = $result.Notes.Replace('"', '``"')
-                        $result.Notes = $result.Notes.Replace('&', "``&")
+                        if (-not [System.String]::IsNullOrEmpty($result.Notes))
+                        {
+                            $result.Notes = $result.Notes.Replace('"', '``"')
+                            $result.Notes = $result.Notes.Replace('&', "``&")
+                        }
 
-                        $currentDSCBlock += '        PlannerTask ' + (New-Guid).ToString() + "`r`n"
-                        $currentDSCBlock += "        {`r`n"
-                        $content = Get-DSCBlock -Params $result -ModulePath $PSScriptRoot
-                        $content = Convert-DSCStringParamToVariable -DSCBlock $content `
-                            -ParameterName 'Credential'
-                        if ($result.Attachments.Length -gt 0)
-                        {
-                            $content = Convert-DSCStringParamToVariable -DSCBlock $content `
-                                -ParameterName 'Attachments' `
-                                -IsCIMArray $true
-                        }
-                        if ($result.Checklist.Length -gt 0)
-                        {
-                            $content = Convert-DSCStringParamToVariable -DSCBlock $content `
-                                -ParameterName 'Checklist' `
-                                -IsCIMArray $true
-                        }
-                        $currentDSCBlock += $content
-                        $currentDSCBlock += "        }`r`n"
+                        $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
+                            -ConnectionMode $ConnectionMode `
+                            -ModulePath $PSScriptRoot `
+                            -Results $result `
+                            -Credential $Credential `
+                            -NoEscape @('Attachments', 'Checklist')
+
                         $dscContent += $currentDSCBlock
-
                         Save-M365DSCPartialExport -Content $currentDSCBlock `
                             -FileName $Global:PartialExportFileName
                         $k++
-                        Write-Host $Global:M365DSCEmojiGreenCheckmark
+                        Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
                     }
                     $j++
                 }
             }
             catch
             {
-                Write-Host $Global:M365DSCEmojiRedX
+                Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
                 New-M365DSCLogEntry -Message 'Error during Export:' `
                     -Exception $_ `
@@ -736,7 +860,7 @@ function Export-TargetResource
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `
@@ -788,105 +912,234 @@ function Test-M365DSCPlannerTaskCheckListValues
     return $true
 }
 
-function Convert-M365DSCPlannerTaskAssignmentToCIMArray
+function Get-TaskCategoryNameByColor
 {
     [CmdletBinding()]
-    [OutputType([System.String[]])]
-    Param(
-        [Parameter(Mandatory = $true)]
-        [System.Collections.HashTable[]]
-        $Attachments
-    )
-
-    $result = @()
-    foreach ($attachment in $Attachments)
-    {
-        $stringContent = "MSFT_PlannerTaskAttachment`r`n            {`r`n"
-        $stringContent += "                Uri = '$($attachment.Uri)'`r`n"
-        $stringContent += "                Alias = '$($attachment.Alias.Replace("'", "''"))'`r`n"
-        $stringContent += "                Type = '$($attachment.Type)'`r`n"
-        $StringContent += "            }`r`n"
-        $result += $stringContent
-    }
-    return $result
-}
-
-function Convert-M365DSCPlannerTaskChecklistToCIMArray
-{
-    [CmdletBinding()]
-    [OutputType([System.String[]])]
-    Param(
-        [Parameter(Mandatory = $true)]
-        [System.Collections.HashTable[]]
-        $Checklist
-    )
-
-    $result = @()
-    foreach ($checklistItem in $Checklist)
-    {
-        $stringContent = "MSFT_PlannerTaskChecklistItem`r`n            {`r`n"
-        $stringContent += "                Title = '$($checklistItem.Title.Replace("'", "''"))'`r`n"
-        $stringContent += "                Completed = `$$($checklistItem.Completed.ToString())`r`n"
-        $StringContent += "            }`r`n"
-        $result += $stringContent
-    }
-    return $result
-}
-
-function Get-M365DSCPlannerPlansFromGroup
-{
-    [CmdletBinding()]
-    [OutputType([System.Collections.Hashtable[]])]
-    Param(
+    [OutputType([System.string])]
+    param(
         [Parameter(Mandatory = $true)]
         [System.String]
-        $GroupId,
-
-        [Parameter(Mandatory = $true)]
-        [System.Management.Automation.PSCredential]
-        $Credential
+        $ColorName
     )
-    $results = @()
-    $uri = "https://graph.microsoft.com/v1.0/groups/$GroupId/planner/plans"
-    $taskResponse = Invoke-MSCloudLoginMicrosoftGraphAPI -CloudCredential $Credential `
-        -Uri $uri `
-        -Method Get
-    foreach ($plan in $taskResponse.value)
+    switch ($ColorName)
     {
-        $results += @{
-            Id    = $plan.id
-            Title = $plan.title
+        'Pink'
+        {
+            return 'category1'
+        }
+        'Red'
+        {
+            return 'category2'
+        }
+        'Yellow'
+        {
+            return 'category3'
+        }
+        'Green'
+        {
+            return 'category4'
+        }
+        'Blue'
+        {
+            return 'category5'
+        }
+        'Purple'
+        {
+            return 'category6'
+        }
+        'Bronze'
+        {
+            return "category7"
+        }
+        'Lime'
+        {
+            return "category8"
+        }
+        'Aqua'
+        {
+            return "category9"
+        }
+        'Gray'
+        {
+            return "category10"
+        }
+        'Silver'
+        {
+            return "category11"
+        }
+        'Brown'
+        {
+            return "category12"
+        }
+        'Cranberry'
+        {
+            return "category13"
+        }
+        'Orange'
+        {
+            return "category14"
+        }
+        'Peach'
+        {
+            return "category15"
+        }
+        'Marigold'
+        {
+            return "category16"
+        }
+        'Light green'
+        {
+            return "category17"
+        }
+        'Dark green'
+        {
+            return "category18"
+        }
+        'Teal'
+        {
+            return "category19"
+        }
+        'Light blue'
+        {
+            return "category20"
+        }
+        'Dark blue'
+        {
+            return "category21"
+        }
+        'Lavender'
+        {
+            return "category22"
+        }
+        'Plum'
+        {
+            return "category23"
+        }
+        'Light gray'
+        {
+            return "category24"
+        }
+        'Dark gray'
+        {
+            return "category25"
         }
     }
-    return $results
+    return $null
 }
 
-function Get-M365DSCPlannerTasksFromPlan
+function Get-TaskColorNameByCategory
 {
     [CmdletBinding()]
-    [OutputType([System.Collections.Hashtable[]])]
-    Param(
+    [OutputType([System.string])]
+    param(
         [Parameter(Mandatory = $true)]
         [System.String]
-        $PlanId,
-
-        [Parameter(Mandatory = $true)]
-        [System.Management.Automation.PSCredential]
-        $Credential
+        $CategoryName
     )
-    $results = @()
-    $uri = "https://graph.microsoft.com/v1.0/planner/plans/$PlanId/tasks"
-    $taskResponse = Invoke-MSCloudLoginMicrosoftGraphAPI -Credential $Credential `
-        -Uri $uri `
-        -Method Get
-    foreach ($task in $taskResponse.value)
+    switch ($CategoryName)
     {
-        $results += @{
-            Title = $task.title
-            Id    = $task.id
+        'category1'
+        {
+            return 'Pink'
+        }
+        'category2'
+        {
+            return 'Red'
+        }
+        'category3'
+        {
+            return 'Yellow'
+        }
+        'category4'
+        {
+            return 'Green'
+        }
+        'category5'
+        {
+            return 'Blue'
+        }
+        'category6'
+        {
+            return 'Purple'
+        }
+        'category7'
+        {
+            return 'Bronze'
+        }
+        'category8'
+        {
+            return 'Lime'
+        }
+        'category9'
+        {
+            return 'Aqua'
+        }
+        'category10'
+        {
+            return 'Gray'
+        }
+        'category11'
+        {
+            return 'Silver'
+        }
+        'category12'
+        {
+            return 'Brown'
+        }
+        'category13'
+        {
+            return 'Cranberry'
+        }
+        'category14'
+        {
+            return 'Orange'
+        }
+        'category15'
+        {
+            return 'Peach'
+        }
+        'category16'
+        {
+            return 'Marigold'
+        }
+        'category17'
+        {
+            return 'Light green'
+        }
+        'category18'
+        {
+            return 'Dark green'
+        }
+        'category19'
+        {
+            return 'Teal'
+        }
+        'category20'
+        {
+            return 'Light blue'
+        }
+        'category21'
+        {
+            return 'Dark blue'
+        }
+        'category22'
+        {
+            return 'Lavender'
+        }
+        'category23'
+        {
+            return 'Plum'
+        }
+        'category24'
+        {
+            return 'Light gray'
+        }
+        'category25'
+        {
+            return 'Dark gray'
         }
     }
-    return $results
+    return $null
 }
 
 Export-ModuleMember -Function *-TargetResource

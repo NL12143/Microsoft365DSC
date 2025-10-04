@@ -20,13 +20,13 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
     InModuleScope -ModuleName $Global:DscHelper.ModuleName -ScriptBlock {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -CommandName Get-MSCloudLoginConnectionProfile -MockWith {
             }
 
             Mock -CommandName Get-PSSession -MockWith {
@@ -35,26 +35,35 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             Mock -CommandName Remove-PSSession -MockWith {
             }
 
-            Mock -CommandName Update-MgIdentityConditionalAccessNamedLocation -MockWith {
+            Mock -CommandName Remove-MgBetaIdentityConditionalAccessNamedLocation -MockWith {
             }
 
-            Mock -CommandName Remove-MgIdentityConditionalAccessNamedLocation -MockWith {
-            }
-
-            Mock -CommandName New-MgIdentityConditionalAccessNamedLocation -MockWith {
+            Mock -CommandName Get-MgBetaIdentityConditionalAccessNamedLocation -MockWith {
+                return @{
+                    DisplayName          = 'Company Network'
+                    Id                   = '046956df-2367-4dd4-b7fd-c6175ec11cd5'
+                    AdditionalProperties = @{
+                        ipRanges                          = @(@{cidrAddress = '2.1.1.1/32' }, @{cidrAddress = '1.2.2.2/32' })
+                        isTrusted                         = $True
+                        '@odata.type'                     = '#microsoft.graph.ipNamedLocation'
+                        countriesAndRegions               = $null
+                        includeUnknownCountriesAndRegions = $null
+                    }
+                }
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
                 return 'Credentials'
             }
 
-
             Mock -CommandName Invoke-MgGraphRequest -MockWith {
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
             }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -66,17 +75,17 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     IpRanges    = @('2.1.1.1/32', '1.2.2.2/32')
                     IsTrusted   = $True
                     OdataType   = '#microsoft.graph.ipNamedLocation'
-                    Credential  = $credsGlobalAdmin
+                    Credential  = $Credscredential
                 }
 
-                Mock -CommandName Get-MgIdentityConditionalAccessNamedLocation -MockWith {
+                Mock -CommandName Get-MgBetaIdentityConditionalAccessNamedLocation -MockWith {
                     return $null
                 }
             }
 
             It 'Should return values from the get method' {
                 (Get-TargetResource @testParams).Ensure | Should -Be 'Absent'
-                Should -Invoke -CommandName 'Get-MgIdentityConditionalAccessNamedLocation' -Exactly 1
+                Should -Invoke -CommandName 'Get-MgBetaIdentityConditionalAccessNamedLocation' -Exactly 1
             }
             It 'Should return false from the test method' {
                 Test-TargetResource @testParams | Should -Be $false
@@ -93,27 +102,13 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     IpRanges    = @('2.1.1.1/32', '1.2.2.2/32')
                     IsTrusted   = $True
                     OdataType   = '#microsoft.graph.ipNamedLocation'
-                    Credential  = $credsGlobalAdmin
-                }
-
-                Mock -CommandName Get-MgIdentityConditionalAccessNamedLocation -MockWith {
-                    return @{
-                        DisplayName          = 'Company Network'
-                        Id                   = '046956df-2367-4dd4-b7fd-c6175ec11cd5'
-                        AdditionalProperties = @{
-                            ipRanges                          = @(@{cidrAddress = '2.1.1.1/32' }, @{cidrAddress = '1.2.2.2/32' })
-                            isTrusted                         = $True
-                            '@odata.type'                     = '#microsoft.graph.ipNamedLocation'
-                            countriesAndRegions               = $null
-                            includeUnknownCountriesAndRegions = $null
-                        }
-                    }
+                    Credential  = $Credscredential
                 }
             }
 
             It 'Should return values from the get method' {
                 (Get-TargetResource @testParams).Ensure | Should -Be 'Present'
-                Should -Invoke -CommandName 'Get-MgIdentityConditionalAccessNamedLocation' -Exactly 1
+                Should -Invoke -CommandName 'Get-MgBetaIdentityConditionalAccessNamedLocation' -Exactly 1
             }
 
             It 'Should return false from the test method' {
@@ -122,7 +117,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should remove the app from the set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName 'Remove-MgIdentityConditionalAccessNamedLocation' -Exactly 1
+                Should -Invoke -CommandName 'Remove-MgBetaIdentityConditionalAccessNamedLocation' -Exactly 1
             }
         }
 
@@ -134,27 +129,13 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     IpRanges    = @('2.1.1.1/32', '1.2.2.2/32')
                     IsTrusted   = $True
                     OdataType   = '#microsoft.graph.ipNamedLocation'
-                    Credential  = $credsGlobalAdmin
-                }
-
-                Mock -CommandName Get-MgIdentityConditionalAccessNamedLocation -MockWith {
-                    return @{
-                        DisplayName          = 'Company Network'
-                        Id                   = '046956df-2367-4dd4-b7fd-c6175ec11cd5'
-                        AdditionalProperties = @{
-                            ipRanges                          = @(@{cidrAddress = '2.1.1.1/32' }, @{cidrAddress = '1.2.2.2/32' })
-                            isTrusted                         = $True
-                            '@odata.type'                     = '#microsoft.graph.ipNamedLocation'
-                            countriesAndRegions               = $null
-                            includeUnknownCountriesAndRegions = $null
-                        }
-                    }
+                    Credential  = $Credscredential
                 }
             }
 
             It 'Should return Values from the get method' {
                 Get-TargetResource @testParams
-                Should -Invoke -CommandName 'Get-MgIdentityConditionalAccessNamedLocation' -Exactly 1
+                Should -Invoke -CommandName 'Get-MgBetaIdentityConditionalAccessNamedLocation' -Exactly 1
             }
 
             It 'Should return true from the test method' {
@@ -168,27 +149,15 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     DisplayName = 'Company Network'
                     Ensure      = 'Present'
                     IpRanges    = @('2.1.1.1/32', '1.2.2.2/32')
-                    IsTrusted   = $True
+                    IsTrusted   = $false # Drift
                     OdataType   = '#microsoft.graph.ipNamedLocation'
-                    Credential  = $credsGlobalAdmin
-                }
-
-                Mock -CommandName Get-MgIdentityConditionalAccessNamedLocation -MockWith {
-                    return @{
-                        DisplayName          = 'Company Network'
-                        Id                   = '046956df-2367-4dd4-b7fd-c6175ec11cd5'
-                        AdditionalProperties = @{
-                            ipRanges      = @(@{cidrAddress = '2.1.1.1/32' }, @{cidrAddress = '1.2.2.2/32' })
-                            isTrusted     = $False
-                            '@odata.type' = '#microsoft.graph.ipNamedLocation'
-                        }
-                    }
+                    Credential  = $Credscredential
                 }
             }
 
             It 'Should return values from the get method' {
                 Get-TargetResource @testParams
-                Should -Invoke -CommandName 'Get-MgIdentityConditionalAccessNamedLocation' -Exactly 1
+                Should -Invoke -CommandName 'Get-MgBetaIdentityConditionalAccessNamedLocation' -Exactly 1
             }
 
             It 'Should return false from the test method' {
@@ -200,30 +169,64 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             }
         }
 
+        Context -Name 'Policies with duplicate names exist' -Fixture {
+            BeforeAll {
+                $testParams = @{
+                    DisplayName = 'Company Network'
+                    Ensure      = 'Present'
+                    IpRanges    = @('2.1.1.1/32', '1.2.2.2/32')
+                    IsTrusted   = $True
+                    OdataType   = '#microsoft.graph.ipNamedLocation'
+                    Credential  = $Credscredential
+                }
+
+                Mock -CommandName Get-MgBetaIdentityConditionalAccessNamedLocation -MockWith {
+                    return @(
+                        @{
+                            DisplayName          = 'Company Network'
+                            Id                   = '046956df-2367-4dd4-b7fd-c6175ec11cd5'
+                            AdditionalProperties = @{
+                                ipRanges      = @(@{cidrAddress = '2.1.1.1/32' }, @{cidrAddress = '1.2.2.2/32' })
+                                isTrusted     = $False
+                                '@odata.type' = '#microsoft.graph.ipNamedLocation'
+                            }
+                        }
+                        @{
+                            DisplayName          = 'Company Network'
+                            Id                   = '046956df-2367-4dd4-b7fd-c6175ec11cd6'
+                            AdditionalProperties = @{
+                                ipRanges      = @(@{cidrAddress = '2.1.1.1/32' }, @{cidrAddress = '1.2.2.2/32' })
+                                isTrusted     = $False
+                                '@odata.type' = '#microsoft.graph.ipNamedLocation'
+                            }
+                        }
+                    )
+                }
+            }
+
+            It 'Should return values from the get method' {
+                $result = Get-TargetResource @testParams
+                $result.Ensure | Should -Be 'Absent'
+                Should -Invoke -CommandName 'Get-MgBetaIdentityConditionalAccessNamedLocation' -Exactly 1
+            }
+
+            It 'Should call the set method' {
+                { Set-TargetResource @testParams } | Should -Throw "More than one instance of a Named Location Policy with name {Company Network} was found. Please provide the ID parameter."
+            }
+        }
+
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
-                }
-
-                Mock -CommandName Get-MgIdentityConditionalAccessNamedLocation -MockWith {
-                    return @{
-                        DisplayName          = 'Company Network'
-                        Id                   = '046956df-2367-4dd4-b7fd-c6175ec11cd5'
-                        AdditionalProperties = @{
-                            ipRanges                          = @(@{cidrAddress = '2.1.1.1/32' }, @{cidrAddress = '1.2.2.2/32' })
-                            isTrusted                         = $True
-                            '@odata.type'                     = '#microsoft.graph.ipNamedLocation'
-                            countriesAndRegions               = $null
-                            includeUnknownCountriesAndRegions = $null
-                        }
-                    }
                 }
             }
 
             It 'Should reverse engineer resource from the export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

@@ -21,13 +21,14 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
         BeforeAll {
 
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -CommandName New-M365DSCConnection -MockWith {
+                return 'Credentials'
             }
 
             Mock -CommandName Get-PSSession -MockWith {
@@ -36,13 +37,13 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             Mock -CommandName Remove-PSSession -MockWith {
             }
 
-            Mock -CommandName Update-MgDirectorySetting -MockWith {
+            Mock -CommandName Update-MgBetaDirectorySetting -MockWith {
             }
 
-            Mock -CommandName Remove-MgDirectorySetting -MockWith {
+            Mock -CommandName Remove-MgBetaDirectorySetting -MockWith {
             }
 
-            Mock -CommandName New-MgDirectorySetting -MockWith {
+            Mock -CommandName New-MgBetaDirectorySetting -MockWith {
             }
 
             Mock -CommandName 'Get-MgGroup' -MockWith {
@@ -52,179 +53,31 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 }
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
-            }
-        }
-
-        # Test contexts
-        Context -Name 'The Policy should exist but it DOES NOT' -Fixture {
-            BeforeAll {
-                $Script:calledOnceAlready = $false
-                $testParams = @{
-                    AllowGuestsToAccessGroups     = $True
-                    AllowGuestsToBeGroupOwner     = $True
-                    AllowToAddGuests              = $True
-                    EnableGroupCreation           = $True
-                    Ensure                        = 'Present'
-                    Credential                    = $Credential
-                    GroupCreationAllowedGroupName = 'All Company'
-                    GuestUsageGuidelinesUrl       = 'https://contoso.com/guestusage'
-                    IsSingleInstance              = 'Yes'
-                    UsageGuidelinesUrl            = 'https://contoso.com/usage'
+            Mock -CommandName Get-MgBetaDirectorySetting -MockWith {
+                if (-not $Script:calledOnceAlready)
+                {
+                    $Script:calledOnceAlready = $true
+                    return $null
                 }
-
-                Mock -CommandName New-M365DSCConnection -MockWith {
-                    return 'Credential'
-                }
-            }
-
-            BeforeEach {
-                Mock -CommandName Get-MgDirectorySetting -MockWith {
-                    if (-not $Script:calledOnceAlready)
-                    {
-                        $Script:calledOnceAlready = $true
-                        return $null
-                    }
-                    else
-                    {
-                        return @{
-                            DisplayName = 'Group.Unified'
-                            Values      = @{
-                                PrefixSuffixNamingRequirement = '[Title]Bob[Company][GroupName][Office]Nik'
-                                CustomBlockedWordsList        = @('CEO', 'Test')
-                            }
-                        }
-                    }
-                }
-            }
-            It 'Should return Values from the Get method' {
-                (Get-TargetResource @testParams).Ensure | Should -Be 'Absent'
-                Should -Invoke -CommandName 'Get-MgDirectorySetting' -Exactly 1
-            }
-
-            It 'Should return true from the Test method' {
-                $Script:calledOnceAlready = $false
-                Test-TargetResource @testParams | Should -Be $false
-            }
-            BeforeEach {
-                Mock -CommandName Get-MgDirectorySetting -MockWith {
-                    if (-not $Script:calledOnceAlready)
-                    {
-                        $Script:calledOnceAlready = $true
-                        return $null
-                    }
-                    else
-                    {
-                        return @{
-                            DisplayName = 'Group.Unified'
-                            Values      = @{
-                                PrefixSuffixNamingRequirement = '[Title]Bob[Company][GroupName][Office]Nik'
-                                CustomBlockedWordsList        = @('CEO', 'Test')
-                            }
-                        }
-                    }
-                }
-            }
-            It 'Should create and set the settings the Set method' {
-                $Script:calledOnceAlready = $false
-                Set-TargetResource @testParams
-                Should -Invoke -CommandName 'New-MgDirectorySetting' -Exactly 1
-                Should -Invoke -CommandName 'Update-MgDirectorySetting' -Exactly 1
-            }
-        }
-
-        Context -Name 'The Policy exists but it SHOULD NOT' -Fixture {
-            BeforeAll {
-                $testParams = @{
-                    IsSingleInstance = 'Yes'
-                    Ensure           = 'Absent'
-                    Credential       = $Credential
-                }
-
-                Mock -CommandName New-M365DSCConnection -MockWith {
-                    return 'Credential'
-                }
-
-                Mock -CommandName Get-MgDirectorySetting -MockWith {
+                else
+                {
                     return @{
                         DisplayName = 'Group.Unified'
                         Values      = @(
                             @{
-                                Name  = 'GroupCreationAllowedGroupId'
-                                Value = ''
-                            },
-                            @{
-                                Name  = 'EnableGroupCreation'
+                                Name  = 'NewUnifiedGroupWritebackDefault'
                                 Value = $true
                             },
-                            @{
-                                Name  = 'AllowGuestsToBeGroupOwner'
-                                Value = $false
-                            },
-                            @{
-                                Name  = 'AllowGuestsToAccessGroups'
-                                Value = $false
-                            },
-                            @{
-                                Name  = 'GuestUsageGuidelinesUrl'
-                                Value = ''
-                            },
-                            @{
-                                Name  = 'AllowToAddGuests'
-                                Value = $false
-                            },
-                            @{
-                                Name  = 'UsageGuidelinesUrl'
-                                Value = ''
-                            }
-                        )
-                    }
-                }
-            }
-
-            It 'Should return Values from the Get method' {
-                (Get-TargetResource @testParams).Ensure | Should -Be 'Present'
-                Should -Invoke -CommandName 'Get-MgDirectorySetting' -Exactly 1
-            }
-
-            It 'Should return true from the Test method' {
-                Test-TargetResource @testParams | Should -Be $false
-            }
-
-            It 'Should Prevent Remove the Policy from the Set method' {
-                { Set-TargetResource @testParams } | Should -Throw 'The AADGroupsSettings resource cannot delete existing Directory Setting entries. Please specify Present.'
-            }
-        }
-        Context -Name 'The Policy Exists and Values are already in the desired state' -Fixture {
-            BeforeAll {
-                $testParams = @{
-                    AllowGuestsToAccessGroups     = $True
-                    AllowGuestsToBeGroupOwner     = $True
-                    AllowToAddGuests              = $True
-                    EnableGroupCreation           = $True
-                    Ensure                        = 'Present'
-                    Credential                    = $Credential
-                    GroupCreationAllowedGroupName = 'All Company'
-                    GuestUsageGuidelinesUrl       = 'https://contoso.com/guestusage'
-                    IsSingleInstance              = 'Yes'
-                    UsageGuidelinesUrl            = 'https://contoso.com/usage'
-                }
-
-                Mock -CommandName New-M365DSCConnection -MockWith {
-                    return 'Credential'
-                }
-
-                Mock -CommandName Get-MgDirectorySetting -MockWith {
-                    return @{
-                        DisplayName = 'Group.Unified'
-                        Values      = @(
                             @{
                                 Name  = 'GroupCreationAllowedGroupId'
                                 Value = '12345-12345-12345-12345-12345'
                             },
                             @{
                                 Name  = 'EnableGroupCreation'
+                                Value = $true
+                            },
+                            @{
+                                Name  = 'EnableMIPLabels'
                                 Value = $true
                             },
                             @{
@@ -250,6 +103,91 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                         )
                     }
                 }
+            }
+
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
+        }
+
+        # Test contexts
+        Context -Name 'The Policy should exist but it DOES NOT' -Fixture {
+            BeforeAll {
+                $Script:calledOnceAlready = $false
+                $testParams = @{
+                    AllowGuestsToAccessGroups     = $True
+                    AllowGuestsToBeGroupOwner     = $True
+                    AllowToAddGuests              = $True
+                    EnableGroupCreation           = $True
+                    Ensure                        = 'Present'
+                    Credential                    = $Credential
+                    GroupCreationAllowedGroupName = 'All Company'
+                    GuestUsageGuidelinesUrl       = 'https://contoso.com/guestusage'
+                    IsSingleInstance              = 'Yes'
+                    UsageGuidelinesUrl            = 'https://contoso.com/usage'
+                }
+            }
+
+            It 'Should return Values from the Get method' {
+                (Get-TargetResource @testParams).Ensure | Should -Be 'Absent'
+                Should -Invoke -CommandName 'Get-MgBetaDirectorySetting' -Exactly 1
+            }
+
+            It 'Should return true from the Test method' {
+                $Script:calledOnceAlready = $false
+                Test-TargetResource @testParams | Should -Be $false
+            }
+
+            It 'Should create and set the settings the Set method' {
+                $Script:calledOnceAlready = $false
+                Set-TargetResource @testParams
+                Should -Invoke -CommandName 'New-MgBetaDirectorySetting' -Exactly 1
+                Should -Invoke -CommandName 'Update-MgBetaDirectorySetting' -Exactly 1
+            }
+        }
+
+        Context -Name 'The Policy exists but it SHOULD NOT' -Fixture {
+            BeforeAll {
+                $testParams = @{
+                    IsSingleInstance = 'Yes'
+                    Ensure           = 'Absent'
+                    Credential       = $Credential
+                }
+            }
+
+            It 'Should return Values from the Get method' {
+                $Script:calledOnceAlready = $true
+                (Get-TargetResource @testParams).Ensure | Should -Be 'Present'
+                Should -Invoke -CommandName 'Get-MgBetaDirectorySetting' -Exactly 1
+            }
+
+            It 'Should return false from the Test method' {
+                $Script:calledOnceAlready = $true
+                Test-TargetResource @testParams | Should -Be $false
+            }
+
+            It 'Should Prevent Remove the Policy from the Set method' {
+                $Script:calledOnceAlready = $true
+                { Set-TargetResource @testParams } | Should -Throw 'The AADGroupsSettings resource cannot delete existing Directory Setting entries. Please specify Present.'
+            }
+        }
+        Context -Name 'The Policy Exists and Values are already in the desired state' -Fixture {
+            BeforeAll {
+                $testParams = @{
+                    AllowGuestsToAccessGroups     = $True
+                    AllowGuestsToBeGroupOwner     = $True
+                    AllowToAddGuests              = $True
+                    EnableGroupCreation           = $True
+                    EnableMIPLabels               = $True
+                    Ensure                        = 'Present'
+                    Credential                    = $Credential
+                    GroupCreationAllowedGroupName = 'All Company'
+                    GuestUsageGuidelinesUrl       = 'https://contoso.com/guestusage'
+                    IsSingleInstance              = 'Yes'
+                    UsageGuidelinesUrl            = 'https://contoso.com/usage'
+                }
 
                 Mock -CommandName Get-MgGroup -MockWith {
                     return @{
@@ -261,7 +199,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should return Values from the Get method' {
                 Get-TargetResource @testParams
-                Should -Invoke -CommandName 'Get-MgDirectorySetting' -Exactly 1
+                Should -Invoke -CommandName 'Get-MgBetaDirectorySetting' -Exactly 1
             }
 
             It 'Should return true from the Test method' {
@@ -275,7 +213,8 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     AllowGuestsToAccessGroups     = $True
                     AllowGuestsToBeGroupOwner     = $True
                     AllowToAddGuests              = $True
-                    EnableGroupCreation           = $False #Drift
+                    EnableGroupCreation           = $False # Drift
+                    EnableMIPLabels               = $False
                     Ensure                        = 'Present'
                     Credential                    = $Credential
                     GroupCreationAllowedGroupName = 'All Company'
@@ -283,61 +222,39 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     IsSingleInstance              = 'Yes'
                     UsageGuidelinesUrl            = 'https://contoso.com/usage'
                 }
-
-                Mock -CommandName New-M365DSCConnection -MockWith {
-                    return 'Credential'
-                }
-
-                Mock -CommandName Get-MgDirectorySetting -MockWith {
-                    return @{
-                        DisplayName = 'Group.Unified'
-                        Values      = @{
-                            PrefixSuffixNamingRequirement = '[Title]Bob[Company][GroupName][Office]Nik'
-                            CustomBlockedWordsList        = @('CEO', 'Test')
-                        }
-                    }
-                }
             }
 
             It 'Should return Values from the Get method' {
+                $Script:calledOnceAlready = $true
                 Get-TargetResource @testParams
-                Should -Invoke -CommandName 'Get-MgDirectorySetting' -Exactly 1
+                Should -Invoke -CommandName 'Get-MgBetaDirectorySetting' -Exactly 1
             }
 
             It 'Should return false from the Test method' {
+                $Script:calledOnceAlready = $true
                 Test-TargetResource @testParams | Should -Be $false
             }
 
             It 'Should call the Set method' {
+                $Script:calledOnceAlready = $true
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName 'Update-MgDirectorySetting' -Exactly 1
+                Should -Invoke -CommandName 'Update-MgBetaDirectorySetting' -Exactly 1
             }
         }
 
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
-                }
-
-                Mock -CommandName Get-MgDirectorySetting -MockWith {
-                    return @{
-                        DisplayName = 'Group.Unified'
-                        Values      = @{
-                            PrefixSuffixNamingRequirement = '[Title]Bob[Company][GroupName][Office]Nik'
-                            CustomBlockedWordsList        = @('CEO', 'Test')
-                        }
-                    }
-                }
-
-                Mock -CommandName New-M365DSCConnection -MockWith {
-                    return 'Credential'
                 }
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $Script:calledOnceAlready = $true
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

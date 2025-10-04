@@ -80,7 +80,6 @@ function New-M365DSCLogEntry
 
         #region Telemetry
         $driftedData = [System.Collections.Generic.Dictionary[[String], [String]]]::new()
-        $driftedData.Add('Event', 'Error')
         $driftedData.Add('CustomMessage', $Message)
         $driftedData.Add('Source', $Source)
 
@@ -131,15 +130,9 @@ function New-M365DSCLogEntry
 
         # Write the error content into the log file;
         $LogFileName = Join-Path -Path (Get-Location).Path -ChildPath $LogFileName
+        $LogFileName = $LogFileName.Replace('\', '/')
         $LogContent | Out-File $LogFileName -Append
-        if (Assert-M365DSCIsNonInteractiveShell)
-        {
-            Write-Verbose -Message "Error Log created at {$LogFileName}"
-        }
-        else
-        {
-            Write-Host "Error Log created at {$LogFileName}" -ForegroundColor Cyan
-        }
+        Write-M365DSCHost -Message "Error Log created at {file://$LogFileName}" -ForegroundColor Red
         #endregion
     }
     catch
@@ -179,7 +172,7 @@ function Add-M365DSCEvent
 
         [Parameter()]
         [System.String]
-        [ValidateSet('Drift', 'Error', 'Warning')]
+        [ValidateSet('Drift', 'Error', 'Warning', 'NonDrift', 'RuleEvaluation')]
         $EventType,
 
         [Parameter()]
@@ -190,7 +183,16 @@ function Add-M365DSCEvent
 
     try
     {
-        if ([System.Diagnostics.EventLog]::SourceExists($Source))
+        try
+        {
+            $sourceExists = [System.Diagnostics.EventLog]::SourceExists($Source)
+        }
+        catch [System.Security.SecurityException]
+        {
+            Write-Verbose -Message "[WARNING] Not all event logs could be searched. Source might exist in another event log."
+        }
+
+        if ($sourceExists)
         {
             $sourceLogName = [System.Diagnostics.EventLog]::LogNameFromSourceName($Source, '.')
             if ($LogName -ne $sourceLogName)
@@ -203,12 +205,19 @@ function Add-M365DSCEvent
         {
             if ([System.Diagnostics.EventLog]::Exists($LogName) -eq $false)
             {
-                #Create event log
+                # Create event log
                 $null = New-EventLog -LogName $LogName -Source $Source
             }
             else
             {
-                [System.Diagnostics.EventLog]::CreateEventSource($Source, $LogName)
+                try
+                {
+                    [System.Diagnostics.EventLog]::CreateEventSource($Source, $LogName)
+                }
+                catch [System.Security.SecurityException]
+                {
+                    Write-Verbose -Message "[WARNING] Not all event logs could be searched. Source might exist in another event log."
+                }
             }
         }
 
@@ -251,9 +260,10 @@ function Add-M365DSCEvent
 
         $MessageText = "Could not write to event log Source {$Source} EntryType {$EntryType} Message {$Message}"
         # Check call stack to prevent indefinite loop between New-M365DSCLogEntry and this function
-        if ((Get-PSCallStack)[1].FunctionName -ne 'New-M365DSCLogEntry')
+        if ((Get-PSCallStack)[1].FunctionName -ne 'New-M365DSCLogEntry' -and `
+            -not $_.ToString().Contains('EventLog access is not supported on this platform.'))
         {
-            New-M365DSCLogEntry -Error $_ -Message $MessageText `
+            New-M365DSCLogEntry -Exception $_ -Message $MessageText `
                 -Source '[M365DSCLogEngine]' `
                 -TenantId $TenantId
         }
@@ -331,8 +341,7 @@ function Export-M365DSCDiagnosticData
 
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator') -eq $false)
     {
-        Write-Host -Object '[ERROR] You need to run this cmdlet with Administrator privileges!' -ForegroundColor Red
-        return
+        throw 'You need to run this cmdlet with Administrator privileges!'
     }
 
     $afterDate = (Get-Date).AddDays(($NumberOfDays * -1))
@@ -447,7 +456,7 @@ function New-M365DSCNotificationEndPointRegistration
 
         [Parameter(Mandatory = $true)]
         [System.String]
-        [ValidateSet('Drift', 'Error', 'Warning')]
+        [ValidateSet('Drift', 'Error', 'Warning', 'NonDrift', 'RuleEvaluation')]
         $EventType
     )
 
@@ -497,7 +506,7 @@ function Remove-M365DSCNotificationEndPointRegistration
 
         [Parameter(Mandatory = $true)]
         [System.String]
-        [ValidateSet('Drift', 'Error', 'Warning')]
+        [ValidateSet('Drift', 'Error', 'Warning', 'NonDrift', 'RuleEvaluation')]
         $EventType
     )
 
@@ -549,7 +558,7 @@ function Get-M365DSCNotificationEndPointRegistration
 
         [Parameter()]
         [System.String]
-        [ValidateSet('Drift', 'Error', 'Warning')]
+        [ValidateSet('Drift', 'Error', 'Warning', 'NonDrift', 'RuleEvaluation')]
         $EventType
     )
 
@@ -605,7 +614,7 @@ function Send-M365DSCNotificationEndPointMessage
 
         [Parameter()]
         [System.String]
-        [ValidateSet('Drift', 'Error', 'Warning')]
+        [ValidateSet('Drift', 'Error', 'Warning', 'NonDrift', 'RuleEvaluation')]
         $EventType
     )
 
@@ -674,11 +683,66 @@ function Assert-M365DSCIsNonInteractiveShell
     return $true
 }
 
+<#
+.Description
+This function configures the option for logging events into the Event Log.
+
+.Parameter IncludeNonDrifted
+Determines whether or not we should log information about resource's instances that don't have drifts.
+
+.Functionality
+Public
+#>
+function Set-M365DSCLoggingOption
+{
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        [System.Boolean]
+        $IncludeNonDrifted
+    )
+
+    if ($null -ne $IncludeNonDrifted)
+    {
+        [System.Environment]::SetEnvironmentVariable('M365DSCEventLogIncludeNonDrifted', $IncludeNonDrifted, `
+                [System.EnvironmentVariableTarget]::Machine)
+    }
+}
+
+<#
+.Description
+This function returns information about the option for logging events into the Event Log.
+
+.Functionality
+Public
+#>
+function Get-M365DSCLoggingOption
+{
+    [CmdletBinding()]
+    [OutputType([System.Collections.Hashtable])]
+    param()
+
+    try
+    {
+        return @{
+            IncludeNonDrifted = [Boolean]([System.Environment]::GetEnvironmentVariable('M365DSCEventLogIncludeNonDrifted', `
+                    [System.EnvironmentVariableTarget]::Machine))
+        }
+    }
+    catch
+    {
+        throw $_
+    }
+}
+
 Export-ModuleMember -Function @(
     'Add-M365DSCEvent',
+    'Assert-M365DSCIsNonInteractiveShell',
     'Export-M365DSCDiagnosticData',
+    'Get-M365DSCLoggingOption',
     'New-M365DSCLogEntry',
     'Get-M365DSCNotificationEndPointRegistration',
     'New-M365DSCNotificationEndPointRegistration',
-    'Remove-M365DSCNotificationEndPointRegistration'
+    'Remove-M365DSCNotificationEndPointRegistration',
+    'Set-M365DSCLoggingOption'
 )

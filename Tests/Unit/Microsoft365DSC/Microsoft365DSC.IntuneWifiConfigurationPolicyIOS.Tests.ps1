@@ -21,14 +21,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
         BeforeAll {
 
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName Get-PSSession -MockWith {
@@ -37,22 +33,47 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             Mock -CommandName Remove-PSSession -MockWith {
             }
 
-            Mock -CommandName Update-MgDeviceManagementDeviceConfiguration -MockWith {
+            Mock -CommandName Update-MgBetaDeviceManagementDeviceConfiguration -MockWith {
             }
 
-            Mock -CommandName New-MgDeviceManagementDeviceConfiguration -MockWith {
+            Mock -CommandName New-MgBetaDeviceManagementDeviceConfiguration -MockWith {
             }
 
-            Mock -CommandName Remove-MgDeviceManagementDeviceConfiguration -MockWith {
+            Mock -CommandName Remove-MgBetaDeviceManagementDeviceConfiguration -MockWith {
             }
-
+            Mock -CommandName Update-DeviceConfigurationPolicyAssignment -MockWith {
+            }
             Mock -CommandName New-M365DSCConnection -MockWith {
-                return 'Credential'
+                return 'Credentials'
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            Mock -CommandName Get-MgBetaDeviceManagementDeviceConfiguration -MockWith {
+                return @{
+                    AdditionalProperties = @{
+                        ProxyManualPort                = 25
+                        '@odata.type'                  = '#microsoft.graph.iosWifiConfiguration'
+                        NetworkName                    = 'FakeStringValue'
+                        WiFiSecurityType               = 'open'
+                        DisableMacAddressRandomization = $True
+                        ConnectAutomatically           = $True
+                        ProxyAutomaticConfigurationUrl = 'FakeStringValue'
+                        PreSharedKey                   = 'FakeStringValue'
+                        ConnectWhenNetworkNameIsHidden = $True
+                        ProxySettings                  = 'automatic'
+                        Ssid                           = 'FakeStringValue'
+                        ProxyManualAddress             = 'FakeStringValue'
+                    }
+                    Description          = 'FakeStringValue'
+                    DisplayName          = 'FakeStringValue'
+                    Id                   = 'FakeStringValue'
+                }
             }
+
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -70,15 +91,14 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     ProxyAutomaticConfigurationUrl = 'FakeStringValue'
                     ProxyManualAddress             = 'FakeStringValue'
                     ProxyManualPort                = 25
-                    ProxySettings                  = 'none'
+                    ProxySettings                  = 'automatic'
                     Ssid                           = 'FakeStringValue'
                     WiFiSecurityType               = 'open'
-
                     Ensure                         = 'Present'
                     Credential                     = $Credential
                 }
 
-                Mock -CommandName Get-MgDeviceManagementDeviceConfiguration -MockWith {
+                Mock -CommandName Get-MgBetaDeviceManagementDeviceConfiguration -MockWith {
                     return $null
                 }
             }
@@ -90,7 +110,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             }
             It 'Should Create the group from the Set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName New-MgDeviceManagementDeviceConfiguration -Exactly 1
+                Should -Invoke -CommandName New-MgBetaDeviceManagementDeviceConfiguration -Exactly 1
             }
         }
 
@@ -108,36 +128,11 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     ProxyAutomaticConfigurationUrl = 'FakeStringValue'
                     ProxyManualAddress             = 'FakeStringValue'
                     ProxyManualPort                = 25
-                    ProxySettings                  = 'none'
+                    ProxySettings                  = 'automatic'
                     Ssid                           = 'FakeStringValue'
                     WiFiSecurityType               = 'open'
-
                     Ensure                         = 'Absent'
                     Credential                     = $Credential
-                }
-
-                Mock -CommandName Get-MgDeviceManagementDeviceConfiguration -MockWith {
-                    return @{
-                        AdditionalProperties = @{
-                            ProxyManualPort                = 25
-                            '@odata.type'                  = '#microsoft.graph.iosWifiConfiguration'
-                            NetworkName                    = 'FakeStringValue'
-                            WiFiSecurityType               = 'open'
-                            DisableMacAddressRandomization = $True
-                            ConnectAutomatically           = $True
-                            ProxyAutomaticConfigurationUrl = 'FakeStringValue'
-                            PreSharedKey                   = 'FakeStringValue'
-                            ConnectWhenNetworkNameIsHidden = $True
-                            ProxySettings                  = 'none'
-                            Ssid                           = 'FakeStringValue'
-                            ProxyManualAddress             = 'FakeStringValue'
-
-                        }
-                        Description          = 'FakeStringValue'
-                        DisplayName          = 'FakeStringValue'
-                        Id                   = 'FakeStringValue'
-
-                    }
                 }
             }
 
@@ -151,9 +146,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should Remove the group from the Set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName Remove-MgDeviceManagementDeviceConfiguration -Exactly 1
+                Should -Invoke -CommandName Remove-MgBetaDeviceManagementDeviceConfiguration -Exactly 1
             }
         }
+
         Context -Name 'The IntuneWifiConfigurationPolicyIOS Exists and Values are already in the desired state' -Fixture {
             BeforeAll {
                 $testParams = @{
@@ -168,39 +164,13 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     ProxyAutomaticConfigurationUrl = 'FakeStringValue'
                     ProxyManualAddress             = 'FakeStringValue'
                     ProxyManualPort                = 25
-                    ProxySettings                  = 'none'
+                    ProxySettings                  = 'automatic'
                     Ssid                           = 'FakeStringValue'
                     WiFiSecurityType               = 'open'
-
                     Ensure                         = 'Present'
                     Credential                     = $Credential
                 }
-
-                Mock -CommandName Get-MgDeviceManagementDeviceConfiguration -MockWith {
-                    return @{
-                        AdditionalProperties = @{
-                            ProxyManualPort                = 25
-                            '@odata.type'                  = '#microsoft.graph.iosWifiConfiguration'
-                            NetworkName                    = 'FakeStringValue'
-                            WiFiSecurityType               = 'open'
-                            DisableMacAddressRandomization = $True
-                            ConnectAutomatically           = $True
-                            ProxyAutomaticConfigurationUrl = 'FakeStringValue'
-                            PreSharedKey                   = 'FakeStringValue'
-                            ConnectWhenNetworkNameIsHidden = $True
-                            ProxySettings                  = 'none'
-                            Ssid                           = 'FakeStringValue'
-                            ProxyManualAddress             = 'FakeStringValue'
-
-                        }
-                        Description          = 'FakeStringValue'
-                        DisplayName          = 'FakeStringValue'
-                        Id                   = 'FakeStringValue'
-
-                    }
-                }
             }
-
 
             It 'Should return true from the Test method' {
                 Test-TargetResource @testParams | Should -Be $true
@@ -220,34 +190,12 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     PreSharedKey                   = 'FakeStringValue'
                     ProxyAutomaticConfigurationUrl = 'FakeStringValue'
                     ProxyManualAddress             = 'FakeStringValue'
-                    ProxyManualPort                = 25
-                    ProxySettings                  = 'none'
+                    ProxyManualPort                = 8443 # Updated property
+                    ProxySettings                  = 'automatic'
                     Ssid                           = 'FakeStringValue'
                     WiFiSecurityType               = 'open'
-
                     Ensure                         = 'Present'
                     Credential                     = $Credential
-                }
-
-                Mock -CommandName Get-MgDeviceManagementDeviceConfiguration -MockWith {
-                    return @{
-                        AdditionalProperties = @{
-                            '@odata.type'                  = '#microsoft.graph.iosWifiConfiguration'
-                            NetworkName                    = 'FakeStringValue'
-                            WiFiSecurityType               = 'open'
-                            ProxyAutomaticConfigurationUrl = 'FakeStringValue'
-                            PreSharedKey                   = 'FakeStringValue'
-                            ProxyManualPort                = 7
-                            ProxySettings                  = 'none'
-                            Ssid                           = 'FakeStringValue'
-                            ProxyManualAddress             = 'FakeStringValue'
-
-                        }
-                        Description          = 'FakeStringValue'
-                        DisplayName          = 'FakeStringValue'
-                        Id                   = 'FakeStringValue'
-
-                    }
                 }
             }
 
@@ -261,42 +209,21 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the Set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName Update-MgDeviceManagementDeviceConfiguration -Exactly 1
+                Should -Invoke -CommandName Update-MgBetaDeviceManagementDeviceConfiguration -Exactly 1
             }
         }
 
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
                 }
-
-                Mock -CommandName Get-MgDeviceManagementDeviceConfiguration -MockWith {
-                    return @{
-                        AdditionalProperties = @{
-                            ProxyManualPort                = 25
-                            '@odata.type'                  = '#microsoft.graph.iosWifiConfiguration'
-                            NetworkName                    = 'FakeStringValue'
-                            WiFiSecurityType               = 'open'
-                            DisableMacAddressRandomization = $True
-                            ConnectAutomatically           = $True
-                            ProxyAutomaticConfigurationUrl = 'FakeStringValue'
-                            PreSharedKey                   = 'FakeStringValue'
-                            ConnectWhenNetworkNameIsHidden = $True
-                            ProxySettings                  = 'none'
-                            Ssid                           = 'FakeStringValue'
-                            ProxyManualAddress             = 'FakeStringValue'
-
-                        }
-                        Description          = 'FakeStringValue'
-                        DisplayName          = 'FakeStringValue'
-                        Id                   = 'FakeStringValue'
-
-                    }
-                }
             }
+
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

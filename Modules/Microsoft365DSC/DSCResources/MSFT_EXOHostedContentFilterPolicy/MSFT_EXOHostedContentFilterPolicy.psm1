@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_EXOHostedContentFilterPolicy'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -48,42 +50,11 @@ function Get-TargetResource
 
         [Parameter()]
         [System.Boolean]
-        $DownloadLink = $false,
-
-        [Parameter()]
-        [System.Boolean]
-        $EnableEndUserSpamNotifications = $false,
-
-        [Parameter()]
-        [System.Boolean]
         $EnableLanguageBlockList = $false,
 
         [Parameter()]
         [System.Boolean]
         $EnableRegionBlockList = $false,
-
-        [Parameter()]
-        [ValidatePattern("^$|^[a-zA-Z0-9.!£#$%&'^_`{}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$")]
-        [System.String]
-        $EndUserSpamNotificationCustomFromAddress,
-
-        [Parameter()]
-        [System.String]
-        $EndUserSpamNotificationCustomFromName,
-
-        [Parameter()]
-        [System.String]
-        $EndUserSpamNotificationCustomSubject,
-
-        [Parameter()]
-        [ValidateRange(1, 15)]
-        [uint32]
-        $EndUserSpamNotificationFrequency = 3,
-
-        [Parameter()]
-        [ValidateSet('Default', 'English', 'French', 'German', 'Italian', 'Japanese', 'Spanish', 'Korean', 'Portuguese', 'Russian', 'ChineseSimplified', 'ChineseTraditional', 'Amharic', 'Arabic', 'Bulgarian', 'BengaliIndia', 'Catalan', 'Czech', 'Cyrillic', 'Danish', 'Greek', 'Estonian', 'Basque', 'Farsi', 'Finnish', 'Filipino', 'Galician', 'Gujarati', 'Hebrew', 'Hindi', 'Croatian', 'Hungarian', 'Indonesian', 'Icelandic', 'Kazakh', 'Kannada', 'Lithuanian', 'Latvian', 'Malayalam', 'Marathi', 'Malay', 'Dutch', 'NorwegianNynorsk', 'Norwegian', 'Oriya', 'Polish', 'PortuguesePortugal', 'Romanian', 'Slovak', 'Slovenian', 'SerbianCyrillic', 'Serbian', 'Swedish', 'Swahili', 'Tamil', 'Telugu', 'Thai', 'Turkish', 'Ukrainian', 'Urdu', 'Vietnamese')]
-        [System.String]
-        $EndUserSpamNotificationLanguage = 'Default',
 
         [Parameter()]
         [ValidateSet('MoveToJmf', 'Redirect', 'Quarantine')]
@@ -106,6 +77,11 @@ function Get-TargetResource
         [Parameter()]
         [System.Boolean]
         $InlineSafetyTipsEnabled = $true,
+
+        [Parameter()]
+        [ValidateSet('Default', 'HighConfidencePhish', 'Phish', 'HighConfidenceSpam', 'Spam', 'Disabled')]
+        [System.String]
+        $IntraOrgFilterState = 'Default',
 
         [Parameter()]
         [ValidateSet('Off', 'On', 'Test')]
@@ -278,20 +254,24 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Getting configuration of HostedContentFilterPolicy for $Identity"
 
     if ($Global:CurrentModeIsExport)
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+        $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
             -InboundParameters $PSBoundParameters `
             -SkipModuleReload $true
     }
     else
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+        $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
             -InboundParameters $PSBoundParameters
     }
 
@@ -311,9 +291,7 @@ function Get-TargetResource
     $nullReturn.Ensure = 'Absent'
     try
     {
-        $HostedContentFilterPolicies = Get-HostedContentFilterPolicy -ErrorAction Stop
-
-        $HostedContentFilterPolicy = $HostedContentFilterPolicies | Where-Object -FilterScript { $_.Identity -eq $Identity }
+        $HostedContentFilterPolicy = Get-HostedContentFilterPolicy -Identity $Identity -ErrorAction Stop
         if ($null -eq $HostedContentFilterPolicy)
         {
             Write-Verbose -Message "HostedContentFilterPolicy $($Identity) does not exist."
@@ -321,32 +299,49 @@ function Get-TargetResource
         }
         else
         {
-            $AllowedSendersValues = $HostedContentFilterPolicy.AllowedSenders.Sender | Select-Object Address -ExpandProperty Address
-            $BlockedSendersValues = $HostedContentFilterPolicy.BlockedSenders.Sender | Select-Object Address -ExpandProperty Address
+            [System.String[]]$AllowedSendersValues = $HostedContentFilterPolicy.AllowedSenders.Sender | Select-Object Address -ExpandProperty Address
+            [System.String[]]$BlockedSendersValues = $HostedContentFilterPolicy.BlockedSenders.Sender | Select-Object Address -ExpandProperty Address
+            # Check if the values are null and assign them an empty string array if they are
+            if ($null -eq $AllowedSendersValues)
+            {
+                $AllowedSendersValues = @()
+            }
+            if ($null -eq $BlockedSendersValues)
+            {
+                $BlockedSendersValues = @()
+            }
+
+            [System.String[]]$AllowedSenderDomains = $HostedContentFilterPolicy.AllowedSenderDomains.Domain
+            [System.String[]]$BlockedSenderDomains = $HostedContentFilterPolicy.BlockedSenderDomains.Domain
+            # Check if the values are null and assign them an empty string array if they are
+            if ($null -eq $AllowedSenderDomains)
+            {
+                $AllowedSenderDomains = @()
+            }
+            if ($null -eq $BlockedSenderDomains)
+            {
+                $BlockedSenderDomains = @()
+            }
             $result = @{
                 Ensure                               = 'Present'
                 Identity                             = $Identity
                 AddXHeaderValue                      = $HostedContentFilterPolicy.AddXHeaderValue
                 AdminDisplayName                     = $HostedContentFilterPolicy.AdminDisplayName
-                AllowedSenderDomains                 = $HostedContentFilterPolicy.AllowedSenderDomains.Domain
+                AllowedSenderDomains                 = $AllowedSenderDomains
                 AllowedSenders                       = $AllowedSendersValues
-                BlockedSenderDomains                 = $HostedContentFilterPolicy.BlockedSenderDomains.Domain
+                BlockedSenderDomains                 = $BlockedSenderDomains
                 BlockedSenders                       = $BlockedSendersValues
                 BulkQuarantineTag                    = $HostedContentFilterPolicy.BulkQuarantineTag
                 BulkSpamAction                       = $HostedContentFilterPolicy.BulkSpamAction
                 BulkThreshold                        = $HostedContentFilterPolicy.BulkThreshold
-                DownloadLink                         = $HostedContentFilterPolicy.DownloadLink
-                EnableEndUserSpamNotifications       = $HostedContentFilterPolicy.EnableEndUserSpamNotifications
                 EnableLanguageBlockList              = $HostedContentFilterPolicy.EnableLanguageBlockList
                 EnableRegionBlockList                = $HostedContentFilterPolicy.EnableRegionBlockList
-                EndUserSpamNotificationCustomSubject = $HostedContentFilterPolicy.EndUserSpamNotificationCustomSubject
-                EndUserSpamNotificationFrequency     = $HostedContentFilterPolicy.EndUserSpamNotificationFrequency
-                EndUserSpamNotificationLanguage      = $HostedContentFilterPolicy.EndUserSpamNotificationLanguage
                 HighConfidencePhishAction            = $HostedContentFilterPolicy.HighConfidencePhishAction
                 HighConfidencePhishQuarantineTag     = $HostedContentFilterPolicy.HighConfidencePhishQuarantineTag
                 HighConfidenceSpamAction             = $HostedContentFilterPolicy.HighConfidenceSpamAction
                 HighConfidenceSpamQuarantineTag      = $HostedContentFilterPolicy.HighConfidenceSpamQuarantineTag
                 InlineSafetyTipsEnabled              = $HostedContentFilterPolicy.InlineSafetyTipsEnabled
+                IntraOrgFilterState                  = $HostedContentFilterPolicy.IntraOrgFilterState
                 IncreaseScoreWithBizOrInfoUrls       = $HostedContentFilterPolicy.IncreaseScoreWithBizOrInfoUrls
                 IncreaseScoreWithImageLinks          = $HostedContentFilterPolicy.IncreaseScoreWithImageLinks
                 IncreaseScoreWithNumericIps          = $HostedContentFilterPolicy.IncreaseScoreWithNumericIps
@@ -382,8 +377,9 @@ function Get-TargetResource
                 CertificateThumbprint                = $CertificateThumbprint
                 CertificatePath                      = $CertificatePath
                 CertificatePassword                  = $CertificatePassword
-                Managedidentity                      = $ManagedIdentity.IsPresent
+                ManagedIdentity                      = $ManagedIdentity.IsPresent
                 TenantId                             = $TenantId
+                AccessTokens                         = $AccessTokens
             }
 
             if ($HostedContentFilterPolicy.IsDefault)
@@ -398,6 +394,7 @@ function Get-TargetResource
     }
     catch
     {
+        Write-Verbose -Message $_
         New-M365DSCLogEntry -Message 'Error retrieving data:' `
             -Exception $_ `
             -Source $($MyInvocation.MyCommand.Source) `
@@ -457,42 +454,11 @@ function Set-TargetResource
 
         [Parameter()]
         [System.Boolean]
-        $DownloadLink = $false,
-
-        [Parameter()]
-        [System.Boolean]
-        $EnableEndUserSpamNotifications = $false,
-
-        [Parameter()]
-        [System.Boolean]
         $EnableLanguageBlockList = $false,
 
         [Parameter()]
         [System.Boolean]
         $EnableRegionBlockList = $false,
-
-        [Parameter()]
-        [ValidatePattern("^$|^[a-zA-Z0-9.!£#$%&'^_`{}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$")]
-        [System.String]
-        $EndUserSpamNotificationCustomFromAddress,
-
-        [Parameter()]
-        [System.String]
-        $EndUserSpamNotificationCustomFromName,
-
-        [Parameter()]
-        [System.String]
-        $EndUserSpamNotificationCustomSubject,
-
-        [Parameter()]
-        [ValidateRange(1, 15)]
-        [uint32]
-        $EndUserSpamNotificationFrequency = 3,
-
-        [Parameter()]
-        [ValidateSet('Default', 'English', 'French', 'German', 'Italian', 'Japanese', 'Spanish', 'Korean', 'Portuguese', 'Russian', 'ChineseSimplified', 'ChineseTraditional', 'Amharic', 'Arabic', 'Bulgarian', 'BengaliIndia', 'Catalan', 'Czech', 'Cyrillic', 'Danish', 'Greek', 'Estonian', 'Basque', 'Farsi', 'Finnish', 'Filipino', 'Galician', 'Gujarati', 'Hebrew', 'Hindi', 'Croatian', 'Hungarian', 'Indonesian', 'Icelandic', 'Kazakh', 'Kannada', 'Lithuanian', 'Latvian', 'Malayalam', 'Marathi', 'Malay', 'Dutch', 'NorwegianNynorsk', 'Norwegian', 'Oriya', 'Polish', 'PortuguesePortugal', 'Romanian', 'Slovak', 'Slovenian', 'SerbianCyrillic', 'Serbian', 'Swedish', 'Swahili', 'Tamil', 'Telugu', 'Thai', 'Turkish', 'Ukrainian', 'Urdu', 'Vietnamese')]
-        [System.String]
-        $EndUserSpamNotificationLanguage = 'Default',
 
         [Parameter()]
         [ValidateSet('MoveToJmf', 'Redirect', 'Quarantine')]
@@ -515,6 +481,11 @@ function Set-TargetResource
         [Parameter()]
         [System.Boolean]
         $InlineSafetyTipsEnabled = $true,
+
+        [Parameter()]
+        [ValidateSet('Default', 'HighConfidencePhish', 'Phish', 'HighConfidenceSpam', 'Spam', 'Disabled')]
+        [System.String]
+        $IntraOrgFilterState = 'Default',
 
         [Parameter()]
         [ValidateSet('Off', 'On', 'Test')]
@@ -687,7 +658,11 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Setting configuration of HostedContentFilterPolicy for $Identity"
@@ -704,33 +679,17 @@ function Set-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+    $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
         -InboundParameters $PSBoundParameters
 
     Write-Verbose (Get-HostedContentFilterPolicy | Out-String)
-    $HostedContentFilterPolicies = Get-HostedContentFilterPolicy
+    $HostedContentFilterPolicy = Get-HostedContentFilterPolicy -Identity $Identity
 
-    $HostedContentFilterPolicy = $HostedContentFilterPolicies | Where-Object -FilterScript { $_.Identity -eq $Identity }
-    $HostedContentFilterPolicyParams = [System.Collections.Hashtable]($PSBoundParameters)
-    $HostedContentFilterPolicyParams.Remove('Ensure') | Out-Null
-    $HostedContentFilterPolicyParams.Remove('Credential') | Out-Null
-    $HostedContentFilterPolicyParams.Remove('MakeDefault') | Out-Null
-    $HostedContentFilterPolicyParams.Remove('ApplicationId') | Out-Null
-    $HostedContentFilterPolicyParams.Remove('TenantId') | Out-Null
-    $HostedContentFilterPolicyParams.Remove('CertificateThumbprint') | Out-Null
-    $HostedContentFilterPolicyParams.Remove('CertificatePath') | Out-Null
-    $HostedContentFilterPolicyParams.Remove('CertificatePassword') | Out-Null
-    $HostedContentFilterPolicyParams.Remove('ManagedIdentity') | Out-Null
+    $HostedContentFilterPolicyParams = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
 
-    if ($HostedContentFilterPolicyParams.Contains('EndUserSpamNotificationCustomFromAddress'))
+    if ($IntraOrgFilterState -eq 'Default')
     {
-        $HostedContentFilterPolicyParams.Remove('EndUserSpamNotificationCustomFromAddress') | Out-Null
-        Write-Verbose -Message 'The EndUserSpamNotificationCustomFromAddress parameter is no longer available and will be deprecated.'
-    }
-    if ($HostedContentFilterPolicyParams.Contains('EndUserSpamNotificationCustomFromName'))
-    {
-        $HostedContentFilterPolicyParams.Remove('EndUserSpamNotificationCustomFromName') | Out-Null
-        Write-Verbose -Message 'The EndUserSpamNotificationCustomFromName parameter is no longer available and will be deprecated.'
+        $HostedContentFilterPolicyParams.IntraOrgFilterState = 'HighConfidencePhish'
     }
 
     if (('Present' -eq $Ensure ) -and ($null -eq $HostedContentFilterPolicy))
@@ -739,6 +698,7 @@ function Set-TargetResource
             Name = $HostedContentFilterPolicyParams.Identity
         }
         $HostedContentFilterPolicyParams.Remove('Identity') | Out-Null
+        $HostedContentFilterPolicyParams.Remove('MakeDefault') | Out-Null
         Write-Verbose -Message "Creating HostedContentFilterPolicy $($Identity) with values: $(Convert-M365DscHashtableToString -Hashtable $HostedContentFilterPolicyParams)"
         New-HostedContentFilterPolicy @HostedContentFilterPolicyParams
         if ($PSBoundParameters.MakeDefault)
@@ -753,6 +713,7 @@ function Set-TargetResource
         if ($PSBoundParameters.MakeDefault)
         {
             Write-Verbose -Message 'Updating Policy as default'
+            $HostedContentFilterPolicyParams.Remove('MakeDefault') | Out-Null
             Set-HostedContentFilterPolicy @HostedContentFilterPolicyParams -MakeDefault -Confirm:$false
         }
         else
@@ -817,42 +778,11 @@ function Test-TargetResource
 
         [Parameter()]
         [System.Boolean]
-        $DownloadLink = $false,
-
-        [Parameter()]
-        [System.Boolean]
-        $EnableEndUserSpamNotifications = $false,
-
-        [Parameter()]
-        [System.Boolean]
         $EnableLanguageBlockList = $false,
 
         [Parameter()]
         [System.Boolean]
         $EnableRegionBlockList = $false,
-
-        [Parameter()]
-        [ValidatePattern("^$|^[a-zA-Z0-9.!£#$%&'^_`{}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$")]
-        [System.String]
-        $EndUserSpamNotificationCustomFromAddress,
-
-        [Parameter()]
-        [System.String]
-        $EndUserSpamNotificationCustomFromName,
-
-        [Parameter()]
-        [System.String]
-        $EndUserSpamNotificationCustomSubject,
-
-        [Parameter()]
-        [ValidateRange(1, 15)]
-        [uint32]
-        $EndUserSpamNotificationFrequency = 3,
-
-        [Parameter()]
-        [ValidateSet('Default', 'English', 'French', 'German', 'Italian', 'Japanese', 'Spanish', 'Korean', 'Portuguese', 'Russian', 'ChineseSimplified', 'ChineseTraditional', 'Amharic', 'Arabic', 'Bulgarian', 'BengaliIndia', 'Catalan', 'Czech', 'Cyrillic', 'Danish', 'Greek', 'Estonian', 'Basque', 'Farsi', 'Finnish', 'Filipino', 'Galician', 'Gujarati', 'Hebrew', 'Hindi', 'Croatian', 'Hungarian', 'Indonesian', 'Icelandic', 'Kazakh', 'Kannada', 'Lithuanian', 'Latvian', 'Malayalam', 'Marathi', 'Malay', 'Dutch', 'NorwegianNynorsk', 'Norwegian', 'Oriya', 'Polish', 'PortuguesePortugal', 'Romanian', 'Slovak', 'Slovenian', 'SerbianCyrillic', 'Serbian', 'Swedish', 'Swahili', 'Tamil', 'Telugu', 'Thai', 'Turkish', 'Ukrainian', 'Urdu', 'Vietnamese')]
-        [System.String]
-        $EndUserSpamNotificationLanguage = 'Default',
 
         [Parameter()]
         [ValidateSet('MoveToJmf', 'Redirect', 'Quarantine')]
@@ -875,6 +805,11 @@ function Test-TargetResource
         [Parameter()]
         [System.Boolean]
         $InlineSafetyTipsEnabled = $true,
+
+        [Parameter()]
+        [ValidateSet('Default', 'HighConfidencePhish', 'Phish', 'HighConfidenceSpam', 'Spam', 'Disabled')]
+        [System.String]
+        $IntraOrgFilterState = 'Default',
 
         [Parameter()]
         [ValidateSet('Off', 'On', 'Test')]
@@ -1047,13 +982,18 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
 
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -1069,39 +1009,15 @@ function Test-TargetResource
     Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
 
     $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('Credential') | Out-Null
-    $ValuesToCheck.Remove('EndUserSpamNotificationCustomFromAddress') | Out-Null
-    $ValuesToCheck.Remove('EndUserSpamNotificationCustomFromName') | Out-Null
-    $ValuesToCheck.Remove('ApplicationId') | Out-Null
-    $ValuesToCheck.Remove('TenantId') | Out-Null
-    $ValuesToCheck.Remove('CertificateThumbprint') | Out-Null
-    $ValuesToCheck.Remove('CertificatePath') | Out-Null
-    $ValuesToCheck.Remove('CertificatePassword') | Out-Null
-    $ValuesToCheck.Remove('ManagedIdentity') | Out-Null
 
-    if ($null -ne $ValuesToCheck.AllowedSenders -and $ValuesToCheck.AllowedSenders.Length -eq 0)
+    if ($CurrentValues.IntraOrgFilterState -ne $IntraOrgFilterState -and $IntraOrgFilterState -eq 'Default')
     {
-        $ValuesToCheck.AllowedSenders = $null
-    }
-
-    if ($null -ne $ValuesToCheck.AllowedSenderDomains -and $ValuesToCheck.AllowedSenderDomains.Length -eq 0)
-    {
-        $ValuesToCheck.AllowedSenderDomains = $null
-    }
-
-    if ($null -ne $ValuesToCheck.BlockedSenders -and $ValuesToCheck.BlockedSenders.Length -eq 0)
-    {
-        $ValuesToCheck.BlockedSenders = $null
-    }
-
-    if ($null -ne $ValuesToCheck.BlockedSenderDomains -and $ValuesToCheck.BlockedSenderDomains.Length -eq 0)
-    {
-        $ValuesToCheck.BlockedSenderDomains = $null
+        $ValuesToCheck.IntraOrgFilterState = 'HighConfidencePhish'
     }
 
     $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
         -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $ValuesToCheck `
+        -DesiredValues $PSBoundParameters `
         -ValuesToCheck $ValuesToCheck.Keys
 
     Write-Verbose -Message "Test-TargetResource returned $TestResult"
@@ -1141,7 +1057,11 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
@@ -1167,15 +1087,20 @@ function Export-TargetResource
 
         if ($HostedContentFilterPolicies.Length -eq 0)
         {
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         }
         else
         {
-            Write-Host "`r`n" -NoNewline
+            Write-M365DSCHost -Message "`r`n" -DeferWrite
         }
         $i = 1
         foreach ($HostedContentFilterPolicy in $HostedContentFilterPolicies)
         {
+            if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+            {
+                $Global:M365DSCExportResourceInstancesCount++
+            }
+
             $Params = @{
                 Credential            = $Credential
                 Identity              = $HostedContentFilterPolicy.Identity
@@ -1183,13 +1108,12 @@ function Export-TargetResource
                 TenantId              = $TenantId
                 CertificateThumbprint = $CertificateThumbprint
                 CertificatePassword   = $CertificatePassword
-                Managedidentity       = $ManagedIdentity.IsPresent
+                ManagedIdentity       = $ManagedIdentity.IsPresent
                 CertificatePath       = $CertificatePath
+                AccessTokens          = $AccessTokens
             }
-            Write-Host "    |---[$i/$($HostedContentFilterPolicies.Length)] $($HostedContentFilterPolicy.Identity)" -NoNewline
+            Write-M365DSCHost -Message "    |---[$i/$($HostedContentFilterPolicies.Length)] $($HostedContentFilterPolicy.Identity)" -DeferWrite
             $Results = Get-TargetResource @Params
-            $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                -Results $Results
             $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                 -ConnectionMode $ConnectionMode `
                 -ModulePath $PSScriptRoot `
@@ -1198,14 +1122,14 @@ function Export-TargetResource
             $dscContent += $currentDSCBlock
             Save-M365DSCPartialExport -Content $currentDSCBlock `
                 -FileName $Global:PartialExportFileName
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
             $i++
         }
         return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `

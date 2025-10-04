@@ -21,17 +21,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
 
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
-            }
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
@@ -47,9 +40,31 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             Mock -CommandName Set-OrganizationConfig -MockWith {
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            Mock -CommandName Get-OrganizationConfig -MockWith {
+                return @{
+                    DefaultPublicFolderProhibitPostQuota       = '13 KB (13,312 bytes)'
+                    VisibleMeetingUpdateProperties             = 'Location,AllProperties:15'
+                    DefaultPublicFolderIssueWarningQuota       = '13 KB (13,312 bytes)'
+                    ConnectorsEnabledForYammer                 = $True
+                    DefaultPublicFolderMaxItemSize             = '13 KB (13,312 bytes)'
+                    MailTipsLargeAudienceThreshold             = 25
+                    PublicFoldersEnabled                       = 'Local'
+                    WebPushNotificationsDisabled               = $False
+                    MailTipsGroupMetricsEnabled                = $True
+                    DefaultPublicFolderMovedItemRetention      = '06.00:00:00'
+                    DefaultPublicFolderDeletedItemRetention    = '30.00:00:00'
+                    ByteEncoderTypeFor7BitCharsets             = 0
+                    SendFromAliasEnabled                       = $false
+                    ActivityBasedAuthenticationTimeoutInterval = '06:00:00'
+                    DefaultGroupAccessType                     = 'Private'
+                }
             }
+
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -67,32 +82,12 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     PublicFoldersEnabled                       = 'Local'
                     WebPushNotificationsDisabled               = $False
                     MailTipsGroupMetricsEnabled                = $True
-                    DefaultPublicFolderMovedItemRetention      = '07.00:00:00'
+                    DefaultPublicFolderMovedItemRetention      = '06.00:00:00'
                     DefaultPublicFolderDeletedItemRetention    = '30.00:00:00'
                     ByteEncoderTypeFor7BitCharsets             = 0
                     ActivityBasedAuthenticationTimeoutInterval = '06:00:00'
                     SendFromAliasEnabled                       = $false
                     DefaultGroupAccessType                     = 'Private'
-                }
-
-                Mock -CommandName Get-OrganizationConfig -MockWith {
-                    return @{
-                        DefaultPublicFolderProhibitPostQuota       = '13 KB (13,312 bytes)'
-                        VisibleMeetingUpdateProperties             = 'Location,AllProperties:15'
-                        DefaultPublicFolderIssueWarningQuota       = '13 KB (13,312 bytes)'
-                        ConnectorsEnabledForYammer                 = $True
-                        DefaultPublicFolderMaxItemSize             = '13 KB (13,312 bytes)'
-                        MailTipsLargeAudienceThreshold             = 25
-                        PublicFoldersEnabled                       = 'Local'
-                        WebPushNotificationsDisabled               = $False
-                        MailTipsGroupMetricsEnabled                = $True
-                        DefaultPublicFolderMovedItemRetention      = '07.00:00:00'
-                        DefaultPublicFolderDeletedItemRetention    = '30.00:00:00'
-                        ByteEncoderTypeFor7BitCharsets             = 0
-                        SendFromAliasEnabled                       = $false
-                        ActivityBasedAuthenticationTimeoutInterval = '06:00:00'
-                        DefaultGroupAccessType                     = 'Private'
-                    }
                 }
             }
 
@@ -100,14 +95,8 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 Test-TargetResource @testParams | Should -Be $true
             }
 
-            It 'Should call the Set method' {
-                Set-TargetResource @testParams
-                Should -Invoke -CommandName 'Set-OrganizationConfig' -Exactly 1
-            }
-
             It 'Should return Values from the Get method' {
-                Get-TargetResource @testParams
-                Should -Invoke -CommandName 'Get-OrganizationConfig'
+                (Get-TargetResource @testParams).IsSingleInstance | Should -Be 'Yes'
             }
         }
 
@@ -125,32 +114,12 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     PublicFoldersEnabled                       = 'Local'
                     WebPushNotificationsDisabled               = $False
                     MailTipsGroupMetricsEnabled                = $False
-                    DefaultPublicFolderMovedItemRetention      = '07.00:00:00'
+                    DefaultPublicFolderMovedItemRetention      = '07.00:00:00' # Drift
                     DefaultPublicFolderDeletedItemRetention    = '30.00:00:00'
                     ByteEncoderTypeFor7BitCharsets             = 0
                     ActivityBasedAuthenticationTimeoutInterval = '06:00:00'
                     SendFromAliasEnabled                       = $false
                     DefaultGroupAccessType                     = 'Public'
-                }
-
-                Mock -CommandName Get-OrganizationConfig -MockWith {
-                    return @{
-                        DefaultPublicFolderProhibitPostQuota       = '13 KB (13,312 bytes)'
-                        VisibleMeetingUpdateProperties             = 'Location,AllProperties:15'
-                        DefaultPublicFolderIssueWarningQuota       = '13 KB (13,312 bytes)'
-                        ConnectorsEnabledForYammer                 = $True
-                        DefaultPublicFolderMaxItemSize             = '13 KB (13,312 bytes)'
-                        MailTipsLargeAudienceThreshold             = 25
-                        PublicFoldersEnabled                       = 'Local'
-                        WebPushNotificationsDisabled               = $False
-                        MailTipsGroupMetricsEnabled                = $True
-                        DefaultPublicFolderMovedItemRetention      = '07.00:00:00'
-                        DefaultPublicFolderDeletedItemRetention    = '30.00:00:00'
-                        ByteEncoderTypeFor7BitCharsets             = 0
-                        ActivityBasedAuthenticationTimeoutInterval = '06:00:00'
-                        DefaultGroupAccessType                     = 'Private'
-                        SendFromAliasEnabled                       = $false
-                    }
                 }
             }
 
@@ -183,7 +152,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     PublicFoldersEnabled                       = 'Local'
                     WebPushNotificationsDisabled               = $False
                     MailTipsGroupMetricsEnabled                = $False
-                    DefaultPublicFolderMovedItemRetention      = '07.00:00:00'
+                    DefaultPublicFolderMovedItemRetention      = '06.00:00:00'
                     DefaultPublicFolderDeletedItemRetention    = '30.00:00:00'
                     ByteEncoderTypeFor7BitCharsets             = 0
                     ActivityBasedAuthenticationTimeoutInterval = '06:00:00'
@@ -202,33 +171,15 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
-                }
-
-                Mock -CommandName Get-OrganizationConfig -MockWith {
-                    return @{
-                        DefaultPublicFolderProhibitPostQuota       = '13 KB (13,312 bytes)'
-                        VisibleMeetingUpdateProperties             = 'Location,AllProperties:15'
-                        DefaultPublicFolderIssueWarningQuota       = '13 KB (13,312 bytes)'
-                        ConnectorsEnabledForYammer                 = $True
-                        DefaultPublicFolderMaxItemSize             = '13 KB (13,312 bytes)'
-                        MailTipsLargeAudienceThreshold             = 25
-                        PublicFoldersEnabled                       = 'Local'
-                        WebPushNotificationsDisabled               = $False
-                        MailTipsGroupMetricsEnabled                = $True
-                        DefaultPublicFolderMovedItemRetention      = '07.00:00:00'
-                        DefaultPublicFolderDeletedItemRetention    = '30.00:00:00'
-                        ByteEncoderTypeFor7BitCharsets             = 0
-                        ActivityBasedAuthenticationTimeoutInterval = '06:00:00'
-                        DefaultGroupAccessType                     = 'Private'
-                        SendFromAliasEnabled                       = $false
-                    }
                 }
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_SPOApp'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -55,31 +57,44 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Getting configuration for app $Identity"
-    $ConnectionMode = New-M365DSCConnection -Workload 'PnP' `
-        -InboundParameters $PSBoundParameters
-
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
-
-    #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
-    $CommandName = $MyInvocation.MyCommand
-    $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
-        -CommandName $CommandName `
-        -Parameters $PSBoundParameters
-    Add-M365DSCTelemetryEvent -Data $data
-    #endregion
-
-    $nullReturn = $PSBoundParameters
-    $nullReturn.Ensure = 'Absent'
 
     try
     {
-        $app = Get-PnPApp -Identity $Identity -ErrorAction SilentlyContinue
+        if (-not $Script:exportedInstance -or $Script:exportedInstance.Title -ne $Identity)
+        {
+            $null = New-M365DSCConnection -Workload 'PnP' `
+                -InboundParameters $PSBoundParameters
+
+            #Ensure the proper dependencies are installed in the current environment.
+            Confirm-M365DSCDependencies
+
+            #region Telemetry
+            $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+            $CommandName = $MyInvocation.MyCommand
+            $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
+                -CommandName $CommandName `
+                -Parameters $PSBoundParameters
+            Add-M365DSCTelemetryEvent -Data $data
+            #endregion
+
+            $nullReturn = $PSBoundParameters
+            $nullReturn.Ensure = 'Absent'
+
+            $app = Get-PnPApp -Identity $Identity -ErrorAction SilentlyContinue
+        }
+        else
+        {
+            $app = $Script:exportedInstance
+        }
+
         if ($null -eq $app)
         {
             Write-Verbose -Message "The specified app wasn't found."
@@ -98,8 +113,9 @@ function Get-TargetResource
             CertificatePassword   = $CertificatePassword
             CertificatePath       = $CertificatePath
             CertificateThumbprint = $CertificateThumbprint
-            Managedidentity       = $ManagedIdentity.IsPresent
+            ManagedIdentity       = $ManagedIdentity.IsPresent
             Credential            = $Credential
+            AccessTokens          = $AccessTokens
         }
     }
     catch
@@ -172,7 +188,11 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Setting configuration for app $Identity"
@@ -188,9 +208,6 @@ function Set-TargetResource
         -Parameters $PSBoundParameters
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
-
-    $ConnectionMode = New-M365DSCConnection -Workload 'PnP' `
-        -InboundParameters $PSBoundParameters
 
     $currentApp = Get-TargetResource @PSBoundParameters
 
@@ -267,13 +284,15 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
 
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -281,22 +300,10 @@ function Test-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message "Testing configuration for app $Identity"
-
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-
-    Write-Verbose -Message "Current Values: $(Convert-M365DscHashtableToString -Hashtable $CurrentValues)"
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck @('Ensure', `
-            'Identity')
-
-    Write-Verbose -Message "Test-TargetResource returned $TestResult"
-
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '') `
+                                         -ExcludedProperties @('Path', 'Publish', 'Overwrite')
+    return $result
 }
 
 function Export-TargetResource
@@ -335,7 +342,11 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     try
@@ -363,14 +374,14 @@ function Export-TargetResource
                 -InboundParameters $PSBoundParameters `
                 -Url $tenantAppCatalogUrl
 
-            if ($ConnectionMode -eq 'Credential')
+            if ($ConnectionMode -eq 'Credentials')
             {
-                $filesToDownload = Get-AllSPOPackages -Credential $Credential
+                [array]$filesToDownload = Get-AllSPOPackages -Credential $Credential
             }
             else
             {
                 # mlh
-                $filesToDownload = Get-AllSPOPackages -ApplicationId $ApplicationId -CertificateThumbprint $CertificateThumbprint `
+                [array]$filesToDownload = Get-AllSPOPackages -ApplicationId $ApplicationId -CertificateThumbprint $CertificateThumbprint `
                     -CertificatePassword $CertificatePassword -TenantId $TenantId -CertificatePath $CertificatePath -ManagedIdentity:$ManagedIdentity.IsPresent
             }
             $tenantAppCatalogPath = $tenantAppCatalogUrl.Replace('https://', '')
@@ -379,18 +390,17 @@ function Export-TargetResource
             $dscContent = ''
             $i = 1
 
-
-            if ($filesToDownload.Length -eq 0)
+            if ($filesToDownload.Count -eq 0)
             {
-                Write-Host $Global:M365DSCEmojiGreenCheckmark
+                Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
             }
             else
             {
-                Write-Host "`r`n"
+                Write-M365DSCHost -Message "`r`n" -CommitWrite
             }
             foreach ($file in $filesToDownload)
             {
-                Write-Host "    |---[$i/$($filesToDownload.Length)] $($file.Name)" -NoNewline
+                Write-M365DSCHost -Message "    |---[$i/$($filesToDownload.Count)] $($file.Name)" -DeferWrite
 
                 $identity = $file.Name.ToLower().Replace('.app', '').Replace('.sppkg', '')
                 $app = Get-PnPApp -Identity $identity -ErrorAction SilentlyContinue
@@ -402,6 +412,11 @@ function Export-TargetResource
                 }
                 if ($null -ne $app)
                 {
+                    if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+                    {
+                        $Global:M365DSCExportResourceInstancesCount++
+                    }
+
                     $Params = @{
                         Identity              = $identity
                         Path                  = ("`$PSScriptRoot\" + $file.Name)
@@ -411,13 +426,13 @@ function Export-TargetResource
                         CertificatePassword   = $CertificatePassword
                         CertificatePath       = $CertificatePath
                         CertificateThumbprint = $CertificateThumbprint
-                        Managedidentity       = $ManagedIdentity.IsPresent
+                        ManagedIdentity       = $ManagedIdentity.IsPresent
                         Credential            = $Credential
+                        AccessTokens          = $AccessTokens
                     }
 
+                    $Script:exportedInstance = $app
                     $Results = Get-TargetResource @Params
-                    $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                        -Results $Results
                     $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                         -ConnectionMode $ConnectionMode `
                         -ModulePath $PSScriptRoot `
@@ -428,12 +443,8 @@ function Export-TargetResource
                         -FileName $Global:PartialExportFileName
                 }
                 $i++
-                Write-Host $Global:M365DSCEmojiGreenCheckmark
+                Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
             }
-
-            $ConnectionMode = New-M365DSCConnection -Workload 'PnP' `
-                -InboundParameters $PSBoundParameters `
-                -Url $tenantAppCatalogUrl
 
             foreach ($file in $filesToDownload)
             {
@@ -445,15 +456,15 @@ function Export-TargetResource
         else
         {
             Write-Verbose -Message '    * App Catalog is not configured on tenant. Cannot extract information about SharePoint apps.'
-            Write-Host $Global:M365DSCEmojiGreenCheckmark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         }
         return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
-        New-M365DSCLogEntry -Message "Error during Export:" `
+        New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `
             -Source $($MyInvocation.MyCommand.Source) `
             -TenantId $TenantId `

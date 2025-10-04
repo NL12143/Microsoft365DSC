@@ -21,17 +21,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
 
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
-            }
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
@@ -39,26 +32,41 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             }
 
             Mock -CommandName New-HostedOutboundSpamFilterRule -MockWith {
-                return @{
-
-                }
             }
 
             Mock -CommandName Set-HostedOutboundSpamFilterRule -MockWith {
-                return @{
-
-                }
             }
 
             Mock -CommandName Remove-HostedOutboundSpamFilterRule -MockWith {
-                return @{
+            }
 
+            Mock -CommandName Get-HostedOutboundSpamFilterRule -MockWith {
+                return @{
+                    Ensure                         = 'Present'
+                    Identity                       = 'TestRule'
+                    HostedOutboundSpamFilterPolicy = 'TestPolicy'
+                    Priority                       = 0
+                    ExceptIfSenderDomainIs         = @('dev.contoso.com')
+                    ExceptIfFrom                   = @('test@contoso.com')
+                    ExceptIfFromMemberOf           = @('Special Group')
+                    SenderDomainIs                 = @('contoso.com')
+                    From                           = @('someone@contoso.com')
+                    FromMemberOf                   = @('Some Group', 'Some Other Group')
+                    State                          = 'Enabled'
                 }
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            Mock -CommandName Get-HostedOutboundSpamFilterPolicy -MockWith {
+                return @{
+                    Identity = 'TestPolicy'
+                }
             }
+
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -72,15 +80,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 }
 
                 Mock -CommandName Get-HostedOutboundSpamFilterRule -MockWith {
-                    return @{
-                        Identity = 'SomeOtherPolicy'
-                    }
-                }
-
-                Mock -CommandName Get-HostedOutboundSpamFilterPolicy -MockWith {
-                    return @{
-                        Identity = 'TestPolicy'
-                    }
+                    return $null
                 }
             }
 
@@ -90,6 +90,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the Set method' {
                 Set-TargetResource @testParams
+                Should -Invoke -CommandName New-HostedOutboundSpamFilterRule -Exactly 1
             }
         }
 
@@ -109,28 +110,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     From                           = @('someone@contoso.com')
                     FromMemberOf                   = @('Some Group', 'Some Other Group')
                 }
-
-                Mock -CommandName Get-HostedOutboundSpamFilterRule -MockWith {
-                    return @{
-                        Ensure                         = 'Present'
-                        Identity                       = 'TestRule'
-                        HostedOutboundSpamFilterPolicy = 'TestPolicy'
-                        Priority                       = 0
-                        ExceptIfSenderDomainIs         = @('dev.contoso.com')
-                        ExceptIfFrom                   = @('test@contoso.com')
-                        ExceptIfFromMemberOf           = @('Special Group')
-                        SenderDomainIs                 = @('contoso.com')
-                        From                           = @('someone@contoso.com')
-                        FromMemberOf                   = @('Some Group', 'Some Other Group')
-                        State                          = 'Enabled'
-                    }
-                }
-
-                Mock -CommandName Get-HostedOutboundSpamFilterPolicy -MockWith {
-                    return @{
-                        Identity = 'TestPolicy'
-                    }
-                }
             }
 
             It 'Should return true from the Test method' {
@@ -147,35 +126,12 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     HostedOutboundSpamFilterPolicy = 'TestPolicy'
                     Enabled                        = $true
                     Priority                       = 0
-                    ExceptIfSenderDomainIs         = @('dev.contoso.com')
+                    ExceptIfSenderDomainIs         = @('notdev.contoso.com') # Drift
                     ExceptIfFrom                   = @('test@contoso.com')
                     ExceptIfFromMemberOf           = @('Special Group')
                     SenderDomainIs                 = @('contoso.com')
                     From                           = @('someone@contoso.com')
                     FromMemberOf                   = @('Some Group', 'Some Other Group')
-                }
-
-                Mock -CommandName Get-HostedOutboundSpamFilterRule -MockWith {
-                    return @{
-                        Ensure                         = 'Present'
-                        Identity                       = 'TestRule'
-                        Credential                     = $Credential
-                        HostedOutboundSpamFilterPolicy = 'TestPolicy'
-                        Enabled                        = $true
-                        Priority                       = 0
-                        ExceptIfSenderDomainIs         = @('notdev.contoso.com')
-                        ExceptIfFrom                   = @('nottest@contoso.com')
-                        ExceptIfFromMemberOf           = @('UnSpecial Group')
-                        SenderDomainIs                 = @('contoso.com')
-                        From                           = @('wrongperson@contoso.com', 'someone@contoso.com')
-                        FromMemberOf                   = @('Some Group', 'Some Other Group', 'DeletedGroup')
-                    }
-                }
-
-                Mock -CommandName Get-HostedOutboundSpamFilterPolicy -MockWith {
-                    return @{
-                        Identity = 'TestPolicy'
-                    }
                 }
             }
 
@@ -185,6 +141,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the Set method' {
                 Set-TargetResource @testParams
+                Should -Invoke -CommandName Set-HostedOutboundSpamFilterRule -Exactly 1
             }
         }
 
@@ -196,18 +153,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Identity                       = 'TestRule'
                     HostedOutboundSpamFilterPolicy = 'TestPolicy'
                 }
-
-                Mock -CommandName Get-HostedOutboundSpamFilterRule -MockWith {
-                    return @{
-                        Identity = 'TestRule'
-                    }
-                }
-
-                Mock -CommandName Get-HostedOutboundSpamFilterPolicy -MockWith {
-                    return @{
-                        Identity = 'TestPolicy'
-                    }
-                }
             }
 
             It 'Should return false from the Test method' {
@@ -216,12 +161,14 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the Set method' {
                 Set-TargetResource @testParams
+                Should -Invoke -CommandName Remove-HostedOutboundSpamFilterRule -Exactly 1
             }
         }
 
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
                 }
@@ -241,7 +188,8 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

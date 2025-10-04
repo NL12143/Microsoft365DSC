@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_EXOIntraOrganizationConnector'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -55,19 +57,24 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     Write-Verbose -Message "Getting configuration of IntraOrganizationConnector for $($Identity)"
 
     if ($Global:CurrentModeIsExport)
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+        $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
             -InboundParameters $PSBoundParameters `
             -SkipModuleReload $true
     }
     else
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+        $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
             -InboundParameters $PSBoundParameters
     }
     #Ensure the proper dependencies are installed in the current environment.
@@ -96,20 +103,34 @@ function Get-TargetResource
         }
         else
         {
+            $DiscoveryEndpointValue = $IntraOrganizationConnector.DiscoveryEndpoint.ToString()
+            if (-not $DiscoveryEndpointValue.EndsWith('/'))
+            {
+                $DiscoveryEndpointValue += '/'
+            }
+            if ($IntraOrganizationConnector.TargetSharingEpr)
+            {
+                $TargetSharingEprValue = $IntraOrganizationConnector.TargetSharingEpr.AbsoluteUri.ToString()
+            }
+            else
+            {
+                $TargetSharingEprValue = ''
+            }
             $result = @{
                 Identity              = $Identity
                 DiscoveryEndpoint     = $IntraOrganizationConnector.DiscoveryEndpoint.ToString()
                 Enabled               = $IntraOrganizationConnector.Enabled
                 TargetAddressDomains  = $IntraOrganizationConnector.TargetAddressDomains
-                TargetSharingEpr      = $IntraOrganizationConnector.TargetSharingEpr
+                TargetSharingEpr      = $TargetSharingEprValue
                 Credential            = $Credential
                 Ensure                = 'Present'
                 ApplicationId         = $ApplicationId
                 CertificateThumbprint = $CertificateThumbprint
                 CertificatePath       = $CertificatePath
                 CertificatePassword   = $CertificatePassword
-                Managedidentity       = $ManagedIdentity.IsPresent
+                ManagedIdentity       = $ManagedIdentity.IsPresent
                 TenantId              = $TenantId
+                AccessTokens          = $AccessTokens
             }
 
             Write-Verbose -Message "Found IntraOrganizationConnector $($Identity)"
@@ -185,7 +206,11 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
@@ -201,24 +226,20 @@ function Set-TargetResource
 
     Write-Verbose -Message "Setting configuration of IntraOrganizationConnector for $($Identity)"
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+    $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
         -InboundParameters $PSBoundParameters
 
     $IntraOrganizationConnectors = Get-IntraOrganizationConnector
     $IntraOrganizationConnector = $IntraOrganizationConnectors | Where-Object -FilterScript { $_.Identity -eq $Identity }
-    $IntraOrganizationConnectorParams = [System.Collections.Hashtable]($PSBoundParameters)
-    $IntraOrganizationConnectorParams.Remove('Ensure') | Out-Null
-    $IntraOrganizationConnectorParams.Remove('Credential') | Out-Null
-    $IntraOrganizationConnectorParams.Remove('ApplicationId') | Out-Null
-    $IntraOrganizationConnectorParams.Remove('TenantId') | Out-Null
-    $IntraOrganizationConnectorParams.Remove('CertificateThumbprint') | Out-Null
-    $IntraOrganizationConnectorParams.Remove('CertificatePath') | Out-Null
-    $IntraOrganizationConnectorParams.Remove('CertificatePassword') | Out-Null
-    $IntraOrganizationConnectorParams.Remove('ManagedIdentity') | Out-Null
+    $IntraOrganizationConnectorParams = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
 
+    if ($IntraOrganizationConnectorParams.TargetSharingEpr -eq '')
+    {
+        $IntraOrganizationConnectorParams.TargetSharingEpr = $null
+    }
     if (('Present' -eq $Ensure ) -and ($null -eq $IntraOrganizationConnector))
     {
-        Write-Verbose -Message "Creating IntraOrganizationConnector $($Identity)."
+        Write-Verbose -Message "Creating IntraOrganizationConnector $($Identity) with:`r`n $(ConvertTo-Json $IntraOrganizationConnectorParams -Depth 10)"
         $IntraOrganizationConnectorParams.Add('Name', $Identity)
         $IntraOrganizationConnectorParams.Remove('Identity') | Out-Null
         New-IntraOrganizationConnector @IntraOrganizationConnectorParams
@@ -292,13 +313,15 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
 
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -306,30 +329,9 @@ function Test-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message "Testing configuration of IntraOrganizationConnector for $($Identity)"
-
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-
-    Write-Verbose -Message "Current Values: $(Convert-M365DscHashtableToString -Hashtable $CurrentValues)"
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('Credential') | Out-Null
-    $ValuesToCheck.Remove('ApplicationId') | Out-Null
-    $ValuesToCheck.Remove('TenantId') | Out-Null
-    $ValuesToCheck.Remove('CertificateThumbprint') | Out-Null
-    $ValuesToCheck.Remove('CertificatePath') | Out-Null
-    $ValuesToCheck.Remove('CertificatePassword') | Out-Null
-    $ValuesToCheck.Remove('ManagedIdentity') | Out-Null
-
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck $ValuesToCheck.Keys
-
-    Write-Verbose -Message "Test-TargetResource returned $($TestResult)"
-
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '')
+    return $result
 }
 
 function Export-TargetResource
@@ -364,8 +366,13 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
         -InboundParameters $PSBoundParameters `
         -SkipModuleReload $true
@@ -389,16 +396,21 @@ function Export-TargetResource
 
         if ($IntraOrganizationConnectors.Length -eq 0)
         {
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         }
         else
         {
-            Write-Host "`r`n" -NoNewline
+            Write-M365DSCHost -Message "`r`n" -DeferWrite
         }
         $i = 1
         foreach ($IntraOrganizationConnector in $IntraOrganizationConnectors)
         {
-            Write-Host "    |---[$i/$($IntraOrganizationConnectors.length)] $($IntraOrganizationConnector.Identity)" -NoNewline
+            if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+            {
+                $Global:M365DSCExportResourceInstancesCount++
+            }
+
+            Write-M365DSCHost -Message "    |---[$i/$($IntraOrganizationConnectors.length)] $($IntraOrganizationConnector.Identity)" -DeferWrite
 
             $Params = @{
                 Identity              = $IntraOrganizationConnector.Identity
@@ -407,13 +419,12 @@ function Export-TargetResource
                 TenantId              = $TenantId
                 CertificateThumbprint = $CertificateThumbprint
                 CertificatePassword   = $CertificatePassword
-                Managedidentity       = $ManagedIdentity.IsPresent
+                ManagedIdentity       = $ManagedIdentity.IsPresent
                 CertificatePath       = $CertificatePath
+                AccessTokens          = $AccessTokens
             }
 
             $Results = Get-TargetResource @Params
-            $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                -Results $Results
             $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                 -ConnectionMode $ConnectionMode `
                 -ModulePath $PSScriptRoot `
@@ -422,14 +433,14 @@ function Export-TargetResource
             $dscContent += $currentDSCBlock
             Save-M365DSCPartialExport -Content $currentDSCBlock `
                 -FileName $Global:PartialExportFileName
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
             $i++
         }
         return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `

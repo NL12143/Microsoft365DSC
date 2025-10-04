@@ -22,20 +22,74 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
 
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'Pass@word1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString ((New-Guid).ToString()) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
             Mock -CommandName Save-M365DSCPartialExport -MockWith {
+            }
+
+            Mock -CommandName Get-MSCloudLoginConnectionProfile -MockWith {
             }
 
             Mock -CommandName Connect-Graph -MockWith {
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
+                return 'Credentials'
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
+
+            Mock -CommandName Get-MgUser -MockWith {
+                return @{
+                    UserPrincipalName = 'john.smith@contoso.com'
+                    Id                = '12345-12345-12345-12345-12345'
+                }
+            }
+
+            Mock -CommandName Get-MgPlannerTask -MockWith {
+                return @{
+                    PlanId          = '1234567890'
+                    Title           = 'Contoso Task'
+                    Priority        = 5
+                    Id              = '12345'
+                    PercentComplete = 75
+                    StartDateTime   = '2020-06-09'
+                    DueDateTime     = '2020-06-10'
+                    BucketId        = 'Bucket12345'
+                    Assignments     = @{
+                        AdditionalProperties = @{
+                            'john.smith@contoso.com' = @{}
+                        }
+                    }
+                    AppliedCategories = @{
+                        AdditionalProperties = @{
+                            Category1 = $true
+                        }
+                    }
+                }
+            }
+
+            Mock -CommandName New-MgPlannerTask -MockWith {
+            }
+
+            Mock -CommandName Get-MgPlannerTaskDetail -MockWith {
+                return @{
+                    CheckList = @()
+                }
+            }
+
+            Mock -CommandName Get-MgPlannerPlanDetail -MockWith {
+                return @{
+                    Id = '1234567890'
+                    CategoryDescriptions = @{
+                        Category1 = $null
+                    }
+                }
             }
         }
 
@@ -46,8 +100,11 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     PlanId          = '1234567890'
                     Title           = 'Contoso Task'
                     Priority        = 5
+                    Bucket          = '1234'
                     PercentComplete = 75
                     StartDateTime   = '2020-06-09'
+                    DueDateTime     = '2020-06-10'
+                    AssignedUsers   = @('john.smith@contoso.com')
                     Ensure          = 'Present'
                     Credential      = $Credential
                 }
@@ -55,56 +112,9 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 Mock -CommandName Get-MgPlannerTask -MockWith {
                     return $null
                 }
-                try
-                {
-                    Add-Type -TypeDefinition @'
-                        public class PlannerTaskObject
-                        {
-                            public string Title {get;set;}
-                            public string PlanId {get;set;}
-                            public string TaskId {
-                                get{ return "12345"; }
-                                set{}
-                            }
-                            public string Notes {get;set;}
-                            public string BucketId {
-                                get{ return "Bucket12345"; }
-                                set{}
-                            }
-                            public string ETag {get;set;}
-                            public string[] Assignments {get;set;}
-                            public System.Collections.Hashtable[] Attachments {get;set;}
-                            public System.Collections.Hashtable[] Checklist {get;set;}
-                            public string StartDateTime {
-                                get{ return "2020-06-09"; }
-                                set{}
-                            }
-                            public string DueDateTime {get;set;}
-                            public string[] Categories {get;set;}
-                            public string CompletedDateTime {get;set;}
-                            public int PercentComplete {
-                                get{ return 75; }
-                                set{}
-                            }
-                            public int Priority {
-                                get { return 5; }
-                                set {}
-                            }
-                            public string ConversationThreadId {get;set;}
-                            public string OrderHint {get;set;}
-                            public void Create(System.Management.Automation.PSCredential Credential){}
-                            public void Update(System.Management.Automation.PSCredential Credential){}
-                            public string GetTaskCategoryNameByColor(string ColorName){return "";}
-                            public string GetTaskColorNameByCategory(string CategoryName){return "";}
-                            public void PopulateById(System.Management.Automation.PSCredential Credential, string TaskId){}
-                            public void UpdateDetails(System.Management.Automation.PSCredential Credential){}
-                            public void Delete(System.Management.Automation.PSCredential Credential, string TaskId){}
-                        }
-'@
-                }
-                catch
-                {
-                    throw $_
+
+                Mock -CommandName Get-MgPlannerTaskDetail -MockWith {
+                    return $null
                 }
             }
 
@@ -128,21 +138,13 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     TaskId          = '12345'
                     Title           = 'Contoso Task'
                     Priority        = 4
+                    AssignedUsers   = @('john.smith@contoso.com')
                     PercentComplete = 75
+                    Categories      = @('Pink')
                     StartDateTime   = '2020-06-09'
+                    DueDateTime     = '2020-06-10'
                     Ensure          = 'Present'
                     Credential      = $Credential
-                }
-
-                Mock -CommandName Get-MgPlannerTask -MockWith {
-                    return @{
-                        PlanId          = '1234567890'
-                        Title           = 'Contoso Task'
-                        Id              = '12345'
-                        Priority        = 5
-                        PercentComplete = 75
-                        StartDateTime   = '2020-06-09'
-                    }
                 }
             }
 
@@ -166,23 +168,14 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Title           = 'Contoso Task'
                     TaskId          = '12345'
                     Priority        = 5
+                    AssignedUsers   = @('john.smith@contoso.com')
                     PercentComplete = 75
+                    Categories      = @('Pink')
                     StartDateTime   = '2020-06-09'
+                    DueDateTime     = '2020-06-10'
                     Bucket          = 'Bucket12345'
                     Ensure          = 'Present'
                     Credential      = $Credential
-                }
-
-                Mock -CommandName Get-MgPlannerTask -MockWith {
-                    return @{
-                        PlanId          = '1234567890'
-                        Title           = 'Contoso Task'
-                        Priority        = 5
-                        Id              = '12345'
-                        PercentComplete = 75
-                        StartDateTime   = '2020-06-09'
-                        BucketId        = 'Bucket12345'
-                    }
                 }
             }
 
@@ -202,21 +195,13 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Title           = 'Contoso Task'
                     TaskId          = '12345'
                     Priority        = 5
+                    AssignedUsers   = @('john.smith@contoso.com')
                     PercentComplete = 75
+                    Categories      = @('Pink')
                     StartDateTime   = '2020-06-09'
+                    DueDateTime     = '2020-06-10'
                     Ensure          = 'Absent'
                     Credential      = $Credential
-                }
-
-                Mock -CommandName Get-MgPlannerTask -MockWith {
-                    return @{
-                        PlanId          = '1234567890'
-                        Title           = 'Contoso Task'
-                        Id              = '12345'
-                        Priority        = 5
-                        PercentComplete = 75
-                        StartDateTime   = '2020-06-09'
-                    }
                 }
             }
 
@@ -237,22 +222,13 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Title           = 'Contoso Task'
                     Bucket          = 'Bucket12345'
                     Priority        = 5
+                    AssignedUsers   = @('john.smith@contoso.com')
                     PercentComplete = 75
+                    Categories      = @('Pink')
                     StartDateTime   = '2020-06-09'
+                    DueDateTime     = '2020-06-10'
                     Ensure          = 'Present'
                     Credential      = $Credential
-                }
-
-                Mock -CommandName Get-MgPlannerTask -MockWith {
-                    return @{
-                        PlanId          = '1234567890'
-                        Title           = 'Contoso Task'
-                        BucketId        = 'Bucket12345'
-                        Id              = '12345'
-                        Priority        = 5
-                        PercentComplete = 75
-                        StartDateTime   = '2020-06-09'
-                    }
                 }
 
                 Mock -CommandName Get-MgPlannerPlanBucket -MockWith {
@@ -281,21 +257,13 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Title           = 'Contoso Task'
                     Bucket          = 'TestBucket'
                     Priority        = 5
+                    AssignedUsers   = @('john.smith@contoso.com')
                     PercentComplete = 75
+                    Categories      = @('Pink')
                     StartDateTime   = '2020-06-09'
+                    DueDateTime     = '2020-06-10'
                     Ensure          = 'Present'
                     Credential      = $Credential
-                }
-
-                Mock -CommandName Get-MgPlannerTask -MockWith {
-                    return @{
-                        PlanId          = '1234567890'
-                        Title           = 'Contoso Task'
-                        Id              = '12345'
-                        Priority        = 5
-                        PercentComplete = 75
-                        StartDateTime   = '2020-06-09'
-                    }
                 }
 
                 Mock -CommandName Get-MgPlannerPlanBucket -MockWith {
@@ -315,23 +283,15 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     TaskId          = '12345'
                     Title           = 'Contoso Task'
                     Priority        = 5
+                    AssignedUsers   = @('john.smith@contoso.com')
                     PercentComplete = 75
+                    Categories      = @('Pink')
                     StartDateTime   = '2020-06-09'
+                    DueDateTime     = '2020-06-10'
                     Ensure          = 'Present'
                     Credential      = $Credential
                 }
 
-                Mock -CommandName Get-MgPlannerTask -MockWith {
-                    return @{
-                        PlanId          = '1234567890'
-                        Title           = 'Contoso Task'
-                        BucketId        = 'Bucket12345'
-                        Id              = '12345'
-                        Priority        = 5
-                        PercentComplete = 75
-                        StartDateTime   = '2020-06-09'
-                    }
-                }
 
                 Mock -CommandName Get-MgPlannerPlanBucket -MockWith {
                     return @{
@@ -353,24 +313,44 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
                 }
 
-                $Global:PartialExportFileName = 'PlannerTask.ps1'
-                Mock -CommandName Get-MgPlannerTask -MockWith {
+                Mock -CommandName Get-MgGroup -MockWith {
+                    return @(
+                        @{
+                            DisplayName = 'Contoso Group'
+                            Id          = '12345-12345-12345-12345-12345'
+                        }
+                    )
+                }
+
+                Mock -CommandName Get-MgGroupPlannerPlan -MockWith {
                     return @{
-                        PlanId          = '1234567890'
-                        Title           = 'Contoso Task'
-                        Priority        = 5
-                        PercentComplete = 75
-                        StartDateTime   = '2020-06-09'
+                        Title = 'Contoso Plan'
+                        Id    = '1234567890'
+                        Owner = '12345-12345-12345-12345-12345'
                     }
+                }
+
+                Mock -CommandName Get-MgGroupPlannerPlanTask -MockWith {
+                    return @(
+                        @{
+                            PlanId          = '1234567890'
+                            Title           = 'Contoso Task'
+                            Priority        = 5
+                            PercentComplete = 75
+                            StartDateTime   = '2020-06-09'
+                        }
+                    )
                 }
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

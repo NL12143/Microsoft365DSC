@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_SCComplianceSearchAction'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -48,103 +50,157 @@ function Get-TargetResource
         [System.String]
         $Ensure = 'Present',
 
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [System.Management.Automation.PSCredential]
-        $Credential
+        $Credential,
+
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [System.String]
+        $CertificatePath,
+
+        [Parameter()]
+        [System.Management.Automation.PSCredential]
+        $CertificatePassword,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     Write-Verbose -Message "Getting configuration of SCComplianceSearchAction for $SearchName - $Action"
-    if ($Global:CurrentModeIsExport)
-    {
-        $ConnectionMode = New-M365DSCConnection -Workload 'SecurityComplianceCenter' `
-            -InboundParameters $PSBoundParameters `
-            -SkipModuleReload $true
-    }
-    else
-    {
-        $ConnectionMode = New-M365DSCConnection -Workload 'SecurityComplianceCenter' `
-            -InboundParameters $PSBoundParameters
-    }
-
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
-
-    #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
-    $CommandName = $MyInvocation.MyCommand
-    $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
-        -CommandName $CommandName `
-        -Parameters $PSBoundParameters
-    Add-M365DSCTelemetryEvent -Data $data
-    #endregion
-
-    $nullReturn = $PSBoundParameters
-    $nullReturn.Ensure = 'Absent'
 
     try
     {
-        $currentAction = Get-CurrentAction -SearchName $SearchName -Action $Action `
-            -ErrorAction Stop
+         if (-not $Script:exportedInstance -or $Script:exportedInstance.Action -ne $Action)
+         {
+            $null = New-M365DSCConnection -Workload 'SecurityComplianceCenter' `
+                -InboundParameters $PSBoundParameters
 
-        if ($null -eq $currentAction)
-        {
-            Write-Verbose -Message "SCComplianceSearchAction $ActionName does not exist."
-            return $nullReturn
+            #Ensure the proper dependencies are installed in the current environment.
+            Confirm-M365DSCDependencies
+
+            #region Telemetry
+            $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+            $CommandName = $MyInvocation.MyCommand
+            $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
+                -CommandName $CommandName `
+                -Parameters $PSBoundParameters
+            Add-M365DSCTelemetryEvent -Data $data
+            #endregion
+
+            $nullReturn = $PSBoundParameters
+            $nullReturn.Ensure = 'Absent'
+
+            $currentAction = Get-CurrentAction -SearchName $SearchName -Action $Action `
+                -ErrorAction Stop
+
+            if ($null -eq $currentAction)
+            {
+                Write-Verbose -Message "SCComplianceSearchAction $ActionName does not exist."
+                return $nullReturn
+            }
         }
         else
         {
-            if ('Purge' -ne $Action)
-            {
-                $Scenario = Get-ResultProperty -ResultString $currentAction.Results -PropertyName 'Scenario'
-                $FileTypeExclusion = Get-ResultProperty -ResultString $currentAction.Results -PropertyName 'File type exclusions for unindexed'
-                $EnableDedupe = Get-ResultProperty -ResultString $currentAction.Results -PropertyName 'Enable dedupe'
-                $IncludeCreds = Get-ResultProperty -ResultString $currentAction.Results -PropertyName 'SAS token'
-                $IncludeSP = Get-ResultProperty -ResultString $currentAction.Results -PropertyName 'Include SharePoint versions'
-                $ScopeValue = Get-ResultProperty -ResultString $currentAction.Results -PropertyName 'Scope'
-
-                $ActionName = 'Export'
-                if ('RetentionReports' -eq $Scenario)
-                {
-                    $ActionName = 'Retention'
-                }
-
-                $result = @{
-                    Action                              = $ActionName
-                    SearchName                          = $currentAction.SearchName
-                    FileTypeExclusionsForUnindexedItems = $FileTypeExclusion
-                    EnableDedupe                        = $EnableDedupe
-                    IncludeSharePointDocumentVersions   = $IncludeSP
-                    RetryOnError                        = $currentAction.Retry
-                    ActionScope                         = $ScopeValue
-                    Credential                          = $Credential
-                    Ensure                              = 'Present'
-                }
-            }
-            else
-            {
-                $PurgeTP = Get-ResultProperty -ResultString $currentAction.Results -PropertyName 'Purge Type'
-                $result = @{
-                    Action       = $currentAction.Action
-                    SearchName   = $currentAction.SearchName
-                    PurgeType    = $PurgeTP
-                    RetryOnError = $currentAction.Retry
-                    Credential   = $Credential
-                    Ensure       = 'Present'
-                }
-            }
-
-            if ('<Specify -IncludeCredential parameter to show the SAS token>' -eq $IncludeCreds -or 'Purge' -eq $Action)
-            {
-                $result.Add('IncludeCredential', $false)
-            }
-            elseif ('Purge' -ne $Action)
-            {
-                $result.Add('IncludeCredential', $true)
-            }
-
-            Write-Verbose "Found existing $Action SCComplianceSearchAction for Search $SearchName"
-
-            Write-Verbose -Message "Get-TargetResource Result: `n $(Convert-M365DscHashtableToString -Hashtable $result)"
+            $currentAction = $Script:exportedInstance
         }
+
+        if ($Action -eq 'Export' -or $Action -eq 'Retention')
+        {
+            $Scenario = Get-ResultProperty -ResultString $currentAction.Results -PropertyName 'Scenario'
+            $FileTypeExclusion = Get-ResultProperty -ResultString $currentAction.Results -PropertyName 'File type exclusions for unindexed'
+            $EnableDedupe = Get-ResultProperty -ResultString $currentAction.Results -PropertyName 'Enable dedupe'
+            $IncludeCreds = Get-ResultProperty -ResultString $currentAction.Results -PropertyName 'SAS token'
+            $IncludeSP = Get-ResultProperty -ResultString $currentAction.Results -PropertyName 'Include SharePoint versions'
+            $ScopeValue = Get-ResultProperty -ResultString $currentAction.Results -PropertyName 'Scope'
+
+            $ActionName = $Action
+            if ('RetentionReports' -eq $Scenario)
+            {
+                $ActionName = 'Retention'
+            }
+
+            $result = @{
+                Action                              = $ActionName
+                SearchName                          = $currentAction.SearchName
+                FileTypeExclusionsForUnindexedItems = $FileTypeExclusion
+                EnableDedupe                        = $EnableDedupe
+                IncludeSharePointDocumentVersions   = $IncludeSP
+                RetryOnError                        = $currentAction.Retry
+                ActionScope                         = $ScopeValue
+                Credential                          = $Credential
+                ApplicationId                       = $ApplicationId
+                TenantId                            = $TenantId
+                CertificateThumbprint               = $CertificateThumbprint
+                CertificatePath                     = $CertificatePath
+                CertificatePassword                 = $CertificatePassword
+                Ensure                              = 'Present'
+                AccessTokens                        = $AccessTokens
+            }
+            if ($ActionName -eq 'Preview')
+            {
+                $result.Remove('EnableDedupe') | Out-Null
+            }
+        }
+        elseif ($Action -eq 'Purge')
+        {
+            $PurgeTP = Get-ResultProperty -ResultString $currentAction.Results -PropertyName 'Purge Type'
+            $result = @{
+                Action                = $currentAction.Action
+                SearchName            = $currentAction.SearchName
+                PurgeType             = $PurgeTP
+                RetryOnError          = $currentAction.Retry
+                Credential            = $Credential
+                ApplicationId         = $ApplicationId
+                TenantId              = $TenantId
+                CertificateThumbprint = $CertificateThumbprint
+                CertificatePath       = $CertificatePath
+                CertificatePassword   = $CertificatePassword
+                Ensure                = 'Present'
+                AccessTokens          = $AccessTokens
+            }
+        }
+        else
+        {
+            $result = @{
+                Action                = $currentAction.Action
+                SearchName            = $currentAction.SearchName
+                RetryOnError          = $currentAction.Retry
+                Credential            = $Credential
+                ApplicationId         = $ApplicationId
+                TenantId              = $TenantId
+                CertificateThumbprint = $CertificateThumbprint
+                CertificatePath       = $CertificatePath
+                CertificatePassword   = $CertificatePassword
+                Ensure                = 'Present'
+                AccessTokens          = $AccessTokens
+            }
+        }
+
+        if ('<Specify -IncludeCredential parameter to show the SAS token>' -eq $IncludeCreds -or 'Purge' -eq $Action)
+        {
+            $result.Add('IncludeCredential', $false)
+        }
+        elseif ('Purge' -ne $Action)
+        {
+            $result.Add('IncludeCredential', $true)
+        }
+
+        Write-Verbose "Found existing $Action SCComplianceSearchAction for Search $SearchName"
+        Write-Verbose -Message "Get-TargetResource Result: `n $(Convert-M365DscHashtableToString -Hashtable $result)"
+
         return $result
     }
     catch
@@ -208,9 +264,33 @@ function Set-TargetResource
         [System.String]
         $Ensure = 'Present',
 
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [System.Management.Automation.PSCredential]
-        $Credential
+        $Credential,
+
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [System.String]
+        $CertificatePath,
+
+        [Parameter()]
+        [System.Management.Automation.PSCredential]
+        $CertificatePassword,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Setting configuration of SCComplianceSearchAction for $SearchName - $Action"
@@ -227,17 +307,12 @@ function Set-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'SecurityComplianceCenter' `
-        -InboundParameters $PSBoundParameters
-
     $CurrentAction = Get-TargetResource @PSBoundParameters
 
     # Calling the New-ComplianceSearchAction if the action already exists, updates it.
     if ('Present' -eq $Ensure)
     {
-        $CreationParams = $PSBoundParameters
-        $CreationParams.Remove('Credential')
-        $CreationParams.Remove('Ensure')
+        $CreationParams = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
 
         if ($null -ne $ActionScope)
         {
@@ -258,9 +333,16 @@ function Set-TargetResource
             'Purge'
             {
                 $CreationParams.Add('Purge', $true)
-                $CreationParams.Remove('ActionScope')
-                $CreationParams.Remove('Scope')
+                $CreationParams.Remove('ActionScope') | Out-Null
+                $CreationParams.Remove('Scope') | Out-Null
                 $CreationParams.Add('Confirm', $false)
+            }
+            'Preview'
+            {
+                $CreationParams.Add('Preview', $true)
+                $CreationParams.Remove('Scope') | Out-Null
+                $CreationParams.Add('Confirm', $false)
+                $CreationParams.Remove('EnableDedupe') | Out-Null
             }
         }
 
@@ -367,37 +449,47 @@ function Test-TargetResource
         [System.String]
         $Ensure = 'Present',
 
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [System.Management.Automation.PSCredential]
-        $Credential
+        $Credential,
+
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [System.String]
+        $CertificatePath,
+
+        [Parameter()]
+        [System.Management.Automation.PSCredential]
+        $CertificatePassword,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
 
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
         -Parameters $PSBoundParameters
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
-    Write-Verbose -Message 'Testing configuration of SCComplianceSearchAction'
 
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('Credential') | Out-Null
-
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck $ValuesToCheck.Keys
-
-    Write-Verbose -Message "Test-TargetResource returned $TestResult"
-
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '')
+    return $result
 }
 
 function Export-TargetResource
@@ -406,13 +498,37 @@ function Export-TargetResource
     [OutputType([System.String])]
     param
     (
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [System.Management.Automation.PSCredential]
-        $Credential
+        $Credential,
+
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [System.String]
+        $CertificatePath,
+
+        [Parameter()]
+        [System.Management.Automation.PSCredential]
+        $CertificatePassword,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     $ConnectionMode = New-M365DSCConnection -Workload 'SecurityComplianceCenter' `
-        -InboundParameters $PSBoundParameters `
-        -SkipModuleReload $true
+        -InboundParameters $PSBoundParameters
 
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
@@ -432,21 +548,20 @@ function Export-TargetResource
 
         if ($actions.Count -gt 0)
         {
-            Write-Host "`r`n    Tenant Wide Actions:"
+            Write-M365DSCHost -Message "`r`n    Tenant Wide Actions:"
         }
         else
         {
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         }
         $i = 1
         $dscContent = ''
         foreach ($action in $actions)
         {
-            Write-Host "        |---[$i/$($actions.Length)] $($action.Name)" -NoNewline
+            Write-M365DSCHost -Message "        |---[$i/$($actions.Length)] $($action.Name)" -DeferWrite
             $Params = @{
                 Action     = $action.Action
                 SearchName = $action.SearchName
-                Credential = $Credential
             }
 
             $Scenario = Get-ResultProperty -ResultString $action.Results -PropertyName 'Scenario'
@@ -455,9 +570,8 @@ function Export-TargetResource
             {
                 $Params.Action = 'Retention'
             }
-            $Results = Get-TargetResource @Params
-            $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                -Results $Results
+            $Script:exportedInstance = $action
+            $Results = Get-TargetResource @PSBoundParameters @Params
             $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                 -ConnectionMode $ConnectionMode `
                 -ModulePath $PSScriptRoot `
@@ -466,7 +580,7 @@ function Export-TargetResource
             $dscContent += $currentDSCBlock
             Save-M365DSCPartialExport -Content $currentDSCBlock `
                 -FileName $Global:PartialExportFileName
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
             $i++
         }
 
@@ -475,19 +589,23 @@ function Export-TargetResource
         $j = 1
         foreach ($case in $cases)
         {
-            Write-Host "    Case [$j/$($cases.Count)] $($Case.Name)"
+            Write-M365DSCHost -Message "    Case [$j/$($cases.Count)] $($Case.Name)"
 
             $actions = Get-ComplianceSearchAction -Case $Case.Name
 
             $i = 1
             foreach ($action in $actions)
             {
-                Write-Host "        |---[$i/$($actions.Length)] $($action.Name)" -NoNewline
+                if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+                {
+                    $Global:M365DSCExportResourceInstancesCount++
+                }
+
+                Write-M365DSCHost -Message "        |---[$i/$($actions.Length)] $($action.Name)" -DeferWrite
 
                 $Params = @{
                     Action     = $action.Action
                     SearchName = $action.SearchName
-                    Credential = $Credential
                 }
 
                 $Scenario = Get-ResultProperty -ResultString $action.Results -PropertyName 'Scenario'
@@ -496,15 +614,14 @@ function Export-TargetResource
                 {
                     $Params.Action = 'Retention'
                 }
-                $Results = Get-TargetResource @Params
-                $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                    -Results $Results
+                $Results = Get-TargetResource @PSBoundParameters @Params
+
                 $dscContent += Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                     -ConnectionMode $ConnectionMode `
                     -ModulePath $PSScriptRoot `
                     -Results $Results `
                     -Credential $Credential
-                Write-Host $Global:M365DSCEmojiGreenCheckMark
+                Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
                 $i++
             }
             $j++
@@ -513,7 +630,7 @@ function Export-TargetResource
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `
@@ -581,7 +698,6 @@ function Get-CurrentAction
 
         [Parameter(Mandatory = $true)]
         [System.String]
-        [ValidateSet('Export', 'Purge', 'Retention')]
         $Action
     )
     # For the sake of retrieving the current action, search by Action = Export;
@@ -604,22 +720,26 @@ function Get-CurrentAction
         if ($null -ne $searches)
         {
             $currentAction = Get-ComplianceSearchAction -Case $Case.Name
-            break;
+            break
         }
     }
 
     if ($null -eq $currentAction)
     {
-        $currentAction = Get-ComplianceSearchAction -Details | Where-Object { $_.SearchName -eq $SearchName -and $_.Action -eq $Action }
+        $currentAction = Get-ComplianceSearchAction | Where-Object { $_.SearchName -eq $SearchName -and $_.Action -eq $Action }
     }
 
-    if ('Purge' -ne $Action -and $null -ne $currentAction)
+    if ('Purge' -ne $Action -and $null -ne $currentAction -and -not [System.String]::IsNullOrEmpty($Scenario))
     {
         $currentAction = $currentAction | Where-Object { $_.Results -like "*Scenario: $($Scenario)*" }
     }
     elseif ('Purge' -eq $Action)
     {
         $currentAction = $currentAction | Where-Object { $_.Action -eq 'Purge' }
+    }
+    elseif ('Preview' -eq $Action)
+    {
+        $currentAction = $currentAction | Where-Object { $_.Action -eq 'Preview' }
     }
 
     return $currentAction

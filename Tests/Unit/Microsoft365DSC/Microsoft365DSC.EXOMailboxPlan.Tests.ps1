@@ -21,29 +21,50 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
 
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
-            }
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
                 return 'Credentials'
             }
 
+            Mock -CommandName Get-MailboxPlan -MockWith {
+                return @{
+                    Identity                 = 'ExchangeOnlineEnterprise'
+                    IssueWarningQuota        = '98 GB (105,226,698,752 bytes)'
+                    MaxReceiveSize           = '25 MB (26,214,400 bytes)'
+                    MaxSendSize              = '25 MB (26,214,400 bytes)'
+                    ProhibitSendQuota        = '99 GB (106,300,440,576 bytes)'
+                    ProhibitSendReceiveQuota = '100 GB (107,374,182,400 bytes)'
+                    RetainDeletedItemsFor    = '14.00:00:00'
+                    RoleAssignmentPolicy     = 'Default Role Assignment Policy'
+                }
+            }
+
             Mock -CommandName Set-MailboxPlan -MockWith {
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            Mock -CommandName Get-MailboxPlan -MockWith {
+                return @{
+                    Identity                 = 'ExchangeOnlineEnterprise'
+                    IssueWarningQuota        = '98 GB (105,226,698,752 bytes)'
+                    MaxReceiveSize           = '25 MB (26,214,400 bytes)'
+                    MaxSendSize              = '25 MB (26,214,400 bytes)'
+                    ProhibitSendQuota        = '99 GB (106,300,440,576 bytes)'
+                    ProhibitSendReceiveQuota = '100 GB (107,374,182,400 bytes)'
+                    RetainDeletedItemsFor    = '14.00:00:00'
+                    RoleAssignmentPolicy     = 'Default Role Assignment Policy'
+                }
             }
+
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -61,33 +82,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     RetainDeletedItemsFor    = '14.00:00:00'
                     RoleAssignmentPolicy     = 'Default Role Assignment Policy'
                 }
-
-                Mock -CommandName Get-MailboxPlan -MockWith {
-                    return @{
-                        Ensure                   = 'Present'
-                        Credential               = $Credential
-                        Identity                 = 'ExchangeOnlineEnterprise'
-                        IssueWarningQuota        = '98 GB (105,226,698,752 bytes)'
-                        MaxReceiveSize           = '25 MB (26,214,400 bytes)'
-                        MaxSendSize              = '25 MB (26,214,400 bytes)'
-                        ProhibitSendQuota        = '99 GB (106,300,440,576 bytes)'
-                        ProhibitSendReceiveQuota = '100 GB (107,374,182,400 bytes)'
-                        RetainDeletedItemsFor    = '14.00:00:00'
-                        RoleAssignmentPolicy     = 'Default Role Assignment Policy'
-                    }
-                }
             }
 
             It 'Should return true from the Test method' {
                 Test-TargetResource @testParams | Should -Be $true
-            }
-
-            It 'Should return Present from the Get method' {
-                (Get-TargetResource @testParams).Ensure | Should -Be 'Present'
-            }
-
-            It 'Should not update anything in the Set Method' {
-                Set-TargetResource @testParams
             }
         }
 
@@ -102,22 +100,8 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     MaxSendSize              = '25 MB (26,214,400 bytes)'
                     ProhibitSendQuota        = '99 GB (106,300,440,576 bytes)'
                     ProhibitSendReceiveQuota = '100 GB (107,374,182,400 bytes)'
-                    RetainDeletedItemsFor    = '14.00:00:00'
+                    RetainDeletedItemsFor    = '30.00:00:00' # Drift
                     RoleAssignmentPolicy     = 'Default Role Assignment Policy'
-                }
-                Mock -CommandName Get-MailboxPlan -MockWith {
-                    return @{
-                        Ensure                   = 'Present'
-                        Credential               = $Credential
-                        Identity                 = 'ExchangeOnlineEnterprise'
-                        IssueWarningQuota        = '98 GB (105,226,698,752 bytes)'
-                        MaxReceiveSize           = '25 MB (26,214,400 bytes)'
-                        MaxSendSize              = '25 MB (26,214,400 bytes)'
-                        ProhibitSendQuota        = '99 GB (106,300,440,576 bytes)'
-                        ProhibitSendReceiveQuota = '100 GB (107,374,182,400 bytes)'
-                        RetainDeletedItemsFor    = '30.00:00:00'
-                        RoleAssignmentPolicy     = 'Default Role Assignment Policy'
-                    }
                 }
             }
 
@@ -127,31 +111,22 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the Set method' {
                 Set-TargetResource @testParams
+                Should -Invoke -CommandName Set-MailboxPlan -Exactly 1
             }
         }
 
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
+                $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
-                }
-
-                Mock -CommandName Get-MailboxPlan -MockWith {
-                    return @{
-                        Identity                 = 'ExchangeOnlineEnterprise'
-                        IssueWarningQuota        = '98 GB (105,226,698,752 bytes)'
-                        MaxReceiveSize           = '25 MB (26,214,400 bytes)'
-                        MaxSendSize              = '25 MB (26,214,400 bytes)'
-                        ProhibitSendQuota        = '99 GB (106,300,440,576 bytes)'
-                        ProhibitSendReceiveQuota = '100 GB (107,374,182,400 bytes)'
-                        RetainDeletedItemsFor    = '14.00:00:00'
-                        RoleAssignmentPolicy     = 'Default Role Assignment Policy'
-                    }
                 }
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

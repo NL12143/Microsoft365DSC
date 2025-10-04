@@ -15,20 +15,16 @@ Import-Module -Name (Join-Path -Path $M365DSCTestFolder `
         -Resolve)
 
 $Global:DscHelper = New-M365DscUnitTestHelper -StubModule $CmdletModule `
-    -DscResource 'IntuneDeviceConfigurationPolicyIOS' -GenericStubModule $GenericStubPath
+    -DscResource 'IntuneDeviceConfigurationPolicyiOS' -GenericStubModule $GenericStubPath
 Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
     InModuleScope -ModuleName $Global:DscHelper.ModuleName -ScriptBlock {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
         BeforeAll {
 
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName Get-PSSession -MockWith {
@@ -37,22 +33,280 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             Mock -CommandName Remove-PSSession -MockWith {
             }
 
-            Mock -CommandName Update-MgDeviceManagementDeviceConfiguration -MockWith {
+            Mock -CommandName Update-MgBetaDeviceManagementDeviceConfiguration -MockWith {
             }
 
-            Mock -CommandName New-MgDeviceManagementDeviceConfiguration -MockWith {
+            Mock -CommandName New-MgBetaDeviceManagementDeviceConfiguration -MockWith {
             }
 
-            Mock -CommandName Remove-MgDeviceManagementDeviceConfiguration -MockWith {
+            Mock -CommandName Remove-MgBetaDeviceManagementDeviceConfiguration -MockWith {
             }
-
+            Mock -CommandName Update-DeviceConfigurationPolicyAssignment -MockWith {
+            }
             Mock -CommandName New-M365DSCConnection -MockWith {
-                return 'Credential'
+                return 'Credentials'
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            Mock -CommandName Get-MgBetaDeviceManagementDeviceConfiguration -MockWith {
+                return @{
+                    AdditionalProperties = @{
+                        FaceTimeBlocked                                = $True
+                        KioskModeAllowSleepButton                      = $True
+                        MediaContentRatingCanada                       = @{
+                            movieRating = 'allAllowed'
+                            tvRating    = 'allAllowed'
+                        }
+                        UnpairedExternalBootToRecoveryAllowed          = $True
+                        ICloudBlockPhotoStreamSync                     = $True
+                        KeyboardBlockPredictive                        = $True
+                        SafariBlockPopups                              = $True
+                        GameCenterBlocked                              = $True
+                        PasscodeBlockSimple                            = $True
+                        ITunesBlocked                                  = $True
+                        PasscodeMinimumCharacterSetCount               = 25
+                        AppleWatchForceWristDetection                  = $True
+                        PasscodeExpirationDays                         = 25
+                        EnterpriseAppBlockTrustModification            = $True
+                        AirPlayForcePairingPasswordForOutgoingRequests = $True
+                        KeyboardBlockAutoCorrect                       = $True
+                        ITunesBlockExplicitContent                     = $True
+                        IBooksStoreBlockErotica                        = $True
+                        KioskModeAllowRingerSwitch                     = $True
+                        DocumentsBlockUnmanagedDocumentsInManagedApps  = $True
+                        MessagesBlocked                                = $True
+                        DeviceBlockEnableRestrictions                  = $True
+                        AppStoreBlocked                                = $True
+                        SpotlightBlockInternetResults                  = $True
+                        KioskModeAppType                               = 'notConfigured'
+                        KioskModeAllowVolumeButtons                    = $True
+                        VoiceDialingBlocked                            = $True
+                        PasscodeMinimumLength                          = 25
+                        ICloudBlockSharedPhotoStream                   = $True
+                        ActivationLockAllowWhenSupervised              = $True
+                        CellularBlockVoiceRoaming                      = $True
+                        MediaContentRatingIreland                      = @{
+                            movieRating = 'allAllowed'
+                            tvRating    = 'allAllowed'
+                        }
+                        PkiBlockOTAUpdates                             = $True
+                        KeyboardBlockDictation                         = $True
+                        PasscodeBlockModification                      = $True
+                        AutoUnlockBlocked                              = $True
+                        PasswordBlockProximityRequests                 = $True
+                        MediaContentRatingAustralia                    = @{
+                            movieRating = 'allAllowed'
+                            tvRating    = 'allAllowed'
+                        }
+                        ITunesBlockMusicService                        = $True
+                        DiagnosticDataBlockSubmissionModification      = $True
+                        EnterpriseAppBlockTrust                        = $True
+                        ManagedPasteboardRequired                      = $True
+                        ProximityBlockSetupToNewDevice                 = $True
+                        PasscodeMinutesOfInactivityBeforeScreenTimeout = 25
+                        ITunesBlockRadio                               = $True
+                        CellularBlockGlobalBackgroundFetchWhileRoaming = $True
+                        SiriBlocked                                    = $True
+                        MediaContentRatingJapan                        = @{
+                            movieRating = 'allAllowed'
+                            tvRating    = 'allAllowed'
+                        }
+                        FindMyFriendsInFindMyAppBlocked                = $True
+                        CellularBlockPerAppDataModification            = $True
+                        ClassroomForceAutomaticallyJoinClasses         = $True
+                        SiriBlockUserGeneratedContent                  = $True
+                        MediaContentRatingApps                         = 'allAllowed'
+                        SafariCookieSettings                           = 'browserDefault'
+                        DeviceBlockNameModification                    = $True
+                        WifiPowerOnForced                              = $True
+                        ContactsAllowManagedToUnmanagedWrite           = $True
+                        AirPrintBlockCredentialsStorage                = $True
+                        '@odata.type'                                  = '#microsoft.graph.iosGeneralDeviceConfiguration'
+                        KioskModeAllowAssistiveTouchSettings           = $True
+                        PasscodeRequiredType                           = 'deviceDefault'
+                        PasscodePreviousPasscodeBlockCount             = 25
+                        AutoFillForceAuthentication                    = $True
+                        CompliantAppListType                           = 'none'
+                        ICloudBlockBackup                              = $True
+                        KioskModeAllowAutoLock                         = $True
+                        LockScreenBlockControlCenter                   = $True
+                        EsimBlockModification                          = $True
+                        AppleNewsBlocked                               = $True
+                        CellularBlockPersonalHotspot                   = $True
+                        KioskModeBuiltInAppId                          = 'FakeStringValue'
+                        AirPrintForceTrustedTLS                        = $True
+                        CameraBlocked                                  = $True
+                        SiriRequireProfanityFilter                     = $True
+                        PasscodeBlockFingerprintUnlock                 = $True
+                        DateAndTimeForceSetAutomatically               = $True
+                        KioskModeAllowAssistiveSpeak                   = $True
+                        AccountBlockModification                       = $True
+                        BlockSystemAppRemoval                          = $True
+                        DocumentsBlockManagedDocumentsInUnmanagedApps  = $True
+                        FindMyFriendsBlocked                           = $True
+                        ICloudBlockManagedAppsSync                     = $True
+                        LockScreenBlockTodayView                       = $True
+                        BluetoothBlockModification                     = $True
+                        KioskModeManagedAppId                          = 'FakeStringValue'
+                        SoftwareUpdatesForceDelayed                    = $True
+                        ConfigurationProfileBlockChanges               = $True
+                        WiFiConnectOnlyToConfiguredNetworks            = $True
+                        MediaContentRatingNewZealand                   = @{
+                            movieRating = 'allAllowed'
+                            tvRating    = 'allAllowed'
+                        }
+                        KioskModeRequireMonoAudio                      = $True
+                        AppStoreRequirePassword                        = $True
+                        ICloudBlockDocumentSync                        = $True
+                        CellularBlockDataRoaming                       = $True
+                        ICloudRequireEncryptedBackup                   = $True
+                        ApplePersonalizedAdsBlocked                    = $True
+                        KioskModeBlockAutoLock                         = $True
+                        ClassroomAppBlockRemoteScreenObservation       = $True
+                        PasscodeBlockFingerprintModification           = $True
+                        FindMyDeviceInFindMyAppBlocked                 = $True
+                        IBooksStoreBlocked                             = $True
+                        KioskModeRequireVoiceOver                      = $True
+                        KioskModeAllowVoiceOverSettings                = $True
+                        AirDropForceUnmanagedDropTarget                = $True
+                        SafariBlockAutofill                            = $True
+                        PasscodeSignInFailureCountBeforeWipe           = 25
+                        ContinuousPathKeyboardBlocked                  = $True
+                        KeychainBlockCloudSync                         = $True
+                        VpnBlockCreation                               = $True
+                        KioskModeAllowVoiceControlModification         = $True
+                        MediaContentRatingUnitedStates                 = @{
+                            movieRating = 'allAllowed'
+                            tvRating    = 'allAllowed'
+                        }
+                        KioskModeBlockVolumeButtons                    = $True
+                        HostPairingBlocked                             = $True
+                        AppClipsBlocked                                = $True
+                        PasscodeRequired                               = $True
+                        AppStoreBlockInAppPurchases                    = $True
+                        LockScreenBlockNotificationView                = $True
+                        KioskModeBlockSleepButton                      = $True
+                        OnDeviceOnlyDictationForced                    = $True
+                        NetworkUsageRules                              = @(
+                            @{
+                                cellularDataBlocked          = $True
+                                cellularDataBlockWhenRoaming = $True
+                            }
+                        )
+                        ICloudBlockActivityContinuation                = $True
+                        SoftwareUpdatesEnforcedDelayInDays             = 25
+                        AppsSingleAppModeList                          = @(
+                            @{
+                                name          = 'FakeStringValue'
+                                appId         = 'FakeStringValue'
+                                appStoreUrl   = 'FakeStringValue'
+                                '@odata.type' = '#microsoft.graph.appleAppListItem'
+                                publisher     = 'FakeStringValue'
+                            }
+                        )
+                        ICloudBlockPhotoLibrary                        = $True
+                        PrivacyForceLimitAdTracking                    = $True
+                        MediaContentRatingGermany                      = @{
+                            movieRating = 'allAllowed'
+                            tvRating    = 'allAllowed'
+                        }
+                        KeyboardBlockShortcuts                         = $True
+                        OnDeviceOnlyTranslationForced                  = $True
+                        FilesUsbDriveAccessBlocked                     = $True
+                        AppStoreBlockAutomaticDownloads                = $True
+                        KioskModeRequireColorInversion                 = $True
+                        SharedDeviceBlockTemporarySessions             = $True
+                        GamingBlockGameCenterFriends                   = $True
+                        EnterpriseBookBlockBackup                      = $True
+                        EnterpriseBookBlockMetadataSync                = $True
+                        AirDropBlocked                                 = $True
+                        KioskModeBlockRingerSwitch                     = $True
+                        KioskModeEnableVoiceControl                    = $True
+                        MediaContentRatingUnitedKingdom                = @{
+                            movieRating = 'allAllowed'
+                            tvRating    = 'allAllowed'
+                        }
+                        CellularBlockPlanModification                  = $True
+                        AirPrintBlocked                                = $True
+                        KioskModeAllowZoomSettings                     = $True
+                        AppRemovalBlocked                              = $True
+                        ICloudPrivateRelayBlocked                      = $True
+                        PodcastsBlocked                                = $True
+                        WallpaperBlockModification                     = $True
+                        ClassroomForceRequestPermissionToLeaveClasses  = $True
+                        AppsVisibilityList                             = @(
+                            @{
+                                name          = 'FakeStringValue'
+                                appId         = 'FakeStringValue'
+                                appStoreUrl   = 'FakeStringValue'
+                                '@odata.type' = '#microsoft.graph.appleAppListItem'
+                                publisher     = 'FakeStringValue'
+                            }
+                        )
+                        SiriBlockedWhenLocked                          = $True
+                        MediaContentRatingFrance                       = @{
+                            movieRating = 'allAllowed'
+                            tvRating    = 'allAllowed'
+                        }
+                        DefinitionLookupBlocked                        = $True
+                        SafariBlockJavaScript                          = $True
+                        AppsVisibilityListType                         = 'none'
+                        AppleWatchBlockPairing                         = $True
+                        KioskModeAppStoreUrl                           = 'FakeStringValue'
+                        NfcBlocked                                     = $True
+                        LockScreenBlockPassbook                        = $True
+                        PasswordBlockAutoFill                          = $True
+                        CompliantAppsList                              = @(
+                            @{
+                                name          = 'FakeStringValue'
+                                appId         = 'FakeStringValue'
+                                appStoreUrl   = 'FakeStringValue'
+                                '@odata.type' = '#microsoft.graph.appleAppListItem'
+                                publisher     = 'FakeStringValue'
+                            }
+                        )
+                        AirPrintBlockiBeaconDiscovery                  = $True
+                        ScreenCaptureBlocked                           = $True
+                        KioskModeAllowTouchscreen                      = $True
+                        ContactsAllowUnmanagedToManagedRead            = $True
+                        KioskModeBlockTouchscreen                      = $True
+                        UsbRestrictedModeBlocked                       = $True
+                        DeviceBlockEraseContentAndSettings             = $True
+                        PasswordBlockAirDropSharing                    = $True
+                        CellularBlockPersonalHotspotModification       = $True
+                        NotificationsBlockSettingsModification         = $True
+                        SafariBlocked                                  = $True
+                        CertificatesBlockUntrustedTlsCertificates      = $True
+                        FilesNetworkDriveAccessBlocked                 = $True
+                        KeyboardBlockSpellCheck                        = $True
+                        ClassroomAppForceUnpromptedScreenObservation   = $True
+                        ClassroomForceUnpromptedAppAndDeviceLock       = $True
+                        KioskModeAllowScreenRotation                   = $True
+                        KioskModeAllowColorInversionSettings           = $True
+                        PasscodeMinutesOfInactivityBeforeLock          = 25
+                        DiagnosticDataBlockSubmission                  = $True
+                        GamingBlockMultiplayer                         = $True
+                        SafariRequireFraudWarning                      = $True
+                        KioskModeRequireAssistiveTouch                 = $True
+                        AppStoreBlockUIAppInstallation                 = $True
+                        KioskModeBlockScreenRotation                   = $True
+                        WiFiConnectToAllowedNetworksOnlyForced         = $True
+                        KioskModeRequireZoom                           = $True
+                    }
+                    Description          = 'FakeStringValue'
+                    DisplayName          = 'FakeStringValue'
+                    Id                   = 'FakeStringValue'
+                }
             }
+
+            Mock -CommandName Get-MgBetaDeviceManagementDeviceConfigurationAssignment -MockWith {
+                return @()
+            }
+
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -74,7 +328,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     AppleWatchBlockPairing                         = $True
                     AppleWatchForceWristDetection                  = $True
                     AppRemovalBlocked                              = $True
-                    AppsSingleAppModeList                          = @(
+                    AppsSingleAppModeList                          = [CimInstance[]]@(
                             (New-CimInstance -ClassName MSFT_MicrosoftGraphapplistitem -Property @{
                             appId       = 'FakeStringValue'
                             publisher   = 'FakeStringValue'
@@ -89,7 +343,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     AppStoreBlockInAppPurchases                    = $True
                     AppStoreBlockUIAppInstallation                 = $True
                     AppStoreRequirePassword                        = $True
-                    AppsVisibilityList                             = @(
+                    AppsVisibilityList                             = [CimInstance[]]@(
                             (New-CimInstance -ClassName MSFT_MicrosoftGraphapplistitem -Property @{
                             appId       = 'FakeStringValue'
                             publisher   = 'FakeStringValue'
@@ -119,7 +373,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     ClassroomForceRequestPermissionToLeaveClasses  = $True
                     ClassroomForceUnpromptedAppAndDeviceLock       = $True
                     CompliantAppListType                           = 'none'
-                    CompliantAppsList                              = @(
+                    CompliantAppsList                              = [CimInstance[]]@(
                             (New-CimInstance -ClassName MSFT_MicrosoftGraphapplistitem -Property @{
                             appId       = 'FakeStringValue'
                             publisher   = 'FakeStringValue'
@@ -252,7 +506,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                             tvRating    = 'allAllowed'
                         } -ClientOnly)
                     MessagesBlocked                                = $True
-                    NetworkUsageRules                              = @(
+                    NetworkUsageRules                              = [CimInstance[]]@(
                             (New-CimInstance -ClassName MSFT_MicrosoftGraphiosnetworkusagerule -Property @{
                             cellularDataBlocked          = $True
                             cellularDataBlockWhenRoaming = $True
@@ -311,12 +565,8 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Credential                                     = $Credential
                 }
 
-                Mock -CommandName Get-MgDeviceManagementDeviceConfiguration -MockWith {
+                Mock -CommandName Get-MgBetaDeviceManagementDeviceConfiguration -MockWith {
                     return $null
-                }
-
-                Mock -CommandName Get-MgDeviceManagementDeviceConfigurationAssignment -MockWith {
-                    return @()
                 }
             }
             It 'Should return Values from the Get method' {
@@ -327,7 +577,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             }
             It 'Should Create the group from the Set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName New-MgDeviceManagementDeviceConfiguration -Exactly 1
+                Should -Invoke -CommandName New-MgBetaDeviceManagementDeviceConfiguration -Exactly 1
             }
         }
 
@@ -349,7 +599,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     AppleWatchBlockPairing                         = $True
                     AppleWatchForceWristDetection                  = $True
                     AppRemovalBlocked                              = $True
-                    AppsSingleAppModeList                          = @(
+                    AppsSingleAppModeList                          = [CimInstance[]]@(
                             (New-CimInstance -ClassName MSFT_MicrosoftGraphapplistitem -Property @{
                             appId       = 'FakeStringValue'
                             publisher   = 'FakeStringValue'
@@ -364,7 +614,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     AppStoreBlockInAppPurchases                    = $True
                     AppStoreBlockUIAppInstallation                 = $True
                     AppStoreRequirePassword                        = $True
-                    AppsVisibilityList                             = @(
+                    AppsVisibilityList                             = [CimInstance[]]@(
                             (New-CimInstance -ClassName MSFT_MicrosoftGraphapplistitem -Property @{
                             appId       = 'FakeStringValue'
                             publisher   = 'FakeStringValue'
@@ -394,7 +644,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     ClassroomForceRequestPermissionToLeaveClasses  = $True
                     ClassroomForceUnpromptedAppAndDeviceLock       = $True
                     CompliantAppListType                           = 'none'
-                    CompliantAppsList                              = @(
+                    CompliantAppsList                              = [CimInstance[]]@(
                             (New-CimInstance -ClassName MSFT_MicrosoftGraphapplistitem -Property @{
                             appId       = 'FakeStringValue'
                             publisher   = 'FakeStringValue'
@@ -585,267 +835,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Ensure                                         = 'Absent'
                     Credential                                     = $Credential
                 }
-
-                Mock -CommandName Get-MgDeviceManagementDeviceConfiguration -MockWith {
-                    return @{
-                        AdditionalProperties = @{
-                            FaceTimeBlocked                                = $True
-                            KioskModeAllowSleepButton                      = $True
-                            MediaContentRatingCanada                       = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            UnpairedExternalBootToRecoveryAllowed          = $True
-                            ICloudBlockPhotoStreamSync                     = $True
-                            KeyboardBlockPredictive                        = $True
-                            SafariBlockPopups                              = $True
-                            GameCenterBlocked                              = $True
-                            PasscodeBlockSimple                            = $True
-                            ITunesBlocked                                  = $True
-                            PasscodeMinimumCharacterSetCount               = 25
-                            AppleWatchForceWristDetection                  = $True
-                            PasscodeExpirationDays                         = 25
-                            EnterpriseAppBlockTrustModification            = $True
-                            AirPlayForcePairingPasswordForOutgoingRequests = $True
-                            KeyboardBlockAutoCorrect                       = $True
-                            ITunesBlockExplicitContent                     = $True
-                            IBooksStoreBlockErotica                        = $True
-                            KioskModeAllowRingerSwitch                     = $True
-                            DocumentsBlockUnmanagedDocumentsInManagedApps  = $True
-                            MessagesBlocked                                = $True
-                            DeviceBlockEnableRestrictions                  = $True
-                            AppStoreBlocked                                = $True
-                            SpotlightBlockInternetResults                  = $True
-                            KioskModeAppType                               = 'notConfigured'
-                            KioskModeAllowVolumeButtons                    = $True
-                            VoiceDialingBlocked                            = $True
-                            PasscodeMinimumLength                          = 25
-                            ICloudBlockSharedPhotoStream                   = $True
-                            ActivationLockAllowWhenSupervised              = $True
-                            CellularBlockVoiceRoaming                      = $True
-                            MediaContentRatingIreland                      = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            PkiBlockOTAUpdates                             = $True
-                            KeyboardBlockDictation                         = $True
-                            PasscodeBlockModification                      = $True
-                            AutoUnlockBlocked                              = $True
-                            PasswordBlockProximityRequests                 = $True
-                            MediaContentRatingAustralia                    = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            ITunesBlockMusicService                        = $True
-                            DiagnosticDataBlockSubmissionModification      = $True
-                            EnterpriseAppBlockTrust                        = $True
-                            ManagedPasteboardRequired                      = $True
-                            ProximityBlockSetupToNewDevice                 = $True
-                            PasscodeMinutesOfInactivityBeforeScreenTimeout = 25
-                            ITunesBlockRadio                               = $True
-                            CellularBlockGlobalBackgroundFetchWhileRoaming = $True
-                            SiriBlocked                                    = $True
-                            MediaContentRatingJapan                        = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            FindMyFriendsInFindMyAppBlocked                = $True
-                            CellularBlockPerAppDataModification            = $True
-                            ClassroomForceAutomaticallyJoinClasses         = $True
-                            SiriBlockUserGeneratedContent                  = $True
-                            MediaContentRatingApps                         = 'allAllowed'
-                            SafariCookieSettings                           = 'browserDefault'
-                            DeviceBlockNameModification                    = $True
-                            WifiPowerOnForced                              = $True
-                            ContactsAllowManagedToUnmanagedWrite           = $True
-                            AirPrintBlockCredentialsStorage                = $True
-                            '@odata.type'                                  = '#microsoft.graph.iosGeneralDeviceConfiguration'
-                            KioskModeAllowAssistiveTouchSettings           = $True
-                            PasscodeRequiredType                           = 'deviceDefault'
-                            PasscodePreviousPasscodeBlockCount             = 25
-                            AutoFillForceAuthentication                    = $True
-                            CompliantAppListType                           = 'none'
-                            ICloudBlockBackup                              = $True
-                            KioskModeAllowAutoLock                         = $True
-                            LockScreenBlockControlCenter                   = $True
-                            EsimBlockModification                          = $True
-                            AppleNewsBlocked                               = $True
-                            CellularBlockPersonalHotspot                   = $True
-                            KioskModeBuiltInAppId                          = 'FakeStringValue'
-                            AirPrintForceTrustedTLS                        = $True
-                            CameraBlocked                                  = $True
-                            SiriRequireProfanityFilter                     = $True
-                            PasscodeBlockFingerprintUnlock                 = $True
-                            DateAndTimeForceSetAutomatically               = $True
-                            KioskModeAllowAssistiveSpeak                   = $True
-                            AccountBlockModification                       = $True
-                            BlockSystemAppRemoval                          = $True
-                            DocumentsBlockManagedDocumentsInUnmanagedApps  = $True
-                            FindMyFriendsBlocked                           = $True
-                            ICloudBlockManagedAppsSync                     = $True
-                            LockScreenBlockTodayView                       = $True
-                            BluetoothBlockModification                     = $True
-                            KioskModeManagedAppId                          = 'FakeStringValue'
-                            SoftwareUpdatesForceDelayed                    = $True
-                            ConfigurationProfileBlockChanges               = $True
-                            WiFiConnectOnlyToConfiguredNetworks            = $True
-                            MediaContentRatingNewZealand                   = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            KioskModeRequireMonoAudio                      = $True
-                            AppStoreRequirePassword                        = $True
-                            ICloudBlockDocumentSync                        = $True
-                            CellularBlockDataRoaming                       = $True
-                            ICloudRequireEncryptedBackup                   = $True
-                            ApplePersonalizedAdsBlocked                    = $True
-                            KioskModeBlockAutoLock                         = $True
-                            ClassroomAppBlockRemoteScreenObservation       = $True
-                            PasscodeBlockFingerprintModification           = $True
-                            FindMyDeviceInFindMyAppBlocked                 = $True
-                            IBooksStoreBlocked                             = $True
-                            KioskModeRequireVoiceOver                      = $True
-                            KioskModeAllowVoiceOverSettings                = $True
-                            AirDropForceUnmanagedDropTarget                = $True
-                            SafariBlockAutofill                            = $True
-                            PasscodeSignInFailureCountBeforeWipe           = 25
-                            ContinuousPathKeyboardBlocked                  = $True
-                            KeychainBlockCloudSync                         = $True
-                            VpnBlockCreation                               = $True
-                            KioskModeAllowVoiceControlModification         = $True
-                            MediaContentRatingUnitedStates                 = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            KioskModeBlockVolumeButtons                    = $True
-                            HostPairingBlocked                             = $True
-                            AppClipsBlocked                                = $True
-                            PasscodeRequired                               = $True
-                            AppStoreBlockInAppPurchases                    = $True
-                            LockScreenBlockNotificationView                = $True
-                            KioskModeBlockSleepButton                      = $True
-                            OnDeviceOnlyDictationForced                    = $True
-                            NetworkUsageRules                              = @(
-                                @{
-                                    cellularDataBlocked          = $True
-                                    cellularDataBlockWhenRoaming = $True
-
-                                }
-                            )
-                            ICloudBlockActivityContinuation                = $True
-                            SoftwareUpdatesEnforcedDelayInDays             = 25
-                            AppsSingleAppModeList                          = @(
-                                @{
-                                    name          = 'FakeStringValue'
-                                    appId         = 'FakeStringValue'
-                                    appStoreUrl   = 'FakeStringValue'
-                                    '@odata.type' = '#microsoft.graph.appleAppListItem'
-                                    publisher     = 'FakeStringValue'
-
-                                }
-                            )
-                            ICloudBlockPhotoLibrary                        = $True
-                            PrivacyForceLimitAdTracking                    = $True
-                            MediaContentRatingGermany                      = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            KeyboardBlockShortcuts                         = $True
-                            OnDeviceOnlyTranslationForced                  = $True
-                            FilesUsbDriveAccessBlocked                     = $True
-                            AppStoreBlockAutomaticDownloads                = $True
-                            KioskModeRequireColorInversion                 = $True
-                            SharedDeviceBlockTemporarySessions             = $True
-                            GamingBlockGameCenterFriends                   = $True
-                            EnterpriseBookBlockBackup                      = $True
-                            EnterpriseBookBlockMetadataSync                = $True
-                            AirDropBlocked                                 = $True
-                            KioskModeBlockRingerSwitch                     = $True
-                            KioskModeEnableVoiceControl                    = $True
-                            MediaContentRatingUnitedKingdom                = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            CellularBlockPlanModification                  = $True
-                            AirPrintBlocked                                = $True
-                            KioskModeAllowZoomSettings                     = $True
-                            AppRemovalBlocked                              = $True
-                            ICloudPrivateRelayBlocked                      = $True
-                            PodcastsBlocked                                = $True
-                            WallpaperBlockModification                     = $True
-                            ClassroomForceRequestPermissionToLeaveClasses  = $True
-                            AppsVisibilityList                             = @(
-                                @{
-                                    name          = 'FakeStringValue'
-                                    appId         = 'FakeStringValue'
-                                    appStoreUrl   = 'FakeStringValue'
-                                    '@odata.type' = '#microsoft.graph.appleAppListItem'
-                                    publisher     = 'FakeStringValue'
-
-                                }
-                            )
-                            SiriBlockedWhenLocked                          = $True
-                            MediaContentRatingFrance                       = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            DefinitionLookupBlocked                        = $True
-                            SafariBlockJavaScript                          = $True
-                            AppsVisibilityListType                         = 'none'
-                            AppleWatchBlockPairing                         = $True
-                            KioskModeAppStoreUrl                           = 'FakeStringValue'
-                            NfcBlocked                                     = $True
-                            LockScreenBlockPassbook                        = $True
-                            PasswordBlockAutoFill                          = $True
-                            CompliantAppsList                              = @(
-                                @{
-                                    name          = 'FakeStringValue'
-                                    appId         = 'FakeStringValue'
-                                    appStoreUrl   = 'FakeStringValue'
-                                    '@odata.type' = '#microsoft.graph.appleAppListItem'
-                                    publisher     = 'FakeStringValue'
-
-                                }
-                            )
-                            AirPrintBlockiBeaconDiscovery                  = $True
-                            ScreenCaptureBlocked                           = $True
-                            KioskModeAllowTouchscreen                      = $True
-                            ContactsAllowUnmanagedToManagedRead            = $True
-                            KioskModeBlockTouchscreen                      = $True
-                            UsbRestrictedModeBlocked                       = $True
-                            DeviceBlockEraseContentAndSettings             = $True
-                            PasswordBlockAirDropSharing                    = $True
-                            CellularBlockPersonalHotspotModification       = $True
-                            NotificationsBlockSettingsModification         = $True
-                            SafariBlocked                                  = $True
-                            CertificatesBlockUntrustedTlsCertificates      = $True
-                            FilesNetworkDriveAccessBlocked                 = $True
-                            KeyboardBlockSpellCheck                        = $True
-                            ClassroomAppForceUnpromptedScreenObservation   = $True
-                            ClassroomForceUnpromptedAppAndDeviceLock       = $True
-                            KioskModeAllowScreenRotation                   = $True
-                            KioskModeAllowColorInversionSettings           = $True
-                            PasscodeMinutesOfInactivityBeforeLock          = 25
-                            DiagnosticDataBlockSubmission                  = $True
-                            GamingBlockMultiplayer                         = $True
-                            SafariRequireFraudWarning                      = $True
-                            KioskModeRequireAssistiveTouch                 = $True
-                            AppStoreBlockUIAppInstallation                 = $True
-                            KioskModeBlockScreenRotation                   = $True
-                            WiFiConnectToAllowedNetworksOnlyForced         = $True
-                            KioskModeRequireZoom                           = $True
-
-                        }
-                        Description          = 'FakeStringValue'
-                        DisplayName          = 'FakeStringValue'
-                        Id                   = 'FakeStringValue'
-
-                    }
-                }
-
-                Mock -CommandName Get-MgDeviceManagementDeviceConfigurationAssignment -MockWith {
-                    return @()
-                }
             }
 
             It 'Should return Values from the Get method' {
@@ -858,7 +847,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should Remove the group from the Set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName Remove-MgDeviceManagementDeviceConfiguration -Exactly 1
+                Should -Invoke -CommandName Remove-MgBetaDeviceManagementDeviceConfiguration -Exactly 1
             }
         }
         Context -Name 'The IntuneDeviceConfigurationPolicyIOS Exists and Values are already in the desired state' -Fixture {
@@ -879,7 +868,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     AppleWatchBlockPairing                         = $True
                     AppleWatchForceWristDetection                  = $True
                     AppRemovalBlocked                              = $True
-                    AppsSingleAppModeList                          = @(
+                    AppsSingleAppModeList                          = [CimInstance[]]@(
                             (New-CimInstance -ClassName MSFT_MicrosoftGraphapplistitem -Property @{
                             appId       = 'FakeStringValue'
                             publisher   = 'FakeStringValue'
@@ -894,7 +883,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     AppStoreBlockInAppPurchases                    = $True
                     AppStoreBlockUIAppInstallation                 = $True
                     AppStoreRequirePassword                        = $True
-                    AppsVisibilityList                             = @(
+                    AppsVisibilityList                             = [CimInstance[]]@(
                             (New-CimInstance -ClassName MSFT_MicrosoftGraphapplistitem -Property @{
                             appId       = 'FakeStringValue'
                             publisher   = 'FakeStringValue'
@@ -924,7 +913,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     ClassroomForceRequestPermissionToLeaveClasses  = $True
                     ClassroomForceUnpromptedAppAndDeviceLock       = $True
                     CompliantAppListType                           = 'none'
-                    CompliantAppsList                              = @(
+                    CompliantAppsList                              = [CimInstance[]]@(
                             (New-CimInstance -ClassName MSFT_MicrosoftGraphapplistitem -Property @{
                             appId       = 'FakeStringValue'
                             publisher   = 'FakeStringValue'
@@ -1057,7 +1046,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                             tvRating    = 'allAllowed'
                         } -ClientOnly)
                     MessagesBlocked                                = $True
-                    NetworkUsageRules                              = @(
+                    NetworkUsageRules                              = [CimInstance[]]@(
                             (New-CimInstance -ClassName MSFT_MicrosoftGraphiosnetworkusagerule -Property @{
                             cellularDataBlocked          = $True
                             cellularDataBlockWhenRoaming = $True
@@ -1115,267 +1104,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Ensure                                         = 'Present'
                     Credential                                     = $Credential
                 }
-
-                Mock -CommandName Get-MgDeviceManagementDeviceConfiguration -MockWith {
-                    return @{
-                        AdditionalProperties = @{
-                            FaceTimeBlocked                                = $True
-                            KioskModeAllowSleepButton                      = $True
-                            MediaContentRatingCanada                       = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            UnpairedExternalBootToRecoveryAllowed          = $True
-                            ICloudBlockPhotoStreamSync                     = $True
-                            KeyboardBlockPredictive                        = $True
-                            SafariBlockPopups                              = $True
-                            GameCenterBlocked                              = $True
-                            PasscodeBlockSimple                            = $True
-                            ITunesBlocked                                  = $True
-                            PasscodeMinimumCharacterSetCount               = 25
-                            AppleWatchForceWristDetection                  = $True
-                            PasscodeExpirationDays                         = 25
-                            EnterpriseAppBlockTrustModification            = $True
-                            AirPlayForcePairingPasswordForOutgoingRequests = $True
-                            KeyboardBlockAutoCorrect                       = $True
-                            ITunesBlockExplicitContent                     = $True
-                            IBooksStoreBlockErotica                        = $True
-                            KioskModeAllowRingerSwitch                     = $True
-                            DocumentsBlockUnmanagedDocumentsInManagedApps  = $True
-                            MessagesBlocked                                = $True
-                            DeviceBlockEnableRestrictions                  = $True
-                            AppStoreBlocked                                = $True
-                            SpotlightBlockInternetResults                  = $True
-                            KioskModeAppType                               = 'notConfigured'
-                            KioskModeAllowVolumeButtons                    = $True
-                            VoiceDialingBlocked                            = $True
-                            PasscodeMinimumLength                          = 25
-                            ICloudBlockSharedPhotoStream                   = $True
-                            ActivationLockAllowWhenSupervised              = $True
-                            CellularBlockVoiceRoaming                      = $True
-                            MediaContentRatingIreland                      = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            PkiBlockOTAUpdates                             = $True
-                            KeyboardBlockDictation                         = $True
-                            PasscodeBlockModification                      = $True
-                            AutoUnlockBlocked                              = $True
-                            PasswordBlockProximityRequests                 = $True
-                            MediaContentRatingAustralia                    = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            ITunesBlockMusicService                        = $True
-                            DiagnosticDataBlockSubmissionModification      = $True
-                            EnterpriseAppBlockTrust                        = $True
-                            ManagedPasteboardRequired                      = $True
-                            ProximityBlockSetupToNewDevice                 = $True
-                            PasscodeMinutesOfInactivityBeforeScreenTimeout = 25
-                            ITunesBlockRadio                               = $True
-                            CellularBlockGlobalBackgroundFetchWhileRoaming = $True
-                            SiriBlocked                                    = $True
-                            MediaContentRatingJapan                        = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            FindMyFriendsInFindMyAppBlocked                = $True
-                            CellularBlockPerAppDataModification            = $True
-                            ClassroomForceAutomaticallyJoinClasses         = $True
-                            SiriBlockUserGeneratedContent                  = $True
-                            MediaContentRatingApps                         = 'allAllowed'
-                            SafariCookieSettings                           = 'browserDefault'
-                            DeviceBlockNameModification                    = $True
-                            WifiPowerOnForced                              = $True
-                            ContactsAllowManagedToUnmanagedWrite           = $True
-                            AirPrintBlockCredentialsStorage                = $True
-                            '@odata.type'                                  = '#microsoft.graph.iosGeneralDeviceConfiguration'
-                            KioskModeAllowAssistiveTouchSettings           = $True
-                            PasscodeRequiredType                           = 'deviceDefault'
-                            PasscodePreviousPasscodeBlockCount             = 25
-                            AutoFillForceAuthentication                    = $True
-                            CompliantAppListType                           = 'none'
-                            ICloudBlockBackup                              = $True
-                            KioskModeAllowAutoLock                         = $True
-                            LockScreenBlockControlCenter                   = $True
-                            EsimBlockModification                          = $True
-                            AppleNewsBlocked                               = $True
-                            CellularBlockPersonalHotspot                   = $True
-                            KioskModeBuiltInAppId                          = 'FakeStringValue'
-                            AirPrintForceTrustedTLS                        = $True
-                            CameraBlocked                                  = $True
-                            SiriRequireProfanityFilter                     = $True
-                            PasscodeBlockFingerprintUnlock                 = $True
-                            DateAndTimeForceSetAutomatically               = $True
-                            KioskModeAllowAssistiveSpeak                   = $True
-                            AccountBlockModification                       = $True
-                            BlockSystemAppRemoval                          = $True
-                            DocumentsBlockManagedDocumentsInUnmanagedApps  = $True
-                            FindMyFriendsBlocked                           = $True
-                            ICloudBlockManagedAppsSync                     = $True
-                            LockScreenBlockTodayView                       = $True
-                            BluetoothBlockModification                     = $True
-                            KioskModeManagedAppId                          = 'FakeStringValue'
-                            SoftwareUpdatesForceDelayed                    = $True
-                            ConfigurationProfileBlockChanges               = $True
-                            WiFiConnectOnlyToConfiguredNetworks            = $True
-                            MediaContentRatingNewZealand                   = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            KioskModeRequireMonoAudio                      = $True
-                            AppStoreRequirePassword                        = $True
-                            ICloudBlockDocumentSync                        = $True
-                            CellularBlockDataRoaming                       = $True
-                            ICloudRequireEncryptedBackup                   = $True
-                            ApplePersonalizedAdsBlocked                    = $True
-                            KioskModeBlockAutoLock                         = $True
-                            ClassroomAppBlockRemoteScreenObservation       = $True
-                            PasscodeBlockFingerprintModification           = $True
-                            FindMyDeviceInFindMyAppBlocked                 = $True
-                            IBooksStoreBlocked                             = $True
-                            KioskModeRequireVoiceOver                      = $True
-                            KioskModeAllowVoiceOverSettings                = $True
-                            AirDropForceUnmanagedDropTarget                = $True
-                            SafariBlockAutofill                            = $True
-                            PasscodeSignInFailureCountBeforeWipe           = 25
-                            ContinuousPathKeyboardBlocked                  = $True
-                            KeychainBlockCloudSync                         = $True
-                            VpnBlockCreation                               = $True
-                            KioskModeAllowVoiceControlModification         = $True
-                            MediaContentRatingUnitedStates                 = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            KioskModeBlockVolumeButtons                    = $True
-                            HostPairingBlocked                             = $True
-                            AppClipsBlocked                                = $True
-                            PasscodeRequired                               = $True
-                            AppStoreBlockInAppPurchases                    = $True
-                            LockScreenBlockNotificationView                = $True
-                            KioskModeBlockSleepButton                      = $True
-                            OnDeviceOnlyDictationForced                    = $True
-                            NetworkUsageRules                              = @(
-                                @{
-                                    cellularDataBlocked          = $True
-                                    cellularDataBlockWhenRoaming = $True
-
-                                }
-                            )
-                            ICloudBlockActivityContinuation                = $True
-                            SoftwareUpdatesEnforcedDelayInDays             = 25
-                            AppsSingleAppModeList                          = @(
-                                @{
-                                    name          = 'FakeStringValue'
-                                    appId         = 'FakeStringValue'
-                                    appStoreUrl   = 'FakeStringValue'
-                                    '@odata.type' = '#microsoft.graph.appleAppListItem'
-                                    publisher     = 'FakeStringValue'
-
-                                }
-                            )
-                            ICloudBlockPhotoLibrary                        = $True
-                            PrivacyForceLimitAdTracking                    = $True
-                            MediaContentRatingGermany                      = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            KeyboardBlockShortcuts                         = $True
-                            OnDeviceOnlyTranslationForced                  = $True
-                            FilesUsbDriveAccessBlocked                     = $True
-                            AppStoreBlockAutomaticDownloads                = $True
-                            KioskModeRequireColorInversion                 = $True
-                            SharedDeviceBlockTemporarySessions             = $True
-                            GamingBlockGameCenterFriends                   = $True
-                            EnterpriseBookBlockBackup                      = $True
-                            EnterpriseBookBlockMetadataSync                = $True
-                            AirDropBlocked                                 = $True
-                            KioskModeBlockRingerSwitch                     = $True
-                            KioskModeEnableVoiceControl                    = $True
-                            MediaContentRatingUnitedKingdom                = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            CellularBlockPlanModification                  = $True
-                            AirPrintBlocked                                = $True
-                            KioskModeAllowZoomSettings                     = $True
-                            AppRemovalBlocked                              = $True
-                            ICloudPrivateRelayBlocked                      = $True
-                            PodcastsBlocked                                = $True
-                            WallpaperBlockModification                     = $True
-                            ClassroomForceRequestPermissionToLeaveClasses  = $True
-                            AppsVisibilityList                             = @(
-                                @{
-                                    name          = 'FakeStringValue'
-                                    appId         = 'FakeStringValue'
-                                    appStoreUrl   = 'FakeStringValue'
-                                    '@odata.type' = '#microsoft.graph.appleAppListItem'
-                                    publisher     = 'FakeStringValue'
-
-                                }
-                            )
-                            SiriBlockedWhenLocked                          = $True
-                            MediaContentRatingFrance                       = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            DefinitionLookupBlocked                        = $True
-                            SafariBlockJavaScript                          = $True
-                            AppsVisibilityListType                         = 'none'
-                            AppleWatchBlockPairing                         = $True
-                            KioskModeAppStoreUrl                           = 'FakeStringValue'
-                            NfcBlocked                                     = $True
-                            LockScreenBlockPassbook                        = $True
-                            PasswordBlockAutoFill                          = $True
-                            CompliantAppsList                              = @(
-                                @{
-                                    name          = 'FakeStringValue'
-                                    appId         = 'FakeStringValue'
-                                    appStoreUrl   = 'FakeStringValue'
-                                    '@odata.type' = '#microsoft.graph.appleAppListItem'
-                                    publisher     = 'FakeStringValue'
-
-                                }
-                            )
-                            AirPrintBlockiBeaconDiscovery                  = $True
-                            ScreenCaptureBlocked                           = $True
-                            KioskModeAllowTouchscreen                      = $True
-                            ContactsAllowUnmanagedToManagedRead            = $True
-                            KioskModeBlockTouchscreen                      = $True
-                            UsbRestrictedModeBlocked                       = $True
-                            DeviceBlockEraseContentAndSettings             = $True
-                            PasswordBlockAirDropSharing                    = $True
-                            CellularBlockPersonalHotspotModification       = $True
-                            NotificationsBlockSettingsModification         = $True
-                            SafariBlocked                                  = $True
-                            CertificatesBlockUntrustedTlsCertificates      = $True
-                            FilesNetworkDriveAccessBlocked                 = $True
-                            KeyboardBlockSpellCheck                        = $True
-                            ClassroomAppForceUnpromptedScreenObservation   = $True
-                            ClassroomForceUnpromptedAppAndDeviceLock       = $True
-                            KioskModeAllowScreenRotation                   = $True
-                            KioskModeAllowColorInversionSettings           = $True
-                            PasscodeMinutesOfInactivityBeforeLock          = 25
-                            DiagnosticDataBlockSubmission                  = $True
-                            GamingBlockMultiplayer                         = $True
-                            SafariRequireFraudWarning                      = $True
-                            KioskModeRequireAssistiveTouch                 = $True
-                            AppStoreBlockUIAppInstallation                 = $True
-                            KioskModeBlockScreenRotation                   = $True
-                            WiFiConnectToAllowedNetworksOnlyForced         = $True
-                            KioskModeRequireZoom                           = $True
-
-                        }
-                        Description          = 'FakeStringValue'
-                        DisplayName          = 'FakeStringValue'
-                        Id                   = 'FakeStringValue'
-
-                    }
-                }
-
-                Mock -CommandName Get-MgDeviceManagementDeviceConfigurationAssignment -MockWith {
-                    return @()
-                }
             }
 
 
@@ -1387,7 +1115,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Context -Name 'The IntuneDeviceConfigurationPolicyIOS exists and values are NOT in the desired state' -Fixture {
             BeforeAll {
                 $testParams = @{
-                    AccountBlockModification                       = $True
+                    AccountBlockModification                       = $False # Updated property
                     ActivationLockAllowWhenSupervised              = $True
                     AirDropBlocked                                 = $True
                     AirDropForceUnmanagedDropTarget                = $True
@@ -1402,7 +1130,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     AppleWatchBlockPairing                         = $True
                     AppleWatchForceWristDetection                  = $True
                     AppRemovalBlocked                              = $True
-                    AppsSingleAppModeList                          = @(
+                    AppsSingleAppModeList                          = [CimInstance[]]@(
                             (New-CimInstance -ClassName MSFT_MicrosoftGraphapplistitem -Property @{
                             appId       = 'FakeStringValue'
                             publisher   = 'FakeStringValue'
@@ -1417,7 +1145,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     AppStoreBlockInAppPurchases                    = $True
                     AppStoreBlockUIAppInstallation                 = $True
                     AppStoreRequirePassword                        = $True
-                    AppsVisibilityList                             = @(
+                    AppsVisibilityList                             = [CimInstance[]]@(
                             (New-CimInstance -ClassName MSFT_MicrosoftGraphapplistitem -Property @{
                             appId       = 'FakeStringValue'
                             publisher   = 'FakeStringValue'
@@ -1447,7 +1175,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     ClassroomForceRequestPermissionToLeaveClasses  = $True
                     ClassroomForceUnpromptedAppAndDeviceLock       = $True
                     CompliantAppListType                           = 'none'
-                    CompliantAppsList                              = @(
+                    CompliantAppsList                              = [CimInstance[]]@(
                             (New-CimInstance -ClassName MSFT_MicrosoftGraphapplistitem -Property @{
                             appId       = 'FakeStringValue'
                             publisher   = 'FakeStringValue'
@@ -1580,7 +1308,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                             tvRating    = 'allAllowed'
                         } -ClientOnly)
                     MessagesBlocked                                = $True
-                    NetworkUsageRules                              = @(
+                    NetworkUsageRules                              = [CimInstance[]]@(
                             (New-CimInstance -ClassName MSFT_MicrosoftGraphiosnetworkusagerule -Property @{
                             cellularDataBlocked          = $True
                             cellularDataBlockWhenRoaming = $True
@@ -1638,113 +1366,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Ensure                                         = 'Present'
                     Credential                                     = $Credential
                 }
-
-                Mock -CommandName Get-MgDeviceManagementDeviceConfiguration -MockWith {
-                    return @{
-                        AdditionalProperties = @{
-                            MediaContentRatingCanada                       = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            PasscodeMinutesOfInactivityBeforeLock          = 7
-                            PasscodeMinimumLength                          = 7
-                            MediaContentRatingIreland                      = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            PasscodeMinutesOfInactivityBeforeScreenTimeout = 7
-                            NetworkUsageRules                              = @(
-                                @{
-                                    cellularDataBlocked          = $True
-                                    cellularDataBlockWhenRoaming = $True
-
-                                }
-                            )
-                            PasscodePreviousPasscodeBlockCount             = 7
-                            MediaContentRatingNewZealand                   = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            KioskModeManagedAppId                          = 'FakeStringValue'
-                            MediaContentRatingApps                         = 'allAllowed'
-                            PasscodeMinimumCharacterSetCount               = 7
-                            MediaContentRatingUnitedStates                 = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            SafariCookieSettings                           = 'browserDefault'
-                            CompliantAppListType                           = 'none'
-                            AppsSingleAppModeList                          = @(
-                                @{
-                                    name          = 'FakeStringValue'
-                                    appId         = 'FakeStringValue'
-                                    appStoreUrl   = 'FakeStringValue'
-                                    '@odata.type' = '#microsoft.graph.appleAppListItem'
-                                    publisher     = 'FakeStringValue'
-
-                                }
-                            )
-                            MediaContentRatingFrance                       = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            MediaContentRatingAustralia                    = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            MediaContentRatingGermany                      = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            PasscodeSignInFailureCountBeforeWipe           = 7
-                            KioskModeAppStoreUrl                           = 'FakeStringValue'
-                            AppsVisibilityListType                         = 'none'
-                            KioskModeAppType                               = 'notConfigured'
-                            AppsVisibilityList                             = @(
-                                @{
-                                    name          = 'FakeStringValue'
-                                    appId         = 'FakeStringValue'
-                                    appStoreUrl   = 'FakeStringValue'
-                                    '@odata.type' = '#microsoft.graph.appleAppListItem'
-                                    publisher     = 'FakeStringValue'
-
-                                }
-                            )
-                            MediaContentRatingJapan                        = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            SoftwareUpdatesEnforcedDelayInDays             = 7
-                            PasscodeExpirationDays                         = 7
-                            CompliantAppsList                              = @(
-                                @{
-                                    name          = 'FakeStringValue'
-                                    appId         = 'FakeStringValue'
-                                    appStoreUrl   = 'FakeStringValue'
-                                    '@odata.type' = '#microsoft.graph.appleAppListItem'
-                                    publisher     = 'FakeStringValue'
-
-                                }
-                            )
-                            '@odata.type'                                  = '#microsoft.graph.iosGeneralDeviceConfiguration'
-                            KioskModeBuiltInAppId                          = 'FakeStringValue'
-                            MediaContentRatingUnitedKingdom                = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            PasscodeRequiredType                           = 'deviceDefault'
-
-                        }
-                        Description          = 'FakeStringValue'
-                        DisplayName          = 'FakeStringValue'
-                        Id                   = 'FakeStringValue'
-
-                    }
-                }
-
-                Mock -CommandName Get-MgDeviceManagementDeviceConfigurationAssignment -MockWith {
-                    return @()
-                }
             }
 
             It 'Should return Values from the Get method' {
@@ -1757,280 +1378,22 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the Set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName Update-MgDeviceManagementDeviceConfiguration -Exactly 1
+                Should -Invoke -CommandName Update-MgBetaDeviceManagementDeviceConfiguration -Exactly 1
             }
         }
 
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
                 }
-
-                Mock -CommandName Get-MgDeviceManagementDeviceConfiguration -MockWith {
-                    return @{
-                        AdditionalProperties = @{
-                            FaceTimeBlocked                                = $True
-                            KioskModeAllowSleepButton                      = $True
-                            MediaContentRatingCanada                       = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            UnpairedExternalBootToRecoveryAllowed          = $True
-                            ICloudBlockPhotoStreamSync                     = $True
-                            KeyboardBlockPredictive                        = $True
-                            SafariBlockPopups                              = $True
-                            GameCenterBlocked                              = $True
-                            PasscodeBlockSimple                            = $True
-                            ITunesBlocked                                  = $True
-                            PasscodeMinimumCharacterSetCount               = 25
-                            AppleWatchForceWristDetection                  = $True
-                            PasscodeExpirationDays                         = 25
-                            EnterpriseAppBlockTrustModification            = $True
-                            AirPlayForcePairingPasswordForOutgoingRequests = $True
-                            KeyboardBlockAutoCorrect                       = $True
-                            ITunesBlockExplicitContent                     = $True
-                            IBooksStoreBlockErotica                        = $True
-                            KioskModeAllowRingerSwitch                     = $True
-                            DocumentsBlockUnmanagedDocumentsInManagedApps  = $True
-                            MessagesBlocked                                = $True
-                            DeviceBlockEnableRestrictions                  = $True
-                            AppStoreBlocked                                = $True
-                            SpotlightBlockInternetResults                  = $True
-                            KioskModeAppType                               = 'notConfigured'
-                            KioskModeAllowVolumeButtons                    = $True
-                            VoiceDialingBlocked                            = $True
-                            PasscodeMinimumLength                          = 25
-                            ICloudBlockSharedPhotoStream                   = $True
-                            ActivationLockAllowWhenSupervised              = $True
-                            CellularBlockVoiceRoaming                      = $True
-                            MediaContentRatingIreland                      = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            PkiBlockOTAUpdates                             = $True
-                            KeyboardBlockDictation                         = $True
-                            PasscodeBlockModification                      = $True
-                            AutoUnlockBlocked                              = $True
-                            PasswordBlockProximityRequests                 = $True
-                            MediaContentRatingAustralia                    = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            ITunesBlockMusicService                        = $True
-                            DiagnosticDataBlockSubmissionModification      = $True
-                            EnterpriseAppBlockTrust                        = $True
-                            ManagedPasteboardRequired                      = $True
-                            ProximityBlockSetupToNewDevice                 = $True
-                            PasscodeMinutesOfInactivityBeforeScreenTimeout = 25
-                            ITunesBlockRadio                               = $True
-                            CellularBlockGlobalBackgroundFetchWhileRoaming = $True
-                            SiriBlocked                                    = $True
-                            MediaContentRatingJapan                        = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            FindMyFriendsInFindMyAppBlocked                = $True
-                            CellularBlockPerAppDataModification            = $True
-                            ClassroomForceAutomaticallyJoinClasses         = $True
-                            SiriBlockUserGeneratedContent                  = $True
-                            MediaContentRatingApps                         = 'allAllowed'
-                            SafariCookieSettings                           = 'browserDefault'
-                            DeviceBlockNameModification                    = $True
-                            WifiPowerOnForced                              = $True
-                            ContactsAllowManagedToUnmanagedWrite           = $True
-                            AirPrintBlockCredentialsStorage                = $True
-                            '@odata.type'                                  = '#microsoft.graph.iosGeneralDeviceConfiguration'
-                            KioskModeAllowAssistiveTouchSettings           = $True
-                            PasscodeRequiredType                           = 'deviceDefault'
-                            PasscodePreviousPasscodeBlockCount             = 25
-                            AutoFillForceAuthentication                    = $True
-                            CompliantAppListType                           = 'none'
-                            ICloudBlockBackup                              = $True
-                            KioskModeAllowAutoLock                         = $True
-                            LockScreenBlockControlCenter                   = $True
-                            EsimBlockModification                          = $True
-                            AppleNewsBlocked                               = $True
-                            CellularBlockPersonalHotspot                   = $True
-                            KioskModeBuiltInAppId                          = 'FakeStringValue'
-                            AirPrintForceTrustedTLS                        = $True
-                            CameraBlocked                                  = $True
-                            SiriRequireProfanityFilter                     = $True
-                            PasscodeBlockFingerprintUnlock                 = $True
-                            DateAndTimeForceSetAutomatically               = $True
-                            KioskModeAllowAssistiveSpeak                   = $True
-                            AccountBlockModification                       = $True
-                            BlockSystemAppRemoval                          = $True
-                            DocumentsBlockManagedDocumentsInUnmanagedApps  = $True
-                            FindMyFriendsBlocked                           = $True
-                            ICloudBlockManagedAppsSync                     = $True
-                            LockScreenBlockTodayView                       = $True
-                            BluetoothBlockModification                     = $True
-                            KioskModeManagedAppId                          = 'FakeStringValue'
-                            SoftwareUpdatesForceDelayed                    = $True
-                            ConfigurationProfileBlockChanges               = $True
-                            WiFiConnectOnlyToConfiguredNetworks            = $True
-                            MediaContentRatingNewZealand                   = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            KioskModeRequireMonoAudio                      = $True
-                            AppStoreRequirePassword                        = $True
-                            ICloudBlockDocumentSync                        = $True
-                            CellularBlockDataRoaming                       = $True
-                            ICloudRequireEncryptedBackup                   = $True
-                            ApplePersonalizedAdsBlocked                    = $True
-                            KioskModeBlockAutoLock                         = $True
-                            ClassroomAppBlockRemoteScreenObservation       = $True
-                            PasscodeBlockFingerprintModification           = $True
-                            FindMyDeviceInFindMyAppBlocked                 = $True
-                            IBooksStoreBlocked                             = $True
-                            KioskModeRequireVoiceOver                      = $True
-                            KioskModeAllowVoiceOverSettings                = $True
-                            AirDropForceUnmanagedDropTarget                = $True
-                            SafariBlockAutofill                            = $True
-                            PasscodeSignInFailureCountBeforeWipe           = 25
-                            ContinuousPathKeyboardBlocked                  = $True
-                            KeychainBlockCloudSync                         = $True
-                            VpnBlockCreation                               = $True
-                            KioskModeAllowVoiceControlModification         = $True
-                            MediaContentRatingUnitedStates                 = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            KioskModeBlockVolumeButtons                    = $True
-                            HostPairingBlocked                             = $True
-                            AppClipsBlocked                                = $True
-                            PasscodeRequired                               = $True
-                            AppStoreBlockInAppPurchases                    = $True
-                            LockScreenBlockNotificationView                = $True
-                            KioskModeBlockSleepButton                      = $True
-                            OnDeviceOnlyDictationForced                    = $True
-                            NetworkUsageRules                              = @(
-                                @{
-                                    cellularDataBlocked          = $True
-                                    cellularDataBlockWhenRoaming = $True
-
-                                }
-                            )
-                            ICloudBlockActivityContinuation                = $True
-                            SoftwareUpdatesEnforcedDelayInDays             = 25
-                            AppsSingleAppModeList                          = @(
-                                @{
-                                    name          = 'FakeStringValue'
-                                    appId         = 'FakeStringValue'
-                                    appStoreUrl   = 'FakeStringValue'
-                                    '@odata.type' = '#microsoft.graph.appleAppListItem'
-                                    publisher     = 'FakeStringValue'
-
-                                }
-                            )
-                            ICloudBlockPhotoLibrary                        = $True
-                            PrivacyForceLimitAdTracking                    = $True
-                            MediaContentRatingGermany                      = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            KeyboardBlockShortcuts                         = $True
-                            OnDeviceOnlyTranslationForced                  = $True
-                            FilesUsbDriveAccessBlocked                     = $True
-                            AppStoreBlockAutomaticDownloads                = $True
-                            KioskModeRequireColorInversion                 = $True
-                            SharedDeviceBlockTemporarySessions             = $True
-                            GamingBlockGameCenterFriends                   = $True
-                            EnterpriseBookBlockBackup                      = $True
-                            EnterpriseBookBlockMetadataSync                = $True
-                            AirDropBlocked                                 = $True
-                            KioskModeBlockRingerSwitch                     = $True
-                            KioskModeEnableVoiceControl                    = $True
-                            MediaContentRatingUnitedKingdom                = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            CellularBlockPlanModification                  = $True
-                            AirPrintBlocked                                = $True
-                            KioskModeAllowZoomSettings                     = $True
-                            AppRemovalBlocked                              = $True
-                            ICloudPrivateRelayBlocked                      = $True
-                            PodcastsBlocked                                = $True
-                            WallpaperBlockModification                     = $True
-                            ClassroomForceRequestPermissionToLeaveClasses  = $True
-                            AppsVisibilityList                             = @(
-                                @{
-                                    name          = 'FakeStringValue'
-                                    appId         = 'FakeStringValue'
-                                    appStoreUrl   = 'FakeStringValue'
-                                    '@odata.type' = '#microsoft.graph.appleAppListItem'
-                                    publisher     = 'FakeStringValue'
-
-                                }
-                            )
-                            SiriBlockedWhenLocked                          = $True
-                            MediaContentRatingFrance                       = @{
-                                movieRating = 'allAllowed'
-                                tvRating    = 'allAllowed'
-                            }
-                            DefinitionLookupBlocked                        = $True
-                            SafariBlockJavaScript                          = $True
-                            AppsVisibilityListType                         = 'none'
-                            AppleWatchBlockPairing                         = $True
-                            KioskModeAppStoreUrl                           = 'FakeStringValue'
-                            NfcBlocked                                     = $True
-                            LockScreenBlockPassbook                        = $True
-                            PasswordBlockAutoFill                          = $True
-                            CompliantAppsList                              = @(
-                                @{
-                                    name          = 'FakeStringValue'
-                                    appId         = 'FakeStringValue'
-                                    appStoreUrl   = 'FakeStringValue'
-                                    '@odata.type' = '#microsoft.graph.appleAppListItem'
-                                    publisher     = 'FakeStringValue'
-
-                                }
-                            )
-                            AirPrintBlockiBeaconDiscovery                  = $True
-                            ScreenCaptureBlocked                           = $True
-                            KioskModeAllowTouchscreen                      = $True
-                            ContactsAllowUnmanagedToManagedRead            = $True
-                            KioskModeBlockTouchscreen                      = $True
-                            UsbRestrictedModeBlocked                       = $True
-                            DeviceBlockEraseContentAndSettings             = $True
-                            PasswordBlockAirDropSharing                    = $True
-                            CellularBlockPersonalHotspotModification       = $True
-                            NotificationsBlockSettingsModification         = $True
-                            SafariBlocked                                  = $True
-                            CertificatesBlockUntrustedTlsCertificates      = $True
-                            FilesNetworkDriveAccessBlocked                 = $True
-                            KeyboardBlockSpellCheck                        = $True
-                            ClassroomAppForceUnpromptedScreenObservation   = $True
-                            ClassroomForceUnpromptedAppAndDeviceLock       = $True
-                            KioskModeAllowScreenRotation                   = $True
-                            KioskModeAllowColorInversionSettings           = $True
-                            PasscodeMinutesOfInactivityBeforeLock          = 25
-                            DiagnosticDataBlockSubmission                  = $True
-                            GamingBlockMultiplayer                         = $True
-                            SafariRequireFraudWarning                      = $True
-                            KioskModeRequireAssistiveTouch                 = $True
-                            AppStoreBlockUIAppInstallation                 = $True
-                            KioskModeBlockScreenRotation                   = $True
-                            WiFiConnectToAllowedNetworksOnlyForced         = $True
-                            KioskModeRequireZoom                           = $True
-
-                        }
-                        Description          = 'FakeStringValue'
-                        DisplayName          = 'FakeStringValue'
-                        Id                   = 'FakeStringValue'
-
-                    }
-                }
-
-                Mock -CommandName Get-MgDeviceManagementDeviceConfigurationAssignment -MockWith {
-                    return @()
-                }
             }
+
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

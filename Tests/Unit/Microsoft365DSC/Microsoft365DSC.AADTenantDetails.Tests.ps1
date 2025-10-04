@@ -20,13 +20,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
     InModuleScope -ModuleName $Global:DscHelper.ModuleName -ScriptBlock {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
             $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@contoso.onmicrosoft.com', $secpasswd)
 
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName Get-PSSession -MockWith {
@@ -35,16 +32,27 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             Mock -CommandName Remove-PSSession -MockWith {
             }
 
-            Mock -CommandName Update-MgOrganization -MockWith {
+            Mock -CommandName Update-MgBetaOrganization -MockWith {
+            }
+
+            Mock -CommandName Get-MgBetaOrganization -MockWith {
+                return @{
+                    MarketingNotificationEmails          = 'exapmle@contoso.com'
+                    SecurityComplianceNotificationMails  = 'exapmle@contoso.com'
+                    SecurityComplianceNotificationPhones = '+1123456789'
+                    TechnicalNotificationMails           = 'exapmle@contoso.com'
+                }
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
                 return 'Credentials'
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
             }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -59,14 +67,13 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     IsSingleInstance                     = 'Yes'
                 }
 
-                Mock -CommandName Get-MgOrganization -MockWith {
-                    $result = @{
+                Mock -CommandName Get-MgBetaOrganization -MockWith {
+                    return @{
                         MarketingNotificationEmails          = ''
                         SecurityComplianceNotificationMails  = ''
                         SecurityComplianceNotificationPhones = ''
                         TechnicalNotificationMails           = ''
                     }
-                    return $result
                 }
             }
 
@@ -78,21 +85,11 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Context -Name 'Values exists but it should not' -Fixture {
             BeforeAll {
                 $testParams = @{
-                    TechnicalNotificationMails           = 'exapmle@contoso.com'
-                    SecurityComplianceNotificationPhones = '+1123456789'
-                    SecurityComplianceNotificationMails  = 'exapmle@contoso.com'
+                    TechnicalNotificationMails           = ''
+                    SecurityComplianceNotificationPhones = ''
+                    SecurityComplianceNotificationMails  = ''
                     Credential                           = $Credential
                     IsSingleInstance                     = 'Yes'
-                }
-
-                Mock -CommandName Get-MgOrganization -MockWith {
-                    $AADTenantDetails = New-Object PSCustomObject
-                    $AADTenantDetails | Add-Member -MemberType NoteProperty -Name MarketingNotificationEmails -Value '' #should not be
-                    $AADTenantDetails | Add-Member -MemberType NoteProperty -Name SecurityComplianceNotificationMails -Value ''
-                    $AADTenantDetails | Add-Member -MemberType NoteProperty -Name SecurityComplianceNotificationPhones -Value ''
-                    $AADTenantDetails | Add-Member -MemberType NoteProperty -Name TechnicalNotificationMails -Value ''
-
-                    return $AADTenantDetails
                 }
             }
 
@@ -110,20 +107,11 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Credential                           = $Credential
                     IsSingleInstance                     = 'Yes'
                 }
-
-                Mock -CommandName Get-MgOrganization -MockWith {
-                    $AADTenantDetails = New-Object PSCustomObject
-                    $AADTenantDetails | Add-Member -MemberType NoteProperty -Name MarketingNotificationEmails -Value 'exapmle@contoso.com'
-                    $AADTenantDetails | Add-Member -MemberType NoteProperty -Name SecurityComplianceNotificationMails -Value 'exapmle@contoso.com'
-                    $AADTenantDetails | Add-Member -MemberType NoteProperty -Name SecurityComplianceNotificationPhones -Value '+1123456789'
-                    $AADTenantDetails | Add-Member -MemberType NoteProperty -Name TechnicalNotificationMails -Value 'exapmle@contoso.com'
-                    return $AADTenantDetails
-                }
             }
 
             It 'Should return Values from the get method' {
                 Get-TargetResource @testParams
-                Should -Invoke -CommandName 'Get-MgOrganization' -Exactly 1
+                Should -Invoke -CommandName 'Get-MgBetaOrganization' -Exactly 1
             }
 
             It 'Should return true from the test method' {
@@ -141,21 +129,11 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Credential                           = $Credential
                     IsSingleInstance                     = 'Yes'
                 }
-
-                Mock -CommandName Get-MgOrganization -MockWith {
-                    $AADTenantDetails = New-Object PSCustomObject
-                    $AADTenantDetails | Add-Member -MemberType NoteProperty -Name MarketingNotificationEmails -Value 'exapmle@contoso.com'
-                    $AADTenantDetails | Add-Member -MemberType NoteProperty -Name SecurityComplianceNotificationMails -Value 'exapmle@contoso.com'
-                    $AADTenantDetails | Add-Member -MemberType NoteProperty -Name SecurityComplianceNotificationPhones -Value '+1123456789'
-                    $AADTenantDetails | Add-Member -MemberType NoteProperty -Name TechnicalNotificationMails -Value 'exapmle@contoso.com'
-                    $AADTenantDetails | Add-Member -MemberType NoteProperty -Name Id -Value '12345-12345-12345-12345-12345'
-                    return $AADTenantDetails
-                }
             }
 
             It 'Should return values from the get method' {
                 Get-TargetResource @testParams
-                Should -Invoke -CommandName 'Get-MgOrganization' -Exactly 1
+                Should -Invoke -CommandName 'Get-MgBetaOrganization' -Exactly 1
             }
 
             It 'Should return false from the test method' {
@@ -164,26 +142,22 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName 'Update-MgOrganization' -Exactly 1
+                Should -Invoke -CommandName 'Update-MgBetaOrganization' -Exactly 1
             }
         }
 
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
-                }
-
-                Mock -CommandName Get-MgOrganization -MockWith {
-                    $AADTenantDetails = New-Object PSCustomObject
-                    $AADTenantDetails | Add-Member -MemberType NoteProperty -Name IsSingleInstance -Value 'Yes'
-                    return $AADTenantDetails
                 }
             }
 
             It 'Should reverse engineer resource from the export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

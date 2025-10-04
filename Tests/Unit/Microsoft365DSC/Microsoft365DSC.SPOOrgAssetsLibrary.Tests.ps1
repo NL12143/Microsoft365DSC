@@ -21,24 +21,11 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
 
         BeforeAll {
-            if ($null -eq (Get-Module PnP.PowerShell))
-            {
-                Import-Module PnP.PowerShell
-
-            }
-
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
             $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@contoso.com', $secpasswd)
             $global:tenantName = $Credential.UserName.Split('@')[1].Split('.')[0]
 
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
-            }
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
@@ -60,9 +47,31 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 return 'contoso'
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            Mock -CommandName Get-PnPTenantCdnEnabled -ParameterFilter { $CdnType -eq 'Public' } -MockWith {
+                return @{ Value = $true }
             }
+
+            Mock -CommandName Get-PnPTenantCdnEnabled -ParameterFilter { $CdnType -eq 'Private' } -MockWith {
+                return @{ Value = $false }
+            }
+
+            Mock -CommandName Get-PNPOrgAssetsLibrary -MockWith {
+                return @{
+                    LibraryUrl = @{
+                        decodedurl = 'sites/m365dsc/Missing'
+                    }
+                    CdnType    = 'Public'
+                }
+            }
+
+            Mock -CommandName Start-Sleep -MockWith {
+            }
+
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -73,14 +82,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     CdnType    = 'Public'
                     Credential = $Credential
                     Ensure     = 'Present'
-                }
-
-                Mock -CommandName New-M365DSCConnection -MockWith {
-                    return 'Credentials'
-                }
-
-                Mock -CommandName Get-PnPTenantCdnEnabled -MockWith {
-                    return @{ Value = 'true' }
                 }
 
                 Mock -CommandName Get-PNPOrgAssetsLibrary -MockWith {
@@ -108,23 +109,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Credential = $Credential
                     Ensure     = 'Absent'
                 }
-
-                Mock -CommandName New-M365DSCConnection -MockWith {
-                    return 'Credentials'
-                }
-
-                Mock -CommandName Get-PnPTenantCdnEnabled -MockWith {
-                    return @{ Value = 'true' }
-                }
-
-                Mock -CommandName Get-PNPOrgAssetsLibrary -MockWith {
-                    return @{
-                        LibraryUrl = @{
-                            decodedurl = 'sites/m365dsc/Branding'
-                        }
-                    }
-                    CdnType            = 'Public'
-                }
             }
 
             It 'Should return Values from the Get method' {
@@ -149,27 +133,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Credential = $Credential
                     Ensure     = 'Present'
                 }
-
-                Mock -CommandName New-M365DSCConnection -MockWith {
-                    return 'Credentials'
-                }
-
-                Mock -CommandName Get-M365TenantName -MockWith {
-                    return 'contoso'
-                }
-
-                Mock -CommandName Get-PnPTenantCdnEnabled -MockWith {
-                    return @{ Value = 'true' }
-                }
-
-                Mock -CommandName Get-PNPOrgAssetsLibrary -MockWith {
-                    return @{
-                        LibraryUrl = @{
-                            decodedurl = 'sites/m365dsc/Branding'
-                        }
-                    }
-                    CdnType            = 'Public'
-                }
             }
 
             It 'Should return Values from the Get method' {
@@ -186,29 +149,9 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             BeforeAll {
                 $testParams = @{
                     LibraryUrl = 'https://contoso.sharepoint.com/sites/m365dsc/Branding'
-                    CdnType    = 'Public'
+                    CdnType    = 'Private' # Drift
                     Credential = $Credential
                     Ensure     = 'Present'
-                }
-
-                Mock -CommandName New-M365DSCConnection -MockWith {
-                    return 'Credentials'
-                }
-
-                Mock -CommandName Get-PNPOrgAssetsLibrary -MockWith {
-                    return @{
-                        LibraryUrl = @{
-                            decodedurl = 'sites/m365dsc/Missing'
-                        }
-
-                        CdnType    = 'Public'
-                        Credential = $Credential
-                        Ensure     = 'Present'
-                    }
-                }
-
-                Mock -CommandName Get-PnPTenantCdnEnabled -MockWith {
-                    return @{ Value = 'True' }
                 }
             }
 
@@ -230,35 +173,15 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
                 }
-
-                Mock -CommandName New-M365DSCConnection -MockWith {
-                    return 'Credential'
-                }
-
-                Mock -CommandName New-M365DSCConnection -MockWith {
-                    return 'Credential'
-                }
-
-                Mock -CommandName Get-M365TenantName -MockWith {
-                    return 'contoso'
-                }
-
-                Mock -CommandName Get-PnPTenantCdnEnabled -MockWith {
-                    return @{ Value = 'true' }
-                }
-
-                Mock -CommandName Get-PNPOrgAssetsLibrary -MockWith {
-                    return @{
-                        LibraryUrl = 'https://contoso.sharepoint.com/sites/m365dsc/Branding'
-                        CdnType    = 'Private'
-                    }
-                }
             }
+
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

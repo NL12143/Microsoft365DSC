@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_TeamsTeam'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -15,7 +17,7 @@ function Get-TargetResource
 
         [Parameter()]
         [System.String]
-        [ValidateLength(1, 1024)]
+        [ValidateLength(0, 1024)]
         $Description,
 
         [Parameter()]
@@ -119,68 +121,90 @@ function Get-TargetResource
 
         [Parameter()]
         [System.Management.Automation.PSCredential]
-        $Credential
+        $Credential,
+
+        [Parameter()]
+        [Switch]
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     Write-Verbose -Message "Getting configuration of Team $DisplayName"
-
-    $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftTeams' -InboundParameters $PSBoundParameters
-
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
-
-    #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
-    $CommandName = $MyInvocation.MyCommand
-    $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
-        -CommandName $CommandName `
-        -Parameters $PSBoundParameters
-    Add-M365DSCTelemetryEvent -Data $data
-    #endregion
-
-    $nullReturn = $PSBoundParameters
-    $nullReturn.Ensure = 'Absent'
-
-    Write-Verbose -Message "Checking for existence of Team $DisplayName"
 
     try
     {
-        ## will only return 1 instance
-        if ($PSBoundParameters.ContainsKey('GroupID'))
+        if (-not $Script:exportedInstance -or $Script:exportedInstance.DisplayName -ne $DisplayName)
         {
-            Write-Verbose -Message 'GroupID was specified'
-            $team = Get-Team -GroupId $GroupID
-            if ($null -eq $team)
+            $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftTeams' -InboundParameters $PSBoundParameters
+
+            #Ensure the proper dependencies are installed in the current environment.
+            Confirm-M365DSCDependencies
+
+            #region Telemetry
+            $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+            $CommandName = $MyInvocation.MyCommand
+            $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
+                -CommandName $CommandName `
+                -Parameters $PSBoundParameters
+            Add-M365DSCTelemetryEvent -Data $data
+            #endregion
+
+            $nullReturn = $PSBoundParameters
+            $nullReturn.Ensure = 'Absent'
+
+            Write-Verbose -Message "Checking for existence of Team $DisplayName"
+
+            ## will only return 1 instance
+            if ($PSBoundParameters.ContainsKey('GroupID'))
             {
-                Write-Verbose -Message "Teams with GroupId $($GroupID) doesn't exist"
-                return $nullReturn
+                Write-Verbose -Message 'GroupID was specified'
+                $team = Get-Team -GroupId $GroupID
+                if ($null -eq $team)
+                {
+                    Write-Verbose -Message "Teams with GroupId $($GroupID) doesn't exist"
+                    return $nullReturn
+                }
+            }
+            else
+            {
+                Write-Verbose -Message 'GroupID was NOT specified'
+                ## Can retreive multiple Teams since displayname is not unique
+                # Filter on DisplayName as -DisplayName also does partial matches and will report duplicate names that are not real duplicate names
+                $team = Get-Team -DisplayName $DisplayName | Where-Object { $_.DisplayName -eq $DisplayName }
+                if ($null -eq $team)
+                {
+                    Write-Verbose -Message "Teams with displayname $DisplayName doesn't exist"
+                    return $nullReturn
+                }
+                if ($team.Length -gt 1)
+                {
+                    throw "Duplicate Teams name $DisplayName exist in tenant"
+                }
             }
         }
         else
         {
-            Write-Verbose -Message 'GroupID was NOT specified'
-            ## Can retreive multiple Teams since displayname is not unique
-            # Filter on DisplayName as -DisplayName also does partial matches and will report duplicate names that are not real duplicate names
-            $team = Get-Team -DisplayName $DisplayName | Where-Object { $_.DisplayName -eq $DisplayName }
-            if ($null -eq $team)
-            {
-                Write-Verbose -Message "Teams with displayname $DisplayName doesn't exist"
-                return $nullReturn
-            }
-            if ($team.Length -gt 1)
-            {
-                throw "Duplicate Teams name $DisplayName exist in tenant"
-            }
+            $team = $Script:exportedInstance
         }
 
         Write-Verbose -Message "Getting Team {$DisplayName} Owners"
         [array]$Owners = Get-TeamUser -GroupId $team.GroupId | Where-Object { $_.Role -eq 'owner' }
+        if ($null -eq $Owners)
+        {
+            # Without Users, Get-TeamUser returns null instead of an empty array
+            $Owners = @()
+        }
+
         Write-Verbose -Message "Found Team $($team.DisplayName)."
 
         $result = @{
             DisplayName                       = $team.DisplayName
             GroupID                           = $team.GroupId
             Description                       = $team.Description
-            Owner                             = $Owners[0].User.ToString()
+            Owner                             = [array]$Owners.User
             MailNickName                      = $team.MailNickName
             Visibility                        = $team.Visibility
             AllowAddRemoveApps                = $team.AllowAddRemoveApps
@@ -201,9 +225,11 @@ function Get-TargetResource
             AllowDeleteChannels               = $team.AllowDeleteChannels
             ShowInTeamsSearchAndSuggestions   = $team.ShowInTeamsSearchAndSuggestions
             Ensure                            = 'Present'
+            ManagedIdentity                   = $ManagedIdentity.IsPresent
+            AccessTokens                      = $AccessTokens
         }
 
-        if ($ConnectionMode -eq 'ServicePrincipal')
+        if ($ConnectionMode.StartsWith('ServicePrincipal'))
         {
             $result.Add('ApplicationId', $ApplicationId)
             $result.Add('TenantId', $TenantId)
@@ -243,7 +269,7 @@ function Set-TargetResource
 
         [Parameter()]
         [System.String]
-        [ValidateLength(1, 1024)]
+        [ValidateLength(0, 1024)]
         $Description,
 
         [Parameter()]
@@ -347,7 +373,15 @@ function Set-TargetResource
 
         [Parameter()]
         [System.Management.Automation.PSCredential]
-        $Credential
+        $Credential,
+
+        [Parameter()]
+        [Switch]
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Setting configuration of Team $DisplayName"
@@ -367,9 +401,7 @@ function Set-TargetResource
     $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftTeams' -InboundParameters $PSBoundParameters
 
     $team = Get-TargetResource @PSBoundParameters
-
-    $CurrentParameters = $PSBoundParameters
-    $CurrentParameters.Remove('Ensure') | Out-Null
+    $CurrentParameters = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
 
     if ($Ensure -eq 'Present' -and ($team.Ensure -eq 'Present'))
     {
@@ -381,16 +413,6 @@ function Set-TargetResource
         if (-not $CurrentParameters.ContainsKey('GroupID'))
         {
             $CurrentParameters.Add('GroupID', $team.GroupID)
-        }
-        if ($ConnectionMode -eq 'Credential')
-        {
-            $CurrentParameters.Remove('Credential') | Out-Null
-        }
-        else
-        {
-            $CurrentParameters.Remove('ApplicationId') | Out-Null
-            $CurrentParameters.Remove('TenantId') | Out-Null
-            $CurrentParameters.Remove('CertificateThumbprint') | Out-Null
         }
         Set-Team @CurrentParameters
         Write-Verbose -Message "Updating team $DisplayName"
@@ -408,26 +430,27 @@ function Set-TargetResource
             $CurrentParameters.Owner = [array](($Owner[0]).ToString())
         }
         Write-Verbose -Message "Connection mode: $ConnectionMode"
-        if ($ConnectionMode -eq 'ServicePrincipal')
+        if ($ConnectionMode.StartsWith('ServicePrincipal'))
         {
             $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftGraph' `
                 -InboundParameters $PSBoundParameters
-            $group = New-MgSGroup -DisplayName $DisplayName -GroupTypes 'Unified' -MailEnabled $true -SecurityEnabled $true -MailNickname $MailNickName
+            $group = New-MgGroup -DisplayName $DisplayName -GroupTypes 'Unified' -MailEnabled -SecurityEnabled -MailNickname $MailNickName -ErrorAction Stop
             $currentOwner = (($CurrentParameters.Owner)[0])
 
             Write-Verbose -Message "Retrieving Group Owner {$currentOwner}"
-            $ownerUser = Get-MgUser -Search $currentOwner
+            $ownerUser = Get-MgUser -Search "userPrincipalName:$currentOwner" -ConsistencyLevel eventual
+            $ownerOdataID = "$((Get-MSCloudLoginConnectionProfile -Workload MicrosoftGraph).ResourceUrl)v1.0/directoryObjects/$($ownerUser.Id)"
 
-            Write-Verbose -Message "Adding Owner {$($ownerUser.ObjectId)} to Group {$($group.Id)}"
+            Write-Verbose -Message "Adding Owner {$($ownerUser.Id)} to Group {$($group.Id)}"
             try
             {
-                New-MgGroupOwnerByRef -GroupId $group.Id -RefObjectId $ownerUser.ObjectId -ErrorAction Stop
+                New-MgGroupOwnerByRef -GroupId $group.Id -OdataId $ownerOdataID -ErrorAction Stop
             }
             catch
             {
                 Write-Verbose -Message 'Adding Owner - Sleeping for 15 seconds'
                 Start-Sleep -Seconds 15
-                New-MgGroupOwnerByRef -GroupId $group.Id -RefObjectId $ownerUser.ObjectId
+                New-MgGroupOwnerByRef -GroupId $group.Id -OdataId $ownerOdataID -ErrorAction Stop
             }
 
             try
@@ -438,7 +461,7 @@ function Set-TargetResource
             {
                 Write-Verbose -Message 'Creating Team - Sleeping for 15 seconds'
                 Start-Sleep -Seconds 15
-                New-Team -GroupId $group.Id
+                New-Team -GroupId $group.Id -ErrorAction Stop
             }
         }
         else
@@ -453,7 +476,6 @@ function Set-TargetResource
                 $OwnerValue = $Owner[0].ToString()
             }
             $CurrentParameters.Owner = [System.String]$OwnerValue
-            $CurrentParameters.Remove('Credential') | Out-Null
             Write-Verbose -Message "Creating team with Values: $(Convert-M365DscHashtableToString -Hashtable $CurrentParameters)"
             $newTeam = New-Team @CurrentParameters
             Write-Verbose -Message "Team {$DisplayName} was just created."
@@ -488,7 +510,7 @@ function Test-TargetResource
 
         [Parameter()]
         [System.String]
-        [ValidateLength(1, 1024)]
+        [ValidateLength(0, 1024)]
         $Description,
 
         [Parameter()]
@@ -592,13 +614,19 @@ function Test-TargetResource
 
         [Parameter()]
         [System.Management.Automation.PSCredential]
-        $Credential
+        $Credential,
+
+        [Parameter()]
+        [Switch]
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
 
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -606,34 +634,10 @@ function Test-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message "Testing configuration of Team $DisplayName"
-
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-
-    Write-Verbose -Message "Current Values: $(Convert-M365DscHashtableToString -Hashtable $CurrentValues)"
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    If (!$PSBoundParameters.ContainsKey('Ensure'))
-    {
-        $PSBoundParameters.Add('Ensure', $Ensure)
-    }
-    $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('Credential') | Out-Null
-    $ValuesToCheck.Remove('GroupID') | Out-Null
-
-    if ($null -eq $CurrentValues.Owner)
-    {
-        $ValuesToCheck.Remove('Owner') | Out-Null
-    }
-
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck $ValuesToCheck.Keys
-
-    Write-Verbose -Message "Test-TargetResource returned $TestResult"
-
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '') `
+                                         -ExcludedProperties @('GroupID')
+    return $result
 }
 
 function Export-TargetResource
@@ -656,8 +660,17 @@ function Export-TargetResource
 
         [Parameter()]
         [System.Management.Automation.PSCredential]
-        $Credential
+        $Credential,
+
+        [Parameter()]
+        [Switch]
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftTeams' -InboundParameters $PSBoundParameters
 
     #Ensure the proper dependencies are installed in the current environment.
@@ -674,7 +687,7 @@ function Export-TargetResource
 
     try
     {
-        if ($ConnectionMode -eq 'ServicePrincipal')
+        if ($ConnectionMode.StartsWith('ServicePrincipal'))
         {
             $organization = Get-M365DSCTenantDomain -ApplicationId $ApplicationId -TenantId $TenantId -CertificateThumbprint $CertificateThumbprint
         }
@@ -683,43 +696,54 @@ function Export-TargetResource
             $organization = $Credential.UserName.Split('@')[1]
         }
 
-        $teams = Get-Team
+        $teams = Get-Team | Sort-Object -Property GroupId
         $i = 1
         $dscContent = ''
-        Write-Host "`r`n" -NoNewline
+        Write-M365DSCHost -Message "`r`n" -DeferWrite
         foreach ($team in $teams)
         {
-            Write-Host "    |---[$i/$($teams.Length)] $($team.DisplayName)" -NoNewline
-            $params = @{
-                DisplayName           = $team.DisplayName
-                GroupID               = $team.GroupId
-                Credential            = $Credential
-                ApplicationId         = $ApplicationId
-                TenantId              = $TenantId
-                CertificateThumbprint = $CertificateThumbprint
+            # Skip Teams without DisplayName (orphaned/deleted Teams) because the Get method cannot be called without a display name
+            if ($null -ne $team.DisplayName -and $team.DisplayName -ne '')
+            {
+                if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+                {
+                    $Global:M365DSCExportResourceInstancesCount++
+                }
+
+                Write-M365DSCHost -Message "    |---[$i/$($teams.Length)] $($team.DisplayName)" -DeferWrite
+                $params = @{
+                    DisplayName           = $team.DisplayName
+                    GroupID               = $team.GroupId
+                    Credential            = $Credential
+                    ApplicationId         = $ApplicationId
+                    TenantId              = $TenantId
+                    CertificateThumbprint = $CertificateThumbprint
+                    ManagedIdentity       = $ManagedIdentity.IsPresent
+                    AccessTokens          = $AccessTokens
+                }
+
+                $Script:exportedInstance = $team
+                $Results = Get-TargetResource @Params
+                $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
+                    -ConnectionMode $ConnectionMode `
+                    -ModulePath $PSScriptRoot `
+                    -Results $Results `
+                    -Credential $Credential
+                $dscContent += $currentDSCBlock
+                Save-M365DSCPartialExport -Content $currentDSCBlock `
+                    -FileName $Global:PartialExportFileName
+                $i++
+                Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
             }
-            $Results = Get-TargetResource @Params
-            $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                -Results $Results
-            $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
-                -ConnectionMode $ConnectionMode `
-                -ModulePath $PSScriptRoot `
-                -Results $Results `
-                -Credential $Credential
-            $dscContent += $currentDSCBlock
-            Save-M365DSCPartialExport -Content $currentDSCBlock `
-                -FileName $Global:PartialExportFileName
-            $i++
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
         }
 
         return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
-        New-M365DSCLogEntry -Message "Error during Export:" `
+        New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `
             -Source $($MyInvocation.MyCommand.Source) `
             -TenantId $TenantId `

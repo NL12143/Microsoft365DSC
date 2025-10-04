@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_SPOPropertyBag'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -51,68 +53,79 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Getting configuration of SPOPropertyBag for $Key"
-    Write-Verbose -Message 'Connecting to PnP from the Get method'
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'PnP' `
-        -InboundParameters $PSBoundParameters `
-        -Url $Url
-
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
-
-    #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
-    $CommandName = $MyInvocation.MyCommand
-    $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
-        -CommandName $CommandName `
-        -Parameters $PSBoundParameters
-    Add-M365DSCTelemetryEvent -Data $data
-    #endregion
-
-    $nullReturn = $PSBoundParameters
-    $nullReturn.Ensure = 'Absent'
     try
     {
-        try
+        if ($null -eq $Script:exportedInstance -or $Script:exportedInstance.Key -ne $Key)
         {
-            Write-Verbose -Message "Obtaining all properties from the Get method for url {$Url}"
-            [array]$property = Get-PnPPropertyBag -Key $Key -ErrorAction 'Stop'
+            $null = New-M365DSCConnection -Workload 'PnP' `
+                -InboundParameters $PSBoundParameters `
+                -Url $Url
 
-            Write-Verbose -Message 'Properties obtained correctly'
-        }
-        catch
-        {
-            Write-Verbose "Credential or service principal specified does not have admin access to site {$Url}"
-            if ($_.Exception -like '*Unable to cast object of type*')
-            {
-                [array]$property = Get-PnPPropertyBag | Where-Object -FilterScript { $_.Key -ceq $Key }
-            }
-            elseif ($_.Exception -like '*The underlying connection was closed*')
-            {
-                $ConnectionMode = New-M365DSCConnection -Workload 'PnP' `
-                    -InboundParameters $PSBoundParameters `
-                    -Url $Url
+            #Ensure the proper dependencies are installed in the current environment.
+            Confirm-M365DSCDependencies
 
+            #region Telemetry
+            $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+            $CommandName = $MyInvocation.MyCommand
+            $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
+                -CommandName $CommandName `
+                -Parameters $PSBoundParameters
+            Add-M365DSCTelemetryEvent -Data $data
+            #endregion
+
+            $nullReturn = $PSBoundParameters
+            $nullReturn.Ensure = 'Absent'
+            try
+            {
                 Write-Verbose -Message "Obtaining all properties from the Get method for url {$Url}"
-                [array]$property = Get-PnPPropertyBag -Key $Key -ErrorAction 'SilentlyContinue'
+                [array]$property = Get-PnPPropertyBag -Key $Key -ErrorAction 'Stop'
+
+                Write-Verbose -Message 'Properties obtained correctly'
             }
-            else
+            catch
             {
-                New-M365DSCLogEntry -Message "Couldn't get Property Bag for {$Url}" `
-                    -Exception $_ `
-                    -Source $MyInvocation.MyCommand.ModuleName
-                Write-Verbose "Credential specified does not have admin access to site {$Url}"
+                Write-Verbose "Credential or service principal specified does not have admin access to site {$Url}"
+                if ($_.Exception -like '*Unable to cast object of type*')
+                {
+                    [array]$property = Get-PnPPropertyBag | Where-Object -FilterScript { $_.Key -ceq $Key }
+                }
+                elseif ($_.Exception -like '*The underlying connection was closed*')
+                {
+                    $null = New-M365DSCConnection -Workload 'PnP' `
+                        -InboundParameters $PSBoundParameters `
+                        -Url $Url
+
+                    Write-Verbose -Message "Obtaining all properties from the Get method for url {$Url}"
+                    [array]$property = Get-PnPPropertyBag -Key $Key -ErrorAction 'SilentlyContinue'
+                }
+                else
+                {
+                    New-M365DSCLogEntry -Message "Couldn't get Property Bag for {$Url}" `
+                        -Exception $_ `
+                        -Source $MyInvocation.MyCommand.ModuleName
+                    Write-Verbose "Credential specified does not have admin access to site {$Url}"
+                }
             }
         }
-        if ($property.Length -ne 1)
+        else
+        {
+            [array]$property = @($Script:exportedInstance.Value)
+        }
+
+        if ($property.Count -ne 1)
         {
             [array]$property = Get-PnPPropertyBag | Where-Object -FilterScript { $_.Key -ceq $Key }
         }
-        if ($property.Length -eq 0)
+        if ($property.Count -eq 0)
         {
             Write-Verbose -Message "SPOPropertyBag $Key does not exist at {$Url}."
             return $nullReturn
@@ -132,7 +145,8 @@ function Get-TargetResource
                 CertificatePassword   = $CertificatePassword
                 CertificatePath       = $CertificatePath
                 CertificateThumbprint = $CertificateThumbprint
-                Managedidentity       = $ManagedIdentity.IsPresent
+                ManagedIdentity       = $ManagedIdentity.IsPresent
+                AccessTokens          = $AccessTokens
             }
 
             Write-Verbose -Message "Get-TargetResource Result: `n $(Convert-M365DscHashtableToString -Hashtable $result)"
@@ -203,7 +217,11 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Setting configuration of SPOPropertyBag property for $Key at {$Url}"
@@ -219,10 +237,6 @@ function Set-TargetResource
         -Parameters $PSBoundParameters
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
-
-    $ConnectionMode = New-M365DSCConnection -Workload 'PnP' `
-        -InboundParameters $PSBoundParameters `
-        -Url $Url
 
     $currentProperty = Get-TargetResource @PSBoundParameters
 
@@ -293,13 +307,15 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
 
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -307,29 +323,9 @@ function Test-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message "Testing configuration of SPOPropertyBag for $Key at {$Url}"
-
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('Credential') | Out-Null
-    $ValuesToCheck.Remove('ApplicationId') | Out-Null
-    $ValuesToCheck.Remove('TenantId') | Out-Null
-    $ValuesToCheck.Remove('CertificatePath') | Out-Null
-    $ValuesToCheck.Remove('CertificatePassword') | Out-Null
-    $ValuesToCheck.Remove('CertificateThumbprint') | Out-Null
-    $ValuesToCheck.Remove('ManagedIdentity') | Out-Null
-    $ValuesToCheck.Remove('ApplicationSecret') | Out-Null
-
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck $ValuesToCheck.Keys
-
-    Write-Verbose -Message "Test-TargetResource returned $TestResult"
-
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '')
+    return $result
 }
 
 function Export-TargetResource
@@ -338,10 +334,6 @@ function Export-TargetResource
     [OutputType([System.String])]
     param
     (
-        [Parameter()]
-        [ValidateRange(1, 100)]
-        $MaxProcesses,
-
         [Parameter()]
         [System.Management.Automation.PSCredential]
         $Credential,
@@ -372,7 +364,11 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     try
@@ -391,174 +387,103 @@ function Export-TargetResource
             -Parameters $PSBoundParameters
         Add-M365DSCTelemetryEvent -Data $data
         #endregion
-        $result = ''
 
         # Get all Site Collections in tenant;
-        $instances = Get-PnPTenantSite -ErrorAction Stop
-        if ($instances.Length -ge $MaxProcesses)
+        $sites = Get-PnPTenantSite -ErrorAction Stop
+        $i = 1
+        $dscContent = ''
+
+        if ($sites.Length -eq 0)
         {
-            $instances = Split-ArrayByParts -Array $instances -Parts $MaxProcesses
-            $batchSize = $instances[0].Length
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         }
         else
         {
-            $MaxProcesses = $instances.Length
-            $batchSize = 1
+            Write-M365DSCHost -Message "`r`n" -DeferWrite
         }
-
-        # For each batch of 8 items, start and asynchronous background PowerShell job. Each
-        # job will be given the name of the current resource followed by its ID;
-        $i = 1
-        foreach ($batch in $instances)
+        foreach ($site in $sites)
         {
-            Start-Job -Name "SPOPropertyBag$i" -ScriptBlock {
-                Param(
-                    [Parameter(Mandatory = $true)]
-                    [System.Object[]]
-                    $Instances,
+            $siteUrl = $site.Url
+            Write-M365DSCHost -Message "    [$i/$($sites.Length)] $($siteUrl)"
+            try
+            {
+                $null = New-M365DSCConnection -Workload 'PnP' `
+                    -InboundParameters $PSBoundParameters `
+                    -Url $siteUrl
+            }
+            catch
+            {
+                Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
-                    [Parameter(Mandatory = $true)]
-                    [System.String]
-                    $ScriptRoot,
+                New-M365DSCLogEntry -Message 'Error during Export:' `
+                    -Exception $_ `
+                    -Source $($MyInvocation.MyCommand.Source) `
+                    -TenantId $TenantId `
+                    -Credential $Credential
 
-                    [Parameter()]
-                    [System.Management.Automation.PSCredential]
-                    $Credential,
+                continue
+            }
 
-                    [Parameter()]
-                    [System.String]
-                    $ApplicationId,
-
-                    [Parameter()]
-                    [System.String]
-                    $TenantId,
-
-                    [Parameter()]
-                    [System.String]
-                    $ApplicationSecret,
-
-                    [Parameter()]
-                    [System.String]
-                    $CertificatePath,
-
-                    [Parameter()]
-                    [System.Management.Automation.PSCredential]
-                    $CertificatePassword,
-
-                    [Parameter()]
-                    [System.String]
-                    $CertificateThumbprint,
-
-                    [Parameter()]
-                    [Switch]
-                    $ManagedIdentity
-                )
-                $WarningPreference = 'SilentlyContinue'
-
-                # Implicitly load the M365DSCUtil.psm1 module in order to be able to call
-                # into the Invoke-O36DSCCommand cmdlet;
-                Import-Module ($ScriptRoot + '\..\..\Modules\M365DSCUtil.psm1') -Force | Out-Null
-
-                # Invoke the logic that extracts the all the Property Bag values of the current site using the
-                # the invokation wrapper that handles throttling;
-                $returnValue = ''
-                $returnValue += Invoke-M365DSCCommand -Arguments $PSBoundParameters -InvokationPath $ScriptRoot -ScriptBlock {
-                    $VerbosePreference = 'SilentlyContinue'
-                    $params = $args[0]
-                    $dscContent = ''
-                    foreach ($item in $params.instances)
+            try
+            {
+                $properties = Get-PnPPropertyBag
+                $j = 1
+                foreach ($property in $properties)
+                {
+                    if ($null -ne $Global:M365DSCExportResourceInstancesCount)
                     {
-                        foreach ($site in $item)
-                        {
-                            $siteUrl = $site.Url
-                            try
-                            {
-                                $ConnectionMode = New-M365DSCConnection -Workload 'PnP' `
-                                    -InboundParameters $PSBoundParameters `
-                                    -Url $siteUrl
-                            }
-                            catch
-                            {
-                                throw "M365DSC - Failed to connect to PnP {$siteUrl}: " + $_
-                            }
-
-                            try
-                            {
-                                $properties = Get-PnPPropertyBag
-                                foreach ($property in $properties)
-                                {
-                                    $Params = @{
-                                        Url                   = $siteUrl
-                                        Key                   = $property.Key
-                                        Value                 = '*'
-                                        ApplicationId         = $ApplicationId
-                                        TenantId              = $TenantId
-                                        ApplicationSecret     = $ApplicationSecret
-                                        CertificatePassword   = $CertificatePassword
-                                        CertificatePath       = $CertificatePath
-                                        CertificateThumbprint = $CertificateThumbprint
-                                        Managedidentity       = $ManagedIdentity.IsPresent
-                                        Credential            = $Credential
-                                    }
-
-                                    $Results = Get-TargetResource @Params
-                                    $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                                        -Results $Results
-                                    $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName 'SPOPropertyBag' `
-                                        -ConnectionMode $ConnectionMode `
-                                        -ModulePath $PSScriptRoot `
-                                        -Results $Results `
-                                        -Credential $Credential
-                                    $dscContent += $currentDSCBlock
-                                    Save-M365DSCPartialExport -Content $currentDSCBlock `
-                                        -FileName $Global:PartialExportFileName
-                                }
-                            }
-                            catch
-                            {
-                                throw "M365DSC - Failed to Get-PnPPropertyBag {$siteUrl}: " + $_
-                            }
-                        }
+                        $Global:M365DSCExportResourceInstancesCount++
                     }
-                    return $dscContent
+
+                    Write-M365DSCHost -Message "        |---  [$j/$($properties.Length)] $($property.Key)" -DeferWrite
+                    $Params = @{
+                        Url                   = $siteUrl
+                        Key                   = $property.Key
+                        Value                 = '*'
+                        ApplicationId         = $ApplicationId
+                        TenantId              = $TenantId
+                        ApplicationSecret     = $ApplicationSecret
+                        CertificatePassword   = $CertificatePassword
+                        CertificatePath       = $CertificatePath
+                        CertificateThumbprint = $CertificateThumbprint
+                        ManagedIdentity       = $ManagedIdentity.IsPresent
+                        Credential            = $Credential
+                        AccessTokens          = $AccessTokens
+                    }
+
+                    $Script:exportedInstance = @{
+                        Key = $property.Key
+                        Value = $property.Value
+                    }
+                    $Results = Get-TargetResource @Params
+                    $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName 'SPOPropertyBag' `
+                        -ConnectionMode $ConnectionMode `
+                        -ModulePath $PSScriptRoot `
+                        -Results $Results `
+                        -Credential $Credential
+                    $dscContent += $currentDSCBlock
+                    Save-M365DSCPartialExport -Content $currentDSCBlock `
+                        -FileName $Global:PartialExportFileName
+
+                    Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
+                    $j++
                 }
-                return $returnValue
-            } -ArgumentList @($batch, $PSScriptRoot, $Credential, $ApplicationId, $TenantId, $ApplicationSecret, $CertificateThumbprint, $CertificatePassword, $CertificatePath, $ManagedIdentity) | Out-Null
+            }
+            catch
+            {
+                Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
+
+                New-M365DSCLogEntry -Message 'Error during Export:' `
+                    -Exception $_ `
+                    -Source $($MyInvocation.MyCommand.Source) `
+                    -TenantId $TenantId `
+                    -Credential $Credential
+
+                continue
+            }
             $i++
         }
 
-        Write-Verbose -Message "    Broke extraction process down into {$MaxProcesses} jobs of {$($instances[0].Length)} item(s) each"
-        $totalJobs = $MaxProcesses
-        $jobsCompleted = 0
-        $status = 'Running...'
-        $elapsedTime = 0
-        do
-        {
-            $jobs = Get-Job | Where-Object -FilterScript { $_.Name -like '*SPOPropertyBag*' }
-            $count = $jobs.Length
-            foreach ($job in $jobs)
-            {
-                if ($job.JobStateInfo.State -eq 'Complete')
-                {
-                    $result += Receive-Job -Name $job.name
-                    Remove-Job -Name $job.name | Out-Null
-                    $jobsCompleted++
-                }
-                elseif ($job.JobStateInfo.State -eq 'Failed')
-                {
-                    Remove-Job -Name $job.name | Out-Null
-                    Write-Warning "{$($job.name)} failed"
-                    break
-                }
-
-                $status = "Completed $jobsCompleted/$totalJobs jobs in $elapsedTime seconds"
-                $percentCompleted = $jobsCompleted / $totalJobs * 100
-                Write-Progress -Activity 'SPOPropertyBag Extraction' -PercentComplete $percentCompleted -Status $status
-            }
-            $elapsedTime ++
-            Start-Sleep -Seconds 1
-        } while ($count -ne 0)
-        Write-Progress -Activity 'SPOPropertyBag Extraction' -PercentComplete 100 -Status 'Completed' -Completed
         $organization = ''
         $principal = '' # Principal represents the "NetBios" name of the tenant (e.g. the M365DSC part of M365DSC.onmicrosoft.com)
         if ($null -ne $Credential -and $Credential.UserName.Contains('@'))
@@ -576,18 +501,17 @@ function Export-TargetResource
             $principal = $organization.Split('.')[0]
         }
 
-        if ($result.ToLower().Contains($organization.ToLower()) -or `
-                $result.ToLower().Contains($principal.ToLower()))
+        if ($dscContent.ToLower().Contains($organization.ToLower()) -or `
+                $dscContent.ToLower().Contains($principal.ToLower()))
         {
-            $result = $result -ireplace [regex]::Escape('https://' + $principal + '.sharepoint.com/'), "https://`$(`$OrganizationName.Split('.')[0]).sharepoint.com/"
-            $result = $result -ireplace [regex]::Escape('@' + $organization), "@`$(`$OrganizationName)"
+            $dscContent = $dscContent -ireplace [regex]::Escape('https://' + $principal + '.sharepoint.com/'), "https://`$(`$OrganizationName.Split('.')[0]).sharepoint.com/"
+            $dscContent = $dscContent -ireplace [regex]::Escape('@' + $organization), "@`$(`$OrganizationName)"
         }
-        Write-Host $Global:M365DSCEmojiGreenCheckmark
-        return $result
+        return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `

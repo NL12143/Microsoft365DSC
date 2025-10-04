@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_AADRoleDefinition'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -63,73 +65,79 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-
-    Write-Verbose -Message 'Getting configuration of Azure AD role definition'
-    $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftGraph' `
-        -InboundParameters $PSBoundParameters `
-        -ProfileName 'beta'
-    $MaximumFunctionCount = 32000
-    Select-MgProfile -Name 'Beta'
-
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
-
-    #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
-    $CommandName = $MyInvocation.MyCommand
-    $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
-        -CommandName $CommandName `
-        -Parameters $PSBoundParameters
-    Add-M365DSCTelemetryEvent -Data $data
-    #endregion
-
-    $nullReturn = $PSBoundParameters
-    $nullReturn.Ensure = 'Absent'
     try
     {
-        try
+        if (-not $Script:exportedInstance -or $Script:exportedInstance.DisplayName -ne $DisplayName)
         {
-            if ($null -ne $Id -or $Id -ne '')
+            Write-Verbose -Message 'Getting configuration of Azure AD role definition'
+            $null = New-M365DSCConnection -Workload 'MicrosoftGraph' `
+                -InboundParameters $PSBoundParameters
+
+            #Ensure the proper dependencies are installed in the current environment.
+            Confirm-M365DSCDependencies
+
+            #region Telemetry
+            $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+            $CommandName = $MyInvocation.MyCommand
+            $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
+                -CommandName $CommandName `
+                -Parameters $PSBoundParameters
+            Add-M365DSCTelemetryEvent -Data $data
+            #endregion
+
+            $nullReturn = $PSBoundParameters
+            $nullReturn.Ensure = 'Absent'
+
+            try
             {
-                $AADRoleDefinition = Get-MgRoleManagementDirectoryRoleDefinition -Id $Id
+                if (($null -ne $Id) -and ($Id -ne ''))
+                {
+                    $AADRoleDefinition = Get-MgBetaRoleManagementDirectoryRoleDefinition -Filter "Id eq '$($Id)'"
+                }
             }
-        }
-        catch
-        {
-            Write-Verbose -Message "Could not retrieve AAD roledefinition by Id: {$Id}"
-        }
-        if ($null -eq $AADRoleDefinition)
-        {
-            $AADRoleDefinition = Get-MgRoleManagementDirectoryRoleDefinition -Filter "DisplayName eq '$($DisplayName)'"
-        }
-        if ($null -eq $AADRoleDefinition)
-        {
-            return $nullReturn
+            catch
+            {
+                Write-Verbose -Message "Could not retrieve AAD roledefinition by Id: {$Id}"
+            }
+            if ($null -eq $AADRoleDefinition)
+            {
+                $AADRoleDefinition = Get-MgBetaRoleManagementDirectoryRoleDefinition -Filter "DisplayName eq '$($DisplayName -replace "'", "''")'"
+            }
+            if ($null -eq $AADRoleDefinition)
+            {
+                return $nullReturn
+            }
         }
         else
         {
-            $result = @{
-                Id                    = $AADRoleDefinition.Id
-                DisplayName           = $AADRoleDefinition.DisplayName
-                Description           = $AADRoleDefinition.Description
-                ResourceScopes        = $AADRoleDefinition.ResourceScopes
-                IsEnabled             = $AADRoleDefinition.IsEnabled
-                RolePermissions       = $AADRoleDefinition.RolePermissions.AllowedResourceActions
-                TemplateId            = $AADRoleDefinition.TemplateId
-                Version               = $AADRoleDefinition.Version
-                Ensure                = 'Present'
-                Credential            = $Credential
-                ApplicationId         = $ApplicationId
-                ApplicationSecret     = $ApplicationSecret
-                TenantId              = $TenantId
-                CertificateThumbprint = $CertificateThumbprint
-                Managedidentity       = $ManagedIdentity.IsPresent
-            }
-            Write-Verbose -Message "Get-TargetResource Result: `n $(Convert-M365DscHashtableToString -Hashtable $result)"
-            return $result
+            $AADRoleDefinition = $Script:exportedInstance
         }
+        $result = @{
+            Id                    = $AADRoleDefinition.Id
+            DisplayName           = $AADRoleDefinition.DisplayName
+            Description           = $AADRoleDefinition.Description
+            ResourceScopes        = $AADRoleDefinition.ResourceScopes
+            IsEnabled             = $AADRoleDefinition.IsEnabled
+            RolePermissions       = [Array]$AADRoleDefinition.RolePermissions.AllowedResourceActions
+            TemplateId            = $AADRoleDefinition.TemplateId
+            Version               = $AADRoleDefinition.Version
+            Ensure                = 'Present'
+            Credential            = $Credential
+            ApplicationId         = $ApplicationId
+            ApplicationSecret     = $ApplicationSecret
+            TenantId              = $TenantId
+            CertificateThumbprint = $CertificateThumbprint
+            ManagedIdentity       = $ManagedIdentity.IsPresent
+            AccessTokens          = $AccessTokens
+        }
+        Write-Verbose -Message "Get-TargetResource Result: `n $(Convert-M365DscHashtableToString -Hashtable $result)"
+        return $result
     }
     catch
     {
@@ -207,7 +215,11 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message 'Setting configuration of Azure AD role definition'
@@ -225,15 +237,9 @@ function Set-TargetResource
     #endregion
 
     $currentAADRoleDef = Get-TargetResource @PSBoundParameters
-    $currentParameters = $PSBoundParameters
-    $currentParameters.Remove('ApplicationId') | Out-Null
+    $currentParameters = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
     $currentParameters.Remove('RolePermissions') | Out-Null
     $currentParameters.Remove('ResourceScopes') | Out-Null
-    $currentParameters.Remove('TenantId') | Out-Null
-    $currentParameters.Remove('CertificateThumbprint') | Out-Null
-    $currentParameters.Remove('ManagedIdentity') | Out-Null
-    $currentParameters.Remove('Credential') | Out-Null
-    $currentParameters.Remove('Ensure') | Out-Null
 
     $rolePermissionsObj = @()
     $rolePermissionsObj += @{'allowedResourceActions' = $rolePermissions }
@@ -241,14 +247,18 @@ function Set-TargetResource
     $resourceScopesObj += $ResourceScopes
 
     $currentParameters.Add('RolePermissions', $rolePermissionsObj) | Out-Null
-    $currentParameters.Add('ResourceScopes', $resourceScopesObj) | Out-Null
+    if ($ResourceScopes.Length -gt 0)
+    {
+        $currentParameters.Add('ResourceScopes', $resourceScopesObj) | Out-Null
+    }
 
     # Role definition should exist but it doesn't
     if ($Ensure -eq 'Present' -and $currentAADRoleDef.Ensure -eq 'Absent')
     {
-        Write-Verbose -Message "Creating New AzureAD role defition {$DisplayName}"
+        Write-Verbose -Message "Creating New AzureAD role defition {$DisplayName} with parameters:"
+        Write-Verbose -Message (Convert-M365DscHashtableToString -Hashtable $currentParameters)
         $currentParameters.Remove('Id') | Out-Null
-        New-MgRoleManagementDirectoryRoleDefinition @currentParameters
+        New-MgBetaRoleManagementDirectoryRoleDefinition @currentParameters
     }
     # Role definition should exist and will be configured to desired state
     if ($Ensure -eq 'Present' -and $currentAADRoleDef.Ensure -eq 'Present')
@@ -256,13 +266,13 @@ function Set-TargetResource
         Write-Verbose -Message "Updating existing AzureAD role definition {$DisplayName}"
         $currentParameters.Add('UnifiedRoleDefinitionId', $currentAADRoleDef.Id)
         $currentParameters.Remove('Id') | Out-Null
-        Update-MgRoleManagementDirectoryRoleDefinition @currentParameters
+        Update-MgBetaRoleManagementDirectoryRoleDefinition @currentParameters
     }
     # Role definition exists but should not
     elseif ($Ensure -eq 'Absent' -and $currentAADRoleDef.Ensure -eq 'Present')
     {
         Write-Verbose -Message "Removing AzureAD role definition {$DisplayName}"
-        Remove-MgRoleManagementDirectoryRoleDefinition -UnifiedRoleDefinitionId $currentAADRoleDef.Id
+        Remove-MgBetaRoleManagementDirectoryRoleDefinition -UnifiedRoleDefinitionId $currentAADRoleDef.Id
     }
 }
 
@@ -331,14 +341,15 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
-
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -346,29 +357,10 @@ function Test-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message 'Testing configuration of AzureAD role definition'
-
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('Credential') | Out-Null
-    $ValuesToCheck.Remove('ApplicationId') | Out-Null
-    $ValuesToCheck.Remove('TenantId') | Out-Null
-    $ValuesToCheck.Remove('CertificateThumbprint') | Out-Null
-    $ValuesToCheck.Remove('ManagedIdentity') | Out-Null
-    $ValuesToCheck.Remove('Id') | Out-Null
-    $ValuesToCheck.Remove('TemplateId') | Out-Null
-
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck $ValuesToCheck.Keys
-
-    Write-Verbose -Message "Test-TargetResource returned $TestResult"
-
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '') `
+                                         -ExcludedProperties @('TemplateId')
+    return $result
 }
 
 function Export-TargetResource
@@ -403,13 +395,15 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftGraph' `
-        -InboundParameters $PSBoundParameters `
-        -ProfileName 'Beta'
-    $MaximumFunctionCount = 32000
-    Select-MgProfile -Name 'beta'
+        -InboundParameters $PSBoundParameters
 
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
@@ -427,32 +421,41 @@ function Export-TargetResource
     $i = 1
     try
     {
-        [array]$AADRoleDefinitions = Get-MgRoleManagementDirectoryRoleDefinition -Filter $Filter -All:$true -ErrorAction Stop
-        if ($AADRoleDefinitions.Length -gt 0)
+        $Script:ExportMode = $true
+        [array] $Script:exportedInstances = Get-MgBetaRoleManagementDirectoryRoleDefinition -Filter $Filter -All:$true -ErrorAction Stop
+        if ($Script:exportedInstances.Length -eq 0)
         {
-            Write-Host "`r`n" -NoNewline
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         }
-        foreach ($AADRoleDefinition in $AADRoleDefinitions)
+        else
         {
-            Write-Host "    |---[$i/$($AADRoleDefinitions.Count)] $($AADRoleDefinition.DisplayName)" -NoNewline
+            Write-M365DSCHost -Message "`r`n" -DeferWrite
+        }
+        foreach ($AADRoleDefinition in $Script:exportedInstances)
+        {
+            if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+            {
+                $Global:M365DSCExportResourceInstancesCount++
+            }
+
+            Write-M365DSCHost -Message "    |---[$i/$($Script:exportedInstances.Count)] $($AADRoleDefinition.DisplayName)" -DeferWrite
             $Params = @{
                 Credential            = $Credential
                 ApplicationId         = $ApplicationId
                 ApplicationSecret     = $ApplicationSecret
                 TenantId              = $TenantId
                 CertificateThumbprint = $CertificateThumbprint
-                Managedidentity       = $ManagedIdentity.IsPresent
+                ManagedIdentity       = $ManagedIdentity.IsPresent
                 DisplayName           = $AADRoleDefinition.DisplayName
                 Id                    = $AADRoleDefinition.Id
                 IsEnabled             = $true
                 RolePermissions       = @('temp')
+                AccessTokens          = $AccessTokens
             }
+            $Script:exportedInstance = $AADRoleDefinition
             $Results = Get-TargetResource @Params
-
             if ($Results.Ensure -eq 'Present' -and ([array]$results.RolePermissions).Length -gt 0)
             {
-                $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                    -Results $Results
                 $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                     -ConnectionMode $ConnectionMode `
                     -ModulePath $PSScriptRoot `
@@ -463,14 +466,14 @@ function Export-TargetResource
                     -FileName $Global:PartialExportFileName
             }
 
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
             $i++
         }
         return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `

@@ -21,17 +21,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
 
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
-            }
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
@@ -45,38 +38,32 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             }
 
             Mock -CommandName New-SafeLinksRule -MockWith {
-                return @{
-
-                }
             }
 
             Mock -CommandName Set-SafeLinksRule -MockWith {
-                return @{
-
-                }
             }
 
             Mock -CommandName Remove-SafeLinksRule -MockWith {
-                return @{
+            }
 
+            Mock -CommandName Get-SafeLinksRule -MockWith {
+                return @{
+                    Ensure            = 'Present'
+                    Identity          = 'TestRule'
+                    Credential        = $Credential
+                    SafeLinksPolicy   = 'TestSafeLinksPolicy'
+                    Enabled           = $true
+                    Priority          = 0
+                    RecipientDomainIs = @('contoso.com')
+                    State             = 'Enabled'
                 }
             }
 
-            Mock -CommandName New-EXOSafeLinksRule -MockWith {
-                return @{
-
-                }
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
             }
-
-            Mock -CommandName Set-EXOSafeLinksRule -MockWith {
-                return @{
-
-                }
-            }
-
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
-            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -93,9 +80,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 }
 
                 Mock -CommandName Get-SafeLinksRule -MockWith {
-                    return @{
-                        Identity = 'SomeOtherPolicy'
-                    }
+                    return $null
                 }
             }
 
@@ -105,6 +90,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the Set method' {
                 Set-TargetResource @testParams
+                Should -Invoke -CommandName New-SafeLinksRule -Exactly 1
             }
         }
 
@@ -118,19 +104,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Enabled           = $true
                     Priority          = 0
                     RecipientDomainIs = @('contoso.com')
-                }
-
-                Mock -CommandName Get-SafeLinksRule -MockWith {
-                    return @{
-                        Ensure            = 'Present'
-                        Identity          = 'TestRule'
-                        Credential        = $Credential
-                        SafeLinksPolicy   = 'TestSafeLinksPolicy'
-                        Enabled           = $true
-                        Priority          = 0
-                        RecipientDomainIs = @('contoso.com')
-                        State             = 'Enabled'
-                    }
                 }
             }
 
@@ -148,19 +121,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     SafeLinksPolicy   = 'TestSafeLinksPolicy'
                     Enabled           = $true
                     Priority          = 0
-                    RecipientDomainIs = @('contoso.com')
-                }
-
-                Mock -CommandName Get-SafeLinksRule -MockWith {
-                    return @{
-                        Ensure            = 'Present'
-                        Identity          = 'TestRule'
-                        Credential        = $Credential
-                        SafeLinksPolicy   = 'TestSafeLinksPolicy'
-                        State             = 'Disabled'
-                        Priority          = 0
-                        RecipientDomainIs = @('fabrikam.com')
-                    }
+                    RecipientDomainIs = @('fabrikam.com') # Drift
                 }
             }
 
@@ -170,6 +131,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the Set method' {
                 Set-TargetResource @testParams
+                Should -Invoke -CommandName Set-SafeLinksRule -Exactly 1
             }
         }
 
@@ -184,12 +146,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Priority          = 0
                     RecipientDomainIs = @('contoso.com')
                 }
-
-                Mock -CommandName Get-SafeLinksRule -MockWith {
-                    return @{
-                        Identity = 'TestRule'
-                    }
-                }
             }
 
             It 'Should return false from the Test method' {
@@ -198,25 +154,26 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the Set method' {
                 Set-TargetResource @testParams
+                Should -Invoke -CommandName Remove-SafeLinksRule -Exactly 1
             }
         }
 
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
                 }
 
-                Mock -CommandName Get-SafeLinksRule -MockWith {
-                    return @{
-                        Identity = 'TestRule'
-                    }
+                Mock -CommandName Confirm-ImportedCmdletIsAvailable -MockWith {
+                    return $true
                 }
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

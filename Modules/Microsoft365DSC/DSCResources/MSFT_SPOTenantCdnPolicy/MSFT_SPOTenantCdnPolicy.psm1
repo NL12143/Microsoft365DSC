@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_SPOTenantCdnPolicy'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -47,44 +49,57 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Getting configuration for SPOTenantCdnPolicy {$CDNType}"
-    $ConnectionMode = New-M365DSCConnection -Workload 'PNP' `
-        -InboundParameters $PSBoundParameters
 
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
-
-    #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
-    $CommandName = $MyInvocation.MyCommand
-    $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
-        -CommandName $CommandName `
-        -Parameters $PSBoundParameters
-    Add-M365DSCTelemetryEvent -Data $data
-    #endregion
     try
     {
+        if (-not $Script:ExportMode)
+        {
+            $null = New-M365DSCConnection -Workload 'PNP' `
+                -InboundParameters $PSBoundParameters
+
+            #Ensure the proper dependencies are installed in the current environment.
+            Confirm-M365DSCDependencies
+
+            #region Telemetry
+            $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+            $CommandName = $MyInvocation.MyCommand
+            $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
+                -CommandName $CommandName `
+                -Parameters $PSBoundParameters
+            Add-M365DSCTelemetryEvent -Data $data
+            #endregion
+        }
+
+        $nullReturn = @{
+            CDNType = $CDNType
+        }
+
         $Policies = Get-PnPTenantCdnPolicies -CdnType $CDNType -ErrorAction Stop
-        if ($null -ne $Policies['ExcludeRestrictedSiteClassifications'])
+        if ($Policies['ExcludeRestrictedSiteClassifications'].Length -gt 0)
         {
             $ExcludeRestrictedSiteClassifications = `
                 $Policies['ExcludeRestrictedSiteClassifications'].Split(',')
         }
         else
         {
-            $ExcludeRestrictedSiteClassifications = $null
+            $ExcludeRestrictedSiteClassifications = @()
         }
-        if ($null -ne $Policies['IncludeFileExtensions'])
+        if ($Policies['IncludeFileExtensions'].Length -gt 0)
         {
             $IncludeFileExtensions = `
                 $Policies['IncludeFileExtensions'].Split(',')
         }
         else
         {
-            $IncludeFileExtensions = $null
+            $IncludeFileExtensions = @()
         }
 
         return @{
@@ -98,7 +113,8 @@ function Get-TargetResource
             CertificatePassword                  = $CertificatePassword
             CertificatePath                      = $CertificatePath
             CertificateThumbprint                = $CertificateThumbprint
-            Managedidentity                      = $ManagedIdentity.IsPresent
+            ManagedIdentity                      = $ManagedIdentity.IsPresent
+            AccessTokens                         = $AccessTokens
         }
     }
     catch
@@ -109,7 +125,7 @@ function Get-TargetResource
             -TenantId $TenantId `
             -Credential $Credential
 
-        return @{}
+        return $nullReturn
     }
 }
 
@@ -161,7 +177,11 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Setting configuration for SPOTenantCDNPolicy {$CDNType}"
@@ -185,15 +205,10 @@ function Set-TargetResource
     {
         Write-Verbose 'Found difference in IncludeFileExtensions'
 
-        $stringValue = ''
-        foreach ($entry in $IncludeFileExtensions.Split(','))
-        {
-            $stringValue += $entry + ','
-        }
-        $stringValue = $stringValue.Remove($stringValue.Length - 1, 1)
+        [String]$IncludeFileExtensions = [String[]]$IncludeFileExtensions -join ','
         Set-PnPTenantCdnPolicy -CdnType $CDNType `
             -PolicyType 'IncludeFileExtensions' `
-            -PolicyValue $stringValue
+            -PolicyValue $IncludeFileExtensions
     }
 
     if ($null -ne (Compare-Object -ReferenceObject $curPolicies.ExcludeRestrictedSiteClassifications `
@@ -201,10 +216,10 @@ function Set-TargetResource
     {
         Write-Verbose 'Found difference in ExcludeRestrictedSiteClassifications'
 
-
+        [String]$ExcludeRestrictedSiteClassifications = [String[]]$ExcludeRestrictedSiteClassifications -join ','
         Set-PnPTenantCdnPolicy -CdnType $CDNType `
             -PolicyType 'ExcludeRestrictedSiteClassifications' `
-            -PolicyValue $stringValue
+            -PolicyValue $ExcludeRestrictedSiteClassifications
     }
 }
 
@@ -257,13 +272,15 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
 
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -271,23 +288,9 @@ function Test-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message "Testing configuration for SPO Storage Entity for $Key"
-
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-
-    Write-Verbose -Message "Current Values: $(Convert-M365DscHashtableToString -Hashtable $CurrentValues)"
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck @('CDNType', `
-            'ExcludeRestrictedSiteClassifications', `
-            'IncludeFileExtensions')
-
-    Write-Verbose -Message "Test-TargetResource returned $TestResult"
-
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '')
+    return $result
 }
 
 function Export-TargetResource
@@ -326,7 +329,11 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     try
@@ -346,6 +353,12 @@ function Export-TargetResource
         Add-M365DSCTelemetryEvent -Data $data
         #endregion
 
+        if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+        {
+            $Global:M365DSCExportResourceInstancesCount++
+        }
+        $Script:ExportMode = $true
+
         $Params = @{
             CdnType               = 'Public'
             ApplicationId         = $ApplicationId
@@ -354,24 +367,35 @@ function Export-TargetResource
             CertificatePassword   = $CertificatePassword
             CertificatePath       = $CertificatePath
             CertificateThumbprint = $CertificateThumbprint
-            Managedidentity       = $ManagedIdentity.IsPresent
+            ManagedIdentity       = $ManagedIdentity.IsPresent
             Credential            = $Credential
+            AccessTokens          = $AccessTokens
         }
-
-        $Results = Get-TargetResource @Params
-        Write-Host "`r`n    |---[1/2] Public" -NoNewline
         $dscContent = ''
-        if ($null -ne $Results)
+
+        Write-M365DSCHost -Message "`r`n    |---[1/2] Public" -DeferWrite
+        $Results = Get-TargetResource @Params
+        if ($Results -is [System.Collections.Hashtable] -and $Results.Count -gt 1)
         {
-            $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                -Results $Results
             $dscContent += Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                 -ConnectionMode $ConnectionMode `
                 -ModulePath $PSScriptRoot `
                 -Results $Results `
                 -Credential $Credential
+            Save-M365DSCPartialExport -Content $dscContent `
+                -FileName $Global:PartialExportFileName
+
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         }
-        Write-Host $Global:M365DSCEmojiGreenCheckmark
+        else
+        {
+            Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
+        }
+
+        if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+        {
+            $Global:M365DSCExportResourceInstancesCount++
+        }
 
         $Params = @{
             CdnType               = 'Private'
@@ -380,15 +404,14 @@ function Export-TargetResource
             CertificatePassword   = $CertificatePassword
             CertificatePath       = $CertificatePath
             CertificateThumbprint = $CertificateThumbprint
-            Managedidentity       = $ManagedIdentity.IsPresent
+            ManagedIdentity       = $ManagedIdentity.IsPresent
             Credential            = $Credential
         }
-        Write-Host '    |---[2/2] Private' -NoNewline
-        $Results = Get-TargetResource @params
-        if ($null -ne $result)
+        Write-M365DSCHost -Message '    |---[2/2] Private' -DeferWrite
+        $Results = Get-TargetResource @Params
+        if ($Results -is [System.Collections.Hashtable] -and $Results.Count -gt 1)
         {
-            $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                -Results $Results
+
             $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                 -ConnectionMode $ConnectionMode `
                 -ModulePath $PSScriptRoot `
@@ -397,8 +420,14 @@ function Export-TargetResource
             $dscContent += $currentDSCBlock
             Save-M365DSCPartialExport -Content $currentDSCBlock `
                 -FileName $Global:PartialExportFileName
+
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         }
-        Write-Host $Global:M365DSCEmojiGreenCheckmark
+        else
+        {
+            Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
+        }
+
         return $dscContent
     }
     catch
@@ -406,11 +435,11 @@ function Export-TargetResource
         # This method is not implemented in some sovereign clouds (e.g. GCCHigh)
         if ($_.Exception -like '*The method or operation is not implemented*')
         {
-            Write-Host "`r`n    $($Global:M365DSCEmojiYellowCircle) The current tenant does not support this feature."
+            Write-M365DSCHost -Message "`r`n    $($Global:M365DSCEmojiYellowCircle) The current tenant does not support this feature."
         }
         else
         {
-            Write-Host $Global:M365DSCEmojiRedX
+            Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
             New-M365DSCLogEntry -Message 'Error during Export:' `
                 -Exception $_ `

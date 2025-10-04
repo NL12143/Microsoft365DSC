@@ -20,17 +20,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
     InModuleScope -ModuleName $Global:DscHelper.ModuleName -ScriptBlock {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
-            }
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName Get-PSSession -MockWith {
@@ -39,22 +32,34 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             Mock -CommandName Remove-PSSession -MockWith {
             }
 
-            Mock -CommandName Update-MgPolicyTokenLifetimePolicy -MockWith {
+            Mock -CommandName Update-MgBetaPolicyTokenLifetimePolicy -MockWith {
             }
 
-            Mock -CommandName Remove-MgPolicyTokenLifetimePolicy -MockWith {
+            Mock -CommandName Remove-MgBetaPolicyTokenLifetimePolicy -MockWith {
             }
 
-            Mock -CommandName New-MgPolicyTokenLifetimePolicy -MockWith {
+            Mock -CommandName New-MgBetaPolicyTokenLifetimePolicy -MockWith {
+            }
+
+            Mock -CommandName Get-MgBetaPolicyTokenLifetimePolicy -MockWith {
+                return @{
+                    DisplayName           = 'PolicyDisplayName'
+                    ID                    = '78a80fa1-8ced-4019-94d8-2e0130644496'
+                    Definition            = @('{"TokenIssuancePolicy":{"Version": 1,"SigningAlgorithm": "http://www.w3.org/2000/09/xmldsig#rsa-sha1","TokenResponseSigningPolicy": "TokenOnly","SamlTokenVersion": "2.0"}}')
+                    Description           = 'My token'
+                    isOrganizationDefault = 'false'
+                }
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
                 return 'Credentials'
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
             }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -66,24 +71,24 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Definition            = @('{"TokenIssuancePolicy":{"Version": 1,"SigningAlgorithm": "http://www.w3.org/2000/09/xmldsig#rsa-sha1","TokenResponseSigningPolicy": "TokenOnly","SamlTokenVersion": "2.0"}}')
                     IsOrganizationDefault = $false
                     Ensure                = 'Present'
-                    Credential            = $credsGlobalAdmin
+                    Credential            = $Credscredential
                 }
 
-                Mock -CommandName Get-MgPolicyTokenLifetimePolicy -MockWith {
+                Mock -CommandName Get-MgBetaPolicyTokenLifetimePolicy -MockWith {
                     return $null
                 }
             }
 
             It 'Should return values from the get method' {
                 (Get-TargetResource @testParams).Ensure | Should -Be 'Absent'
-                Should -Invoke -CommandName 'Get-MgPolicyTokenLifetimePolicy' -Exactly 2
+                Should -Invoke -CommandName 'Get-MgBetaPolicyTokenLifetimePolicy' -Exactly 1
             }
             It 'Should return false from the test method' {
                 Test-TargetResource @testParams | Should -Be $false
             }
             It 'Should create the Policy from the set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName 'New-MgPolicyTokenLifetimePolicy' -Exactly 1
+                Should -Invoke -CommandName 'New-MgBetaPolicyTokenLifetimePolicy' -Exactly 1
             }
         }
         Context -Name 'The Policy exists but it should not' -Fixture {
@@ -94,23 +99,13 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     IsOrganizationDefault = $false
                     Description           = 'My token'
                     Ensure                = 'Absent'
-                    Credential            = $credsGlobalAdmin
-                }
-
-                Mock -CommandName Get-MgPolicyTokenLifetimePolicy -MockWith {
-                    $AADPolicy = New-Object PSCustomObject
-                    $AADPolicy | Add-Member -MemberType NoteProperty -Name DisplayName -Value 'PolicyDisplayName'
-                    $AADPolicy | Add-Member -MemberType NoteProperty -Name ID -Value '78a80fa1-8ced-4019-94d8-2e0130644496'
-                    $AADPolicy | Add-Member -MemberType NoteProperty -Name Definition -Value @('{"TokenIssuancePolicy":{"Version": 1,"SigningAlgorithm": "http://www.w3.org/2000/09/xmldsig#rsa-sha1","TokenResponseSigningPolicy": "TokenOnly","SamlTokenVersion": "2.0"}}')
-                    $AADPolicy | Add-Member -MemberType NoteProperty -Name isOrganizationDefault -Value 'false'
-
-                    return $AADPolicy
+                    Credential            = $Credscredential
                 }
             }
 
             It 'Should return values from the get method' {
                 (Get-TargetResource @testParams).Ensure | Should -Be 'Present'
-                Should -Invoke -CommandName 'Get-MgPolicyTokenLifetimePolicy' -Exactly 1
+                Should -Invoke -CommandName 'Get-MgBetaPolicyTokenLifetimePolicy' -Exactly 1
             }
 
             It 'Should return false from the test method' {
@@ -119,7 +114,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should remove the app from the set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName 'Remove-MgPolicyTokenLifetimePolicy' -Exactly 1
+                Should -Invoke -CommandName 'Remove-MgBetaPolicyTokenLifetimePolicy' -Exactly 1
             }
         }
 
@@ -131,24 +126,13 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     IsOrganizationDefault = $false
                     Description           = 'My token'
                     Ensure                = 'Present'
-                    Credential            = $credsGlobalAdmin
-                }
-
-                Mock -CommandName Get-MgPolicyTokenLifetimePolicy -MockWith {
-                    $AADPolicy = New-Object PSCustomObject
-                    $AADPolicy | Add-Member -MemberType NoteProperty -Name DisplayName -Value 'PolicyDisplayName'
-                    $AADPolicy | Add-Member -MemberType NoteProperty -Name ID -Value '78a80fa1-8ced-4019-94d8-2e0130644496'
-                    $AADPolicy | Add-Member -MemberType NoteProperty -Name Definition -Value @('{"TokenIssuancePolicy":{"Version": 1,"SigningAlgorithm": "http://www.w3.org/2000/09/xmldsig#rsa-sha1","TokenResponseSigningPolicy": "TokenOnly","SamlTokenVersion": "2.0"}}')
-                    $AADPolicy | Add-Member -MemberType NoteProperty -Name isOrganizationDefault -Value 'false'
-                    $AADPolicy | Add-Member -MemberType NoteProperty -Name Description -Value 'My token'
-
-                    return $AADPolicy
+                    Credential            = $Credscredential
                 }
             }
 
             It 'Should return Values from the get method' {
                 Get-TargetResource @testParams
-                Should -Invoke -CommandName 'Get-MgPolicyTokenLifetimePolicy' -Exactly 1
+                Should -Invoke -CommandName 'Get-MgBetaPolicyTokenLifetimePolicy' -Exactly 1
             }
 
             It 'Should return true from the test method' {
@@ -161,26 +145,16 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 $testParams = @{
                     DisplayName           = 'PolicyDisplayName1'
                     Definition            = @('{"TokenIssuancePolicy":{"Version": 1,"SigningAlgorithm": "http://www.w3.org/2000/09/xmldsig#rsa-sha1","TokenResponseSigningPolicy": "TokenOnly","SamlTokenVersion": "2.0"}}')
-                    IsOrganizationDefault = $true
+                    IsOrganizationDefault = $true # Drift
                     Description           = 'My token'
                     Ensure                = 'Present'
-                    Credential            = $credsGlobalAdmin
-                }
-
-                Mock -CommandName Get-MgPolicyTokenLifetimePolicy -MockWith {
-                    $AADPolicy = New-Object PSCustomObject
-                    $AADPolicy | Add-Member -MemberType NoteProperty -Name DisplayName -Value 'PolicyDisplayName'
-                    $AADPolicy | Add-Member -MemberType NoteProperty -Name ID -Value '78a80fa1-8ced-4019-94d8-2e0130644496'
-                    $AADPolicy | Add-Member -MemberType NoteProperty -Name Definition -Value @('{"TokenIssuancePolicy":{"Version": 1,"SigningAlgorithm": "http://www.w3.org/2000/09/xmldsig#rsa-sha1","TokenResponseSigningPolicy": "TokenOnly","SamlTokenVersion": "2.0"}}')
-                    $AADPolicy | Add-Member -MemberType NoteProperty -Name isOrganizationDefault -Value 'false'
-
-                    return $AADPolicy
+                    Credential            = $Credscredential
                 }
             }
 
             It 'Should return values from the get method' {
                 Get-TargetResource @testParams
-                Should -Invoke -CommandName 'Get-MgPolicyTokenLifetimePolicy' -Exactly 1
+                Should -Invoke -CommandName 'Get-MgBetaPolicyTokenLifetimePolicy' -Exactly 1
             }
 
             It 'Should return false from the test method' {
@@ -189,30 +163,22 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName 'Update-MgPolicyTokenLifetimePolicy' -Exactly 1
+                Should -Invoke -CommandName 'Update-MgBetaPolicyTokenLifetimePolicy' -Exactly 1
             }
         }
 
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
-                }
-
-                Mock -CommandName Get-MgPolicyTokenLifetimePolicy -MockWith {
-                    $AADPolicy = New-Object PSCustomObject
-                    $AADPolicy | Add-Member -MemberType NoteProperty -Name DisplayName -Value 'PolicyDisplayName'
-                    $AADPolicy | Add-Member -MemberType NoteProperty -Name ID -Value '78a80fa1-8ced-4019-94d8-2e0130644496'
-                    $AADPolicy | Add-Member -MemberType NoteProperty -Name Definition -Value '{{"TokenIssuancePolicy": {"Version": 1,"SigningAlgorithm": "http://www.w3.org/2000/09/xmldsig#rsa-sha1","TokenResponseSigningPolicy": "TokenOnly","SamlTokenVersion": "2.0"}}}'
-                    $AADPolicy | Add-Member -MemberType NoteProperty -Name isOrganizationDefault -Value 'false'
-
-                    return $AADPolicy
                 }
             }
 
             It 'Should reverse engineer resource from the export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

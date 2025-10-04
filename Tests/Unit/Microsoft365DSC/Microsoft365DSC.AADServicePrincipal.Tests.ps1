@@ -20,11 +20,16 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
     InModuleScope -ModuleName $Global:DscHelper.ModuleName -ScriptBlock {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
             $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@contoso.com', $secpasswd)
 
-
             Mock -CommandName Get-PSSession -MockWith {
+            }
+
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
+            }
+
+            Mock -CommandName Get-MSCloudLoginConnectionProfile -MockWith {
             }
 
             Mock -CommandName Remove-PSSession -MockWith {
@@ -43,9 +48,22 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 return 'Credentials'
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            Mock -CommandName Get-MgApplication -MockWith {
+                return @{
+                    AppId = "b4f08c68-7276-4cb8-b9ae-e75fca5ff834"
+                    DisplayName = "App1"
+                }
             }
+
+            Mock -CommandName Invoke-M365DSCGraphBatchRequest -MockWith {
+                return @()
+            }
+
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            $Script:exportedInstance =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -66,8 +84,27 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     ServicePrincipalNames     = 'b4f08c68-7276-4cb8-b9ae-e75fca5ff834', 'https://app1.contoso.com'
                     ServicePrincipalType      = 'Application'
                     Tags                      = '{WindowsAzureActiveDirectoryIntegratedApp}'
+                    PasswordCredentials       = @(
+                        New-CimInstance -ClassName MSFT_MicrosoftGraphpasswordCredential -Property @{
+                            KeyId = 'keyid'
+                            EndDateTime = '2025-03-15T19:50:29.0310000+00:00'
+                            Hint = 'VsO'
+                            DisplayName = 'Super Secret'
+                            StartDateTime = '2024-09-16T19:50:29.0310000+00:00'
+                        } -ClientOnly
+                    )
+                    KeyCredentials = @(
+                        New-CimInstance -ClassName MSFT_MicrosoftGraphkeyCredential -Property @{
+                            Usage = 'Verify'
+                            StartDateTime = '2024-09-25T09:13:11.0000000+00:00'
+                            Type = 'AsymmetricX509Cert'
+                            KeyId = 'Key ID'
+                            EndDateTime = '2025-09-25T09:33:11.0000000+00:00'
+                            DisplayName = 'anexas_test_2'
+                        } -ClientOnly
+                    )
                     Ensure                    = 'Present'
-                    Credential                = $credsGlobalAdmin
+                    Credential                = $Credscredential
                 }
 
                 Mock -CommandName Get-MgServicePrincipal -MockWith {
@@ -105,12 +142,31 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     ServicePrincipalNames     = 'b4f08c68-7276-4cb8-b9ae-e75fca5ff834', 'https://app1.contoso.com'
                     ServicePrincipalType      = 'Application'
                     Tags                      = '{WindowsAzureActiveDirectoryIntegratedApp}'
+                    PasswordCredentials       = @(
+                        New-CimInstance -ClassName MSFT_MicrosoftGraphpasswordCredential -Property @{
+                            KeyId = 'keyid'
+                            EndDateTime = '2025-03-15T19:50:29.0310000+00:00'
+                            Hint = 'VsO'
+                            DisplayName = 'Super Secret'
+                            StartDateTime = '2024-09-16T19:50:29.0310000+00:00'
+                        } -ClientOnly
+                    )
+                    KeyCredentials            = @(
+                        New-CimInstance -ClassName MSFT_MicrosoftGraphkeyCredential -Property @{
+                            Usage = 'Verify'
+                            StartDateTime = '2024-09-25T09:13:11.0000000+00:00'
+                            Type = 'AsymmetricX509Cert'
+                            KeyId = 'Key ID'
+                            EndDateTime = '2025-09-25T09:33:11.0000000+00:00'
+                            DisplayName = 'anexas_test_2'
+                        } -ClientOnly
+                    )
                     Ensure                    = 'Absent'
-                    Credential                = $credsGlobalAdmin
+                    Credential                = $Credscredential
                 }
 
                 Mock -CommandName New-M365DSCConnection -MockWith {
-                    return 'Credential'
+                    return 'Credentials'
                 }
 
                 Mock -CommandName Get-MgServicePrincipal -MockWith {
@@ -130,6 +186,21 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     $AADSP | Add-Member -MemberType NoteProperty -Name ServicePrincipalNames -Value 'b4f08c68-7276-4cb8-b9ae-e75fca5ff834', 'https://app1.contoso.com'
                     $AADSP | Add-Member -MemberType NoteProperty -Name ServicePrincipalType -Value 'Application'
                     $AADSP | Add-Member -MemberType NoteProperty -Name Tags -Value '{WindowsAzureActiveDirectoryIntegratedApp}'
+                    $AADSP | Add-Member -MemberType NoteProperty -Name KeyCredentials -Value @{
+                        Usage = 'Verify'
+                        StartDateTime = '2024-09-25T09:13:11.0000000+00:00'
+                        Type = 'AsymmetricX509Cert'
+                        KeyId = 'Key ID'
+                        EndDateTime = '2025-09-25T09:33:11.0000000+00:00'
+                        DisplayName = 'anexas_test_2'
+                    }
+                    $AADSP | Add-Member -MemberType NoteProperty -Name PasswordCredentials -Value @{
+                        KeyId = 'keyid'
+                        EndDateTime = '2025-03-15T19:50:29.0310000+00:00'
+                        Hint = 'VsO'
+                        DisplayName = 'Super Secret'
+                        StartDateTime = '2024-09-16T19:50:29.0310000+00:00'
+                    }
                     return $AADSP
                 }
             }
@@ -165,17 +236,37 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     ServicePrincipalNames     = 'b4f08c68-7276-4cb8-b9ae-e75fca5ff834', 'https://app1.contoso.com'
                     ServicePrincipalType      = 'Application'
                     Tags                      = '{WindowsAzureActiveDirectoryIntegratedApp}'
+                    PasswordCredentials       = @(
+                        New-CimInstance -ClassName MSFT_MicrosoftGraphpasswordCredential -Property @{
+                            KeyId = 'keyid'
+                            EndDateTime = '2025-03-15T19:50:29.0310000+00:00'
+                            Hint = 'VsO'
+                            DisplayName = 'Super Secret'
+                            StartDateTime = '2024-09-16T19:50:29.0310000+00:00'
+                        } -ClientOnly
+                    )
+                    KeyCredentials            = @(
+                        New-CimInstance -ClassName MSFT_MicrosoftGraphkeyCredential -Property @{
+                            Usage = 'Verify'
+                            StartDateTime = '2024-09-25T09:13:11.0000000+00:00'
+                            Type = 'AsymmetricX509Cert'
+                            KeyId = 'Key ID'
+                            EndDateTime = '2025-09-25T09:33:11.0000000+00:00'
+                            DisplayName = 'anexas_test_2'
+                        } -ClientOnly
+                    )
                     Ensure                    = 'Present'
-                    Credential                = $credsGlobalAdmin
+                    Credential                = $Credscredential
                 }
 
                 Mock -CommandName New-M365DSCConnection -MockWith {
-                    return 'Credential'
+                    return 'Credentials'
                 }
 
                 Mock -CommandName Get-MgServicePrincipal -MockWith {
                     $AADSP = New-Object PSCustomObject
                     $AADSP | Add-Member -MemberType NoteProperty -Name AppId -Value 'b4f08c68-7276-4cb8-b9ae-e75fca5ff834'
+                    $AADSP | Add-Member -MemberType NoteProperty -Name AppDisplayName -Value 'App1'
                     $AADSP | Add-Member -MemberType NoteProperty -Name Id -Value '5dcb2237-c61b-4258-9c85-eae2aaeba9d6'
                     $AADSP | Add-Member -MemberType NoteProperty -Name DisplayName -Value 'App1'
                     $AADSP | Add-Member -MemberType NoteProperty -Name AlternativeNames -Value 'AlternativeName1', 'AlternativeName2'
@@ -190,6 +281,21 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     $AADSP | Add-Member -MemberType NoteProperty -Name ServicePrincipalNames -Value 'b4f08c68-7276-4cb8-b9ae-e75fca5ff834', 'https://app1.contoso.com'
                     $AADSP | Add-Member -MemberType NoteProperty -Name ServicePrincipalType -Value 'Application'
                     $AADSP | Add-Member -MemberType NoteProperty -Name Tags -Value '{WindowsAzureActiveDirectoryIntegratedApp}'
+                    $AADSP | Add-Member -MemberType NoteProperty -Name KeyCredentials -Value @{
+                        Usage = 'Verify'
+                        StartDateTime = '2024-09-25T09:13:11.0000000+00:00'
+                        Type = 'AsymmetricX509Cert'
+                        KeyId = 'Key ID'
+                        EndDateTime = '2025-09-25T09:33:11.0000000+00:00'
+                        DisplayName = 'anexas_test_2'
+                    }
+                    $AADSP | Add-Member -MemberType NoteProperty -Name PasswordCredentials -Value @{
+                        KeyId = 'keyid'
+                        EndDateTime = '2025-03-15T19:50:29.0310000+00:00'
+                        Hint = 'VsO'
+                        DisplayName = 'Super Secret'
+                        StartDateTime = '2024-09-16T19:50:29.0310000+00:00'
+                    }
                     return $AADSP
                 }
             }
@@ -221,12 +327,14 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     ServicePrincipalNames     = 'b4f08c68-7276-4cb8-b9ae-e75fca5ff834', 'https://app1.contoso.com'
                     ServicePrincipalType      = 'Application'
                     Tags                      = '{WindowsAzureActiveDirectoryIntegratedApp}'
+                    PasswordCredentials       = @()
+                    KeyCredentials            = @()
                     Ensure                    = 'Present'
-                    Credential                = $credsGlobalAdmin
+                    Credential                = $Credscredential
                 }
 
                 Mock -CommandName New-M365DSCConnection -MockWith {
-                    return 'Credential'
+                    return 'Credentials'
                 }
 
                 Mock -CommandName Get-MgServicePrincipal -MockWith {
@@ -245,6 +353,21 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     $AADSP | Add-Member -MemberType NoteProperty -Name ServicePrincipalNames -Value 'b4f08c68-7276-4cb8-b9ae-e75fca5ff834', 'https://app1.contoso.com'
                     $AADSP | Add-Member -MemberType NoteProperty -Name ServicePrincipalType -Value 'Application'
                     $AADSP | Add-Member -MemberType NoteProperty -Name Tags -Value '{WindowsAzureActiveDirectoryIntegratedApp}'
+                    $AADSP | Add-Member -MemberType NoteProperty -Name KeyCredentials -Value @{
+                        Usage = 'Verify'
+                        StartDateTime = '2024-09-25T09:13:11.0000000+00:00'
+                        Type = 'AsymmetricX509Cert'
+                        KeyId = 'Key ID'
+                        EndDateTime = '2025-09-25T09:33:11.0000000+00:00'
+                        DisplayName = 'anexas_test_2'
+                    }
+                    $AADSP | Add-Member -MemberType NoteProperty -Name PasswordCredentials -Value @{
+                        KeyId = 'keyid'
+                        EndDateTime = '2025-03-15T19:50:29.0310000+00:00'
+                        Hint = 'VsO'
+                        DisplayName = 'Super Secret'
+                        StartDateTime = '2024-09-16T19:50:29.0310000+00:00'
+                    }
                     return $AADSP
                 }
             }
@@ -267,12 +390,13 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
                 }
 
                 Mock -CommandName New-M365DSCConnection -MockWith {
-                    return 'Credential'
+                    return 'Credentials'
                 }
 
                 Mock -CommandName Get-MgServicePrincipal -MockWith {
@@ -292,12 +416,28 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     $AADSP | Add-Member -MemberType NoteProperty -Name ServicePrincipalNames -Value 'b4f08c68-7276-4cb8-b9ae-e75fca5ff834', 'https://app1.contoso.com'
                     $AADSP | Add-Member -MemberType NoteProperty -Name ServicePrincipalType -Value 'Application'
                     $AADSP | Add-Member -MemberType NoteProperty -Name Tags -Value '{WindowsAzureActiveDirectoryIntegratedApp}'
+                    $AADSP | Add-Member -MemberType NoteProperty -Name KeyCredentials -Value @{
+                        Usage = 'Verify'
+                        StartDateTime = '2024-09-25T09:13:11.0000000+00:00'
+                        Type = 'AsymmetricX509Cert'
+                        KeyId = 'Key ID'
+                        EndDateTime = '2025-09-25T09:33:11.0000000+00:00'
+                        DisplayName = 'anexas_test_2'
+                    }
+                    $AADSP | Add-Member -MemberType NoteProperty -Name PasswordCredentials -Value @{
+                        KeyId = 'keyid'
+                        EndDateTime = '2025-03-15T19:50:29.0310000+00:00'
+                        Hint = 'VsO'
+                        DisplayName = 'Super Secret'
+                        StartDateTime = '2024-09-16T19:50:29.0310000+00:00'
+                    }
                     return $AADSP
                 }
             }
 
             It 'Should reverse engineer resource from the export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

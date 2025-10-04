@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_AADTenantDetails'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -46,11 +48,17 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message 'Getting configuration of AzureAD Tenant Details'
-    $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftGraph' -InboundParameters $PSBoundParameters
+
+    $null = New-M365DSCConnection -Workload 'MicrosoftGraph' `
+        -InboundParameters $PSBoundParameters
 
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
@@ -65,14 +73,12 @@ function Get-TargetResource
     #endregion
 
     $nullReturn = @{
-        Credential = $Credential
+        IsSingleInstance = 'Yes'
     }
 
     try
     {
-        $CurrentParameters = $PSBoundParameters
-
-        $AADTenantDetails = Get-MgOrganization -ErrorAction 'SilentlyContinue'
+        $AADTenantDetails = Get-MgBetaOrganization -ErrorAction 'SilentlyContinue'
 
         if ($null -eq $AADTenantDetails)
         {
@@ -92,7 +98,8 @@ function Get-TargetResource
                 TenantId                             = $TenantId
                 ApplicationSecret                    = $ApplicationSecret
                 CertificateThumbprint                = $CertificateThumbprint
-                Managedidentity                      = $ManagedIdentity.IsPresent
+                ManagedIdentity                      = $ManagedIdentity.IsPresent
+                AccessTokens                         = $AccessTokens
             }
             Write-Verbose -Message "Get-TargetResource Result: `n $(Convert-M365DscHashtableToString -Hashtable $result)"
             return $result
@@ -106,7 +113,7 @@ function Get-TargetResource
             -TenantId $TenantId `
             -Credential $Credential
 
-        return @{}
+        return $nullReturn
     }
 }
 
@@ -157,10 +164,17 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message 'Setting configuration of AzureAD Tenant Details'
+
+    $null = New-M365DSCConnection -Workload 'MicrosoftGraph' `
+        -InboundParameters $PSBoundParameters
 
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
@@ -175,37 +189,15 @@ function Set-TargetResource
     #endregion
 
 
-    $currentParameters = $PSBoundParameters
+    $currentParameters = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
     $currentParameters.Remove('IsSingleInstance') | Out-Null
+    $currentParameters.Add('OrganizationId', $(Get-MgBetaOrganization).Id)
 
-    if ($currentParameters.ContainsKey('Credential'))
-    {
-        $currentParameters.Remove('Credential') | Out-Null
-    }
-    if ($currentParameters.ContainsKey('ApplicationId'))
-    {
-        $currentParameters.Remove('ApplicationId') | Out-Null
-    }
-    if ($currentParameters.ContainsKey('ApplicationSecret'))
-    {
-        $currentParameters.Remove('ApplicationSecret') | Out-Null
-    }
-    if ($currentParameters.ContainsKey('TenantId'))
-    {
-        $currentParameters.Remove('TenantId') | Out-Null
-    }
-    if ($currentParameters.ContainsKey('CertificateThumbprint'))
-    {
-        $currentParameters.Remove('CertificateThumbprint') | Out-Null
-    }
-    if ($currentParameters.ContainsKey('ManagedIdentity'))
-    {
-        $currentParameters.Remove('ManagedIdentity') | Out-Null
-    }
-    $currentParameters.Add('OrganizationId', $(Get-MgOrganization).Id)
     try
     {
-        Update-MgOrganization @currentParameters
+        Write-Verbose -Message 'Calling Update-MGBetaOrganization with parameters:'
+        Write-Verbose -Message "$(Convert-M365DscHashtableToString -Hashtable $currentParameters)"
+        Update-MgBetaOrganization @currentParameters
     }
     catch
     {
@@ -261,14 +253,15 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
-
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -276,26 +269,9 @@ function Test-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message 'Testing configuration of AzureAD Tenant Details'
-
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-
-    Write-Verbose -Message "Target-Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('Credential') | Out-Null
-    $ValuesToCheck.Remove('IsSingleInstance') | Out-Null
-    $ValuesToCheck.Remove('ManagedIdentity') | Out-Null
-
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck $ValuesToCheck.Keys
-
-    Write-Verbose -Message "Test-TargetResource returned $TestResult"
-
-    return $TestResult
-
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '')
+    return $result
 }
 
 function Export-TargetResource
@@ -326,9 +302,15 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-    $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftGraph' -InboundParameters $PSBoundParameters
+
+    $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftGraph' `
+        -InboundParameters $PSBoundParameters
 
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
@@ -345,7 +327,12 @@ function Export-TargetResource
     $dscContent = ''
     try
     {
-        $AADTenantDetails = Get-MgOrganization -ErrorAction Stop
+        if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+        {
+            $Global:M365DSCExportResourceInstancesCount++
+        }
+
+        $AADTenantDetails = Get-MgBetaOrganization -ErrorAction Stop
 
         $Params = @{
             MarketingNotificationEmails          = $AADTenantDetails.MarketingNotificationEmails
@@ -357,26 +344,35 @@ function Export-TargetResource
             ApplicationSecret                    = $ApplicationSecret
             TenantId                             = $TenantId
             CertificateThumbprint                = $CertificateThumbprint
-            Managedidentity                      = $ManagedIdentity.IsPresent
+            ManagedIdentity                      = $ManagedIdentity.IsPresent
             IsSingleInstance                     = 'Yes'
+            AccessTokens                         = $AccessTokens
         }
+
         $Results = Get-TargetResource @Params
-        $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode -Results $Results
-        $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName -ConnectionMode $ConnectionMode `
-            -ModulePath $PSScriptRoot `
-            -Results $Results `
-            -Credential $Credential
-        $dscContent += $currentDSCBlock
+        if ($Results -is [System.Collections.Hashtable] -and $Results.Count -gt 1)
+        {
+            $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName -ConnectionMode $ConnectionMode `
+                -ModulePath $PSScriptRoot `
+                -Results $Results `
+                -Credential $Credential
+            $dscContent += $currentDSCBlock
 
-        Save-M365DSCPartialExport -Content $currentDSCBlock `
-            -FileName $Global:PartialExportFileName
+            Save-M365DSCPartialExport -Content $currentDSCBlock `
+                -FileName $Global:PartialExportFileName
 
-        Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
+        }
+        else
+        {
+            Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
+        }
+
         return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `

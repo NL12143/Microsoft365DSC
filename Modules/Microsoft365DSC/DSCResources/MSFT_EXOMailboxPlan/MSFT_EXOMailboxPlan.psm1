@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_EXOMailboxPlan'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -7,6 +9,10 @@ function Get-TargetResource
         [Parameter(Mandatory = $true)]
         [System.String]
         $Identity,
+
+        [Parameter()]
+        [System.String]
+        $DisplayName,
 
         [Parameter()]
         [System.String]
@@ -71,20 +77,24 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Getting configuration of MailboxPlan for $Identity"
 
     if ($Global:CurrentModeIsExport)
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+        $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
             -InboundParameters $PSBoundParameters `
             -SkipModuleReload $true
     }
     else
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+        $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
             -InboundParameters $PSBoundParameters
     }
 
@@ -100,44 +110,57 @@ function Get-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    $nullResult = $PSBoundParameters
-    $nullResult.Ensure = 'Absent'
+    $nullResult = @{
+        Identity = $Identity
+    }
 
     try
     {
-        $MailboxPlan = Get-MailboxPlan $Identity -ErrorAction Stop
+        $MailboxPlan = Get-MailboxPlan -Identity $Identity -ErrorAction Stop
 
         if ($null -eq $MailboxPlan)
         {
-            Write-Verbose -Message "MailboxPlan $($Identity) does not exist."
-            return $nullResult
-        }
-        else
-        {
-            $result = @{
-                Ensure                   = 'Present'
-                Identity                 = $Identity
-                IssueWarningQuota        = $MailboxPlan.IssueWarningQuota
-                MaxReceiveSize           = $MailboxPlan.MaxReceiveSize
-                MaxSendSize              = $MailboxPlan.MaxSendSize
-                ProhibitSendQuota        = $MailboxPlan.ProhibitSendQuota
-                ProhibitSendReceiveQuota = $MailboxPlan.ProhibitSendReceiveQuota
-                RetainDeletedItemsFor    = $MailboxPlan.RetainDeletedItemsFor
-                RetentionPolicy          = $MailboxPlan.RetentionPolicy
-                RoleAssignmentPolicy     = $MailboxPlan.RoleAssignmentPolicy
-                Credential               = $Credential
-                ApplicationId            = $ApplicationId
-                CertificateThumbprint    = $CertificateThumbprint
-                CertificatePath          = $CertificatePath
-                CertificatePassword      = $CertificatePassword
-                Managedidentity          = $ManagedIdentity.IsPresent
-                TenantId                 = $TenantId
+            if (-not [System.String]::IsNullOrEmpty($DisplayName))
+            {
+                Write-Verbose -Message "Couldn't find MailboxPlan by Identity {$Identity}. Trying by DisplayName."
+                $MailboxPlan = Get-MailboxPlan -Identity $DisplayName
+            }
+            else
+            {
+                $MailboxPlan = Get-MailboxPlan -Filter "Name -like '$($Identity.Split('-')[0])*'"
             }
 
-            Write-Verbose -Message "Found MailboxPlan $($Identity)"
-            Write-Verbose -Message "Get-TargetResource Result: `n $(Convert-M365DscHashtableToString -Hashtable $result)"
-            return $result
+            if ($null -eq $MailboxPlan)
+            {
+                return $nullResult
+            }
         }
+
+        $result = @{
+            Ensure                   = 'Present'
+            Identity                 = $Identity
+            DisplayName              = $MailboxPlan.DisplayName
+            IssueWarningQuota        = $MailboxPlan.IssueWarningQuota
+            MaxReceiveSize           = $MailboxPlan.MaxReceiveSize
+            MaxSendSize              = $MailboxPlan.MaxSendSize
+            ProhibitSendQuota        = $MailboxPlan.ProhibitSendQuota
+            ProhibitSendReceiveQuota = $MailboxPlan.ProhibitSendReceiveQuota
+            RetainDeletedItemsFor    = $MailboxPlan.RetainDeletedItemsFor
+            RetentionPolicy          = $MailboxPlan.RetentionPolicy
+            RoleAssignmentPolicy     = $MailboxPlan.RoleAssignmentPolicy
+            Credential               = $Credential
+            ApplicationId            = $ApplicationId
+            CertificateThumbprint    = $CertificateThumbprint
+            CertificatePath          = $CertificatePath
+            CertificatePassword      = $CertificatePassword
+            ManagedIdentity          = $ManagedIdentity.IsPresent
+            TenantId                 = $TenantId
+            AccessTokens             = $AccessTokens
+        }
+
+        Write-Verbose -Message "Found MailboxPlan $($Identity)"
+        Write-Verbose -Message "Get-TargetResource Result: `n $(Convert-M365DscHashtableToString -Hashtable $result)"
+        return $result
     }
     catch
     {
@@ -162,6 +185,10 @@ function Set-TargetResource
 
         [Parameter()]
         [System.String]
+        $DisplayName,
+
+        [Parameter()]
+        [System.String]
         $IssueWarningQuota,
 
         [Parameter()]
@@ -223,7 +250,11 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Setting configuration of MailboxPlan for $Identity"
@@ -240,25 +271,18 @@ function Set-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+    $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
         -InboundParameters $PSBoundParameters
 
-    $MailboxPlanParams = [System.Collections.Hashtable]($PSBoundParameters)
-    $MailboxPlanParams.Remove('Ensure') | Out-Null
-    $MailboxPlanParams.Remove('Credential') | Out-Null
-    $MailboxPlanParams.Remove('ApplicationId') | Out-Null
-    $MailboxPlanParams.Remove('TenantId') | Out-Null
-    $MailboxPlanParams.Remove('CertificateThumbprint') | Out-Null
-    $MailboxPlanParams.Remove('CertificatePath') | Out-Null
-    $MailboxPlanParams.Remove('CertificatePassword') | Out-Null
-    $MailboxPlanParams.Remove('ManagedIdentity') | Out-Null
+    $updateParameters = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
+    $updateParameters.Remove('DisplayName') | Out-Null
 
-    $MailboxPlan = Get-MailboxPlan $Identity
+    $MailboxPlan = Get-MailboxPlan -Identity $Identity
 
     if ($null -ne $MailboxPlan)
     {
-        Write-Verbose -Message "Setting MailboxPlan $Identity with values: $(Convert-M365DscHashtableToString -Hashtable $MailboxPlanParams)"
-        Set-MailboxPlan @MailboxPlanParams
+        Write-Verbose -Message "Setting MailboxPlan $Identity with values: $(Convert-M365DscHashtableToString -Hashtable $updateParameters)"
+        Set-MailboxPlan @updateParameters
     }
     else
     {
@@ -278,6 +302,10 @@ function Test-TargetResource
 
         [Parameter()]
         [System.String]
+        $DisplayName,
+
+        [Parameter()]
+        [System.String]
         $IssueWarningQuota,
 
         [Parameter()]
@@ -339,13 +367,15 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
 
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -353,30 +383,9 @@ function Test-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message "Testing configuration of MailboxPlan for $Identity"
-
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-
-    Write-Verbose -Message "Current Values: $(Convert-M365DscHashtableToString -Hashtable $CurrentValues)"
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('Credential') | Out-Null
-    $ValuesToCheck.Remove('ApplicationId') | Out-Null
-    $ValuesToCheck.Remove('TenantId') | Out-Null
-    $ValuesToCheck.Remove('CertificateThumbprint') | Out-Null
-    $ValuesToCheck.Remove('CertificatePath') | Out-Null
-    $ValuesToCheck.Remove('CertificatePassword') | Out-Null
-    $ValuesToCheck.Remove('ManagedIdentity') | Out-Null
-
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck $ValuesToCheck.Keys
-
-    Write-Verbose -Message "Test-TargetResource returned $TestResult"
-
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '')
+    return $result
 }
 
 function Export-TargetResource
@@ -411,8 +420,13 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
         -InboundParameters $PSBoundParameters `
         -SkipModuleReload $true
@@ -435,48 +449,62 @@ function Export-TargetResource
 
         if ($MailboxPlans.Length -eq 0)
         {
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         }
         else
         {
-            Write-Host "`r`n" -NoNewline
+            Write-M365DSCHost -Message "`r`n" -DeferWrite
         }
         $dscContent = ''
         $i = 1
         foreach ($MailboxPlan in $MailboxPlans)
         {
-            Write-Host "    |---[$i/$($MailboxPlans.Count)] $($MailboxPlan.Identity.Split('-')[0])" -NoNewline
+            if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+            {
+                $Global:M365DSCExportResourceInstancesCount++
+            }
+
+            Write-M365DSCHost -Message "    |---[$i/$($MailboxPlans.Count)] $($MailboxPlan.Identity.Split('-')[0])" -DeferWrite
             $Params = @{
-                Identity              = $MailboxPlan.DisplayName
+                Identity              = $MailboxPlan.Identity
+                DisplayName           = $MailboxPlan.DisplayName
                 Credential            = $Credential
                 ApplicationId         = $ApplicationId
                 TenantId              = $TenantId
                 CertificateThumbprint = $CertificateThumbprint
                 CertificatePassword   = $CertificatePassword
-                Managedidentity       = $ManagedIdentity.IsPresent
+                ManagedIdentity       = $ManagedIdentity.IsPresent
                 CertificatePath       = $CertificatePath
+                AccessTokens          = $AccessTokens
             }
 
             $Results = Get-TargetResource @Params
-            $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                -Results $Results
-            $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
-                -ConnectionMode $ConnectionMode `
-                -ModulePath $PSScriptRoot `
-                -Results $Results `
-                -Credential $Credential
-            $dscContent += $currentDSCBlock
+            if ($Results -is [System.Collections.Hashtable] -and $Results.Count -gt 1)
+            {
+                $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
+                    -ConnectionMode $ConnectionMode `
+                    -ModulePath $PSScriptRoot `
+                    -Results $Results `
+                    -Credential $Credential
+                $dscContent += $currentDSCBlock
 
-            Save-M365DSCPartialExport -Content $currentDSCBlock `
-                -FileName $Global:PartialExportFileName
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+                Save-M365DSCPartialExport -Content $currentDSCBlock `
+                    -FileName $Global:PartialExportFileName
+
+                Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
+            }
+            else
+            {
+                Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
+            }
+
             $i++
         }
         return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `

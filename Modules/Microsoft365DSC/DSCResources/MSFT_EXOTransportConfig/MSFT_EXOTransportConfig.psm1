@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_EXOTransportConfig'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -139,19 +141,24 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message 'Getting EXOTransportConfig'
+
     if ($Global:CurrentModeIsExport)
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+        $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
             -InboundParameters $PSBoundParameters `
             -SkipModuleReload $true
     }
     else
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+        $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
             -InboundParameters $PSBoundParameters
     }
 
@@ -167,8 +174,10 @@ function Get-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    $nullReturn = $PSBoundParameters
-    $nullReturn.Ensure = 'Absent'
+    $nullReturn = @{
+        IsSingleInstance = 'Yes'
+    }
+
     try
     {
         $TransportConfigSettings = Get-TransportConfig -ErrorAction Stop
@@ -185,7 +194,7 @@ function Get-TargetResource
             ConvertDisclaimerWrapperToEml           = $TransportConfigSettings.ConvertDisclaimerWrapperToEml
             DSNConversionMode                       = $TransportConfigSettings.DSNConversionMode
             ExternalDelayDsnEnabled                 = $TransportConfigSettings.ExternalDelayDsnEnabled
-            ExternalDsnDefaultLanguage              = $TransportConfigSettings.ExternalDsnDefaultLanguage
+            ExternalDsnDefaultLanguage              = $TransportConfigSettings.ExternalDsnDefaultLanguage.Name
             ExternalDsnLanguageDetectionEnabled     = $TransportConfigSettings.ExternalDsnLanguageDetectionEnabled
             ExternalDsnReportingAuthority           = $TransportConfigSettings.ExternalDsnReportingAuthority
             ExternalDsnSendHtml                     = $TransportConfigSettings.ExternalDsnSendHtml
@@ -210,8 +219,9 @@ function Get-TargetResource
             CertificateThumbprint                   = $CertificateThumbprint
             CertificatePath                         = $CertificatePath
             CertificatePassword                     = $CertificatePassword
-            Managedidentity                         = $ManagedIdentity.IsPresent
+            ManagedIdentity                         = $ManagedIdentity.IsPresent
             TenantId                                = $TenantId
+            AccessTokens                            = $AccessTokens
         }
 
         return $results
@@ -368,8 +378,15 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
+    Write-Verbose -Message 'Setting EXOTransportConfig'
+
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
 
@@ -382,22 +399,17 @@ function Set-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message 'Setting EXOTransportConfig'
-
-    $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+    $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
         -InboundParameters $PSBoundParameters
 
-
     Write-Verbose -Message "Setting EXOTransportConfig with values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-    $SetValues = [System.Collections.Hashtable]($PSBoundParameters)
+    $SetValues = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
     $SetValues.Remove('IsSingleInstance') | Out-Null
-    $SetValues.Remove('Credential') | Out-Null
-    $SetValues.Remove('ApplicationId') | Out-Null
-    $SetValues.Remove('TenantId') | Out-Null
-    $SetValues.Remove('CertificateThumbprint') | Out-Null
-    $SetValues.Remove('CertificatePath') | Out-Null
-    $SetValues.Remove('CertificatePassword') | Out-Null
-    $SetValues.Remove('ManagedIdentity') | Out-Null
+
+    if ($SetValues.JournalingReportNdrTo -eq '<>' -or [System.String]::IsNullOrEmpty($SetValues.JournalingReportNdrTo))
+    {
+        $SetValues.Remove('JournalingReportNdrTo') | Out-Null
+    }
 
     Set-TransportConfig @SetValues
 }
@@ -543,7 +555,11 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
@@ -565,15 +581,8 @@ function Test-TargetResource
     Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
 
     $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('Credential') | Out-Null
-    $ValuesToCheck.Remove('ApplicationId') | Out-Null
-    $ValuesToCheck.Remove('TenantId') | Out-Null
-    $ValuesToCheck.Remove('CertificateThumbprint') | Out-Null
-    $ValuesToCheck.Remove('CertificatePath') | Out-Null
-    $ValuesToCheck.Remove('CertificatePassword') | Out-Null
-    $ValuesToCheck.Remove('ManagedIdentity') | Out-Null
 
-    if ($CurrentValues.Ensure -eq 'Absent')
+    if ($CurrentValues -is [System.Collections.Hashtable] -and $CurrentValues.Count -lt 1)
     {
         # In case transport config is missing at all for whatever reason.
         $TestResult = $false
@@ -623,7 +632,11 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
@@ -644,6 +657,11 @@ function Export-TargetResource
 
     try
     {
+        if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+        {
+            $Global:M365DSCExportResourceInstancesCount++
+        }
+
         $Params = @{
             IsSingleInstance      = 'Yes'
             Credential            = $Credential
@@ -651,27 +669,35 @@ function Export-TargetResource
             TenantId              = $TenantId
             CertificateThumbprint = $CertificateThumbprint
             CertificatePassword   = $CertificatePassword
-            Managedidentity       = $ManagedIdentity.IsPresent
+            ManagedIdentity       = $ManagedIdentity.IsPresent
             CertificatePath       = $CertificatePath
+            AccessTokens          = $AccessTokens
         }
 
         $Results = Get-TargetResource @Params
-        $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-            -Results $Results
-        $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
-            -ConnectionMode $ConnectionMode `
-            -ModulePath $PSScriptRoot `
-            -Results $Results `
-            -Credential $Credential
-        $dscContent += $currentDSCBlock
-        Save-M365DSCPartialExport -Content $currentDSCBlock `
-            -FileName $Global:PartialExportFileName
-        Write-Host $Global:M365DSCEmojiGreenCheckMark
+        if ($Results -is [System.Collections.Hashtable] -and $Results.Count -gt 1)
+        {
+            $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
+                -ConnectionMode $ConnectionMode `
+                -ModulePath $PSScriptRoot `
+                -Results $Results `
+                -Credential $Credential
+            $dscContent += $currentDSCBlock
+            Save-M365DSCPartialExport -Content $currentDSCBlock `
+                -FileName $Global:PartialExportFileName
+
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
+        }
+        else
+        {
+            Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
+        }
+
         return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `

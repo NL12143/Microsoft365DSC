@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_TeamsUser'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -36,58 +38,74 @@ function Get-TargetResource
 
         [Parameter()]
         [System.String]
-        $CertificateThumbprint
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [Switch]
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Getting configuration of member $User to Team $TeamName"
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftTeams' -InboundParameters $PSBoundParameters
-
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
-
-    #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
-    $CommandName = $MyInvocation.MyCommand
-    $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
-        -CommandName $CommandName `
-        -Parameters $PSBoundParameters
-    Add-M365DSCTelemetryEvent -Data $data
-    #endregion
-
-    $nullReturn = $PSBoundParameters
-    $nullReturn.Ensure = 'Absent'
-
     try
     {
-        Write-Verbose -Message "Checking for existance of Team User $User"
-        $team = Get-TeamByName ([System.Net.WebUtility]::UrlEncode($TeamName)) -ErrorAction SilentlyContinue
-        if ($null -eq $team)
+        if (-not $Script:exportedInstance -or $Script:exportedInstance.User -ne $User)
         {
-            return $nullReturn
+            $null = New-M365DSCConnection -Workload 'MicrosoftTeams' -InboundParameters $PSBoundParameters
+
+            #Ensure the proper dependencies are installed in the current environment.
+            Confirm-M365DSCDependencies
+
+            #region Telemetry
+            $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+            $CommandName = $MyInvocation.MyCommand
+            $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
+                -CommandName $CommandName `
+                -Parameters $PSBoundParameters
+            Add-M365DSCTelemetryEvent -Data $data
+            #endregion
+
+            $nullReturn = $PSBoundParameters
+            $nullReturn.Ensure = 'Absent'
+
+            Write-Verbose -Message "Checking for existance of Team User $User"
+            $team = Get-TeamByName ([System.Net.WebUtility]::UrlEncode($TeamName)) -ErrorAction SilentlyContinue
+            if ($null -eq $team)
+            {
+                return $nullReturn
+            }
+
+            Write-Verbose -Message "Retrieve team GroupId: $($team.GroupId)"
+
+            try
+            {
+                Write-Verbose 'Retrieving user without a specific Role specified'
+                $allMembers = Get-TeamUser -GroupId $team.GroupId -ErrorAction SilentlyContinue
+            }
+            catch
+            {
+                Write-Warning "The current user doesn't have the rights to access the list of members for Team {$($TeamName)}."
+                Write-Verbose -Message $_
+                return $nullReturn
+            }
+
+            if ($null -eq $allMembers)
+            {
+                Write-Verbose -Message "Failed to get Team's users for Team $TeamName"
+                return $nullReturn
+            }
+
+            $myUser = $allMembers | Where-Object -FilterScript { $_.User -eq $User }
+        }
+        else
+        {
+            $myUser = $Script:exportedInstance
         }
 
-        Write-Verbose -Message "Retrieve team GroupId: $($team.GroupId)"
-
-        try
-        {
-            Write-Verbose 'Retrieving user without a specific Role specified'
-            $allMembers = Get-TeamUser -GroupId $team.GroupId -ErrorAction SilentlyContinue
-        }
-        catch
-        {
-            Write-Warning "The current user doesn't have the rights to access the list of members for Team {$($TeamName)}."
-            Write-Verbose -Message $_
-            return $nullReturn
-        }
-
-        if ($null -eq $allMembers)
-        {
-            Write-Verbose -Message "Failed to get Team's users for Team $TeamName"
-            return $nullReturn
-        }
-
-        $myUser = $allMembers | Where-Object -FilterScript { $_.User -eq $User }
         Write-Verbose -Message "Found team user $($myUser.User) with role:$($myUser.Role)"
         return @{
             User                  = $myUser.User
@@ -98,6 +116,8 @@ function Get-TargetResource
             ApplicationId         = $ApplicationId
             TenantId              = $TenantId
             CertificateThumbprint = $CertificateThumbprint
+            ManagedIdentity       = $ManagedIdentity.IsPresent
+            AccessTokens          = $AccessTokens
         }
     }
     catch
@@ -149,7 +169,15 @@ function Set-TargetResource
 
         [Parameter()]
         [System.String]
-        $CertificateThumbprint
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [Switch]
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Setting configuration of member $User to Team $TeamName"
@@ -166,20 +194,15 @@ function Set-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftTeams' -InboundParameters $PSBoundParameters
+    $null = New-M365DSCConnection -Workload 'MicrosoftTeams' -InboundParameters $PSBoundParameters
 
     $team = Get-TeamByName ([System.Net.WebUtility]::UrlEncode($TeamName))
 
     Write-Verbose -Message "Retrieve team GroupId: $($team.GroupId)"
 
-    $CurrentParameters = $PSBoundParameters
+    $CurrentParameters = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
     $CurrentParameters.Remove('TeamName') | Out-Null
     $CurrentParameters.Add('GroupId', $team.GroupId)
-    $CurrentParameters.Remove('Credential') | Out-Null
-    $CurrentParameters.Remove('ApplicationId') | Out-Null
-    $CurrentParameters.Remove('TenantId') | Out-Null
-    $CurrentParameters.Remove('CertificateThumbprint') | Out-Null
-    $CurrentParameters.Remove('Ensure') | Out-Null
 
     if ($Ensure -eq 'Present')
     {
@@ -236,7 +259,15 @@ function Test-TargetResource
 
         [Parameter()]
         [System.String]
-        $CertificateThumbprint
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [Switch]
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
@@ -294,9 +325,17 @@ function Export-TargetResource
 
         [Parameter()]
         [System.String]
-        $CertificateThumbprint
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [Switch]
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-    $InformationPreference = 'Continue'
+
     $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftTeams' -InboundParameters $PSBoundParameters
 
     #Ensure the proper dependencies are installed in the current environment.
@@ -313,14 +352,14 @@ function Export-TargetResource
 
     try
     {
-        [array]$instances = Get-Team
+        [array]$instances = Get-Team | Sort-Object -Property GroupId
         if ($instances.Length -eq 0)
         {
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         }
         else
         {
-            Write-Host "`r`n" -NoNewline
+            Write-M365DSCHost -Message "`r`n" -DeferWrite
         }
         $dscContent = [System.Text.StringBuilder]::new()
         $j = 1
@@ -337,10 +376,15 @@ function Export-TargetResource
                     {
                         $totalCount = 1
                     }
-                    Write-Host "    > [$j/$totalCount] Team {$($team.DisplayName)}"
+                    Write-M365DSCHost -Message "    > [$j/$totalCount] Team {$($team.DisplayName)}"
                     foreach ($user in $users)
                     {
-                        Write-Host "        - [$k/$($users.Length)] $($user.User)" -NoNewline
+                        if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+                        {
+                            $Global:M365DSCExportResourceInstancesCount++
+                        }
+
+                        Write-M365DSCHost -Message "        - [$k/$($users.Length)] $($user.User)" -DeferWrite
 
                         $getParams = @{
                             TeamName              = $team.DisplayName
@@ -349,10 +393,12 @@ function Export-TargetResource
                             ApplicationId         = $ApplicationId
                             TenantId              = $TenantId
                             CertificateThumbprint = $CertificateThumbprint
+                            ManagedIdentity       = $ManagedIdentity.IsPresent
+                            AccessTokens          = $AccessTokens
                         }
+
+                        $Script:exportedInstance = $user
                         $results = Get-TargetResource @getParams
-                        $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                            -Results $Results
                         $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                             -ConnectionMode $ConnectionMode `
                             -ModulePath $PSScriptRoot `
@@ -361,7 +407,7 @@ function Export-TargetResource
                         $dscContent.Append($currentDSCBlock) | Out-Null
                         Save-M365DSCPartialExport -Content $currentDSCBlock `
                             -FileName $Global:PartialExportFileName
-                        Write-Host $Global:M365DSCEmojiGreenCheckMark
+                        Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
                         $k++
                     }
                 }
@@ -377,9 +423,9 @@ function Export-TargetResource
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
-        New-M365DSCLogEntry -Message "Error during Export:" `
+        New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `
             -Source $($MyInvocation.MyCommand.Source) `
             -TenantId $TenantId `

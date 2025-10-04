@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_SPOSiteGroup'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -54,63 +56,75 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Getting SPOSiteGroups for {$Url}"
-    $ConnectionMode = New-M365DSCConnection -Workload 'PNP' `
-        -InboundParameters $PSBoundParameters
-
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
-
-    #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
-    $CommandName = $MyInvocation.MyCommand
-    $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
-        -CommandName $CommandName `
-        -Parameters $PSBoundParameters
-    Add-M365DSCTelemetryEvent -Data $data
-    #endregion
-
-    $nullReturn = $PSBoundParameters
-    $nullReturn.Ensure = 'Absent'
 
     try
     {
-        #checking if the site actually exists
-        try
+        if (-not $Script:exportedInstance -or $Script:exportedInstance.Url -ne $Url)
         {
-            $site = Get-PnPTenantSite $Url
-        }
-        catch
-        {
-            $Message = "The specified site collection doesn't exist."
-            New-M365DSCLogEntry -Message $Message `
-                -Exception $_ `
-                -Source $MyInvocation.MyCommand.ModuleName
-            throw $Message
-            return $nullReturn
-        }
-        try
-        {
-            $ConnectionMode = New-M365DSCConnection -Workload 'PNP' `
-                -InboundParameters $PSBoundParameters `
-                -Url $Url
-            $siteGroup = Get-PnPGroup -Identity $Identity `
-                -ErrorAction Stop
-        }
-        catch
-        {
-            if ($Error[0].Exception.Message -eq 'Group cannot be found.')
-            {
-                Write-Verbose -Message "Site group $($Identity) could not be found on site $($Url)"
+            $null = New-M365DSCConnection -Workload 'PNP' `
+                -InboundParameters $PSBoundParameters
 
+            #Ensure the proper dependencies are installed in the current environment.
+            Confirm-M365DSCDependencies
+
+            #region Telemetry
+            $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+            $CommandName = $MyInvocation.MyCommand
+            $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
+                -CommandName $CommandName `
+                -Parameters $PSBoundParameters
+            Add-M365DSCTelemetryEvent -Data $data
+            #endregion
+
+            $nullReturn = $PSBoundParameters
+            $nullReturn.Ensure = 'Absent'
+
+            #checking if the site actually exists
+            try
+            {
+                $site = Get-PnPTenantSite $Url
+            }
+            catch
+            {
+                $Message = "The specified site collection doesn't exist."
+                New-M365DSCLogEntry -Message $Message `
+                    -Exception $_ `
+                    -Source $MyInvocation.MyCommand.ModuleName
+                throw $Message
+                return $nullReturn
+            }
+            try
+            {
+                $null = New-M365DSCConnection -Workload 'PNP' `
+                    -InboundParameters $PSBoundParameters `
+                    -Url $Url
+                $siteGroup = Get-PnPGroup -Identity $Identity `
+                    -ErrorAction Stop
+            }
+            catch
+            {
+                if ($Error[0].Exception.Message -eq 'Group cannot be found.')
+                {
+                    Write-Verbose -Message "Site group $($Identity) could not be found on site $($Url)"
+
+                }
+            }
+            if ($null -eq $siteGroup)
+            {
+                return $nullReturn
             }
         }
-        if ($null -eq $siteGroup)
+        else
         {
-            return $nullReturn
+            $siteGroup = $Script:exportedInstance
         }
 
         try
@@ -144,7 +158,8 @@ function Get-TargetResource
             CertificatePassword   = $CertificatePassword
             CertificatePath       = $CertificatePath
             CertificateThumbprint = $CertificateThumbprint
-            Managedidentity       = $ManagedIdentity.IsPresent
+            ManagedIdentity       = $ManagedIdentity.IsPresent
+            AccessTokens          = $AccessTokens
         }
     }
     catch
@@ -214,7 +229,11 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Setting SPOSiteGroups for {$Url}"
@@ -230,8 +249,6 @@ function Set-TargetResource
         -Parameters $PSBoundParameters
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
-    $ConnectionMode = New-M365DSCConnection -Workload 'PNP' -InboundParameters $PSBoundParameters `
-        -ErrorAction SilentlyContinue
 
     $currentValues = Get-TargetResource @PSBoundParameters
     $IsNew = $false
@@ -389,13 +406,15 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
 
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -403,30 +422,9 @@ function Test-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message "Testing SPOSiteGroups for {$Url}"
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-
-    Write-Verbose -Message "Current Values: $(Convert-M365DscHashtableToString -Hashtable $CurrentValues)"
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('Credential') | Out-Null
-    $ValuesToCheck.Remove('ApplicationId') | Out-Null
-    $ValuesToCheck.Remove('TenantId') | Out-Null
-    $ValuesToCheck.Remove('CertificatePath') | Out-Null
-    $ValuesToCheck.Remove('CertificatePassword') | Out-Null
-    $ValuesToCheck.Remove('CertificateThumbprint') | Out-Null
-    $ValuesToCheck.Remove('ManagedIdentity') | Out-Null
-    $ValuesToCheck.Remove('ApplicationSecret') | Out-Null
-
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck $ValuesToCheck.Keys
-
-    Write-Verbose -Message "Test-TargetResource returned $TestResult"
-
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '')
+    return $result
 }
 
 function Export-TargetResource
@@ -465,12 +463,17 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     try
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'PNP' -InboundParameters $PSBoundParameters `
+        $ConnectionMode = New-M365DSCConnection -Workload 'PNP' `
+            -InboundParameters $PSBoundParameters `
             -ErrorAction SilentlyContinue
 
         #Ensure the proper dependencies are installed in the current environment.
@@ -508,10 +511,15 @@ function Export-TargetResource
         }
 
         $dscContent = ''
-        Write-Host "`r`n" -NoNewline
+        Write-M365DSCHost -Message "`r`n" -DeferWrite
         foreach ($site in $sites)
         {
-            Write-Host "    |---[$i/$($sites.Length)] SPOSite groups for {$($site.Url)}"
+            if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+            {
+                $Global:M365DSCExportResourceInstancesCount++
+            }
+
+            Write-M365DSCHost -Message "    |---[$i/$($sites.Length)] SPOSite groups for {$($site.Url)}"
             $siteGroups = $null
             try
             {
@@ -529,16 +537,7 @@ function Export-TargetResource
             $j = 1
             foreach ($siteGroup in $siteGroups)
             {
-                Write-Host "        |---[$j/$($siteGroups.Length)] $($siteGroup.Title)" -NoNewline
-                try
-                {
-                    [array]$sitePerm = Get-PnPGroupPermissions -Identity $siteGroup.Title -ErrorAction Stop
-                }
-                catch
-                {
-                    Write-Warning -Message "The specified account does not have access to the permissions list for {$($siteGroup.Title)}"
-                    break
-                }
+                Write-M365DSCHost -Message "        |---[$j/$($siteGroups.Length)] $($siteGroup.Title)" -DeferWrite
                 $Params = @{
                     Url                   = $site.Url
                     Identity              = $siteGroup.Title
@@ -548,16 +547,16 @@ function Export-TargetResource
                     CertificatePassword   = $CertificatePassword
                     CertificatePath       = $CertificatePath
                     CertificateThumbprint = $CertificateThumbprint
-                    Managedidentity       = $ManagedIdentity.IsPresent
+                    ManagedIdentity       = $ManagedIdentity.IsPresent
                     Credential            = $Credential
+                    AccessTokens          = $AccessTokens
                 }
                 try
                 {
+                    $Script:exportedInstance = $siteGroup
                     $Results = Get-TargetResource @Params
                     if ($Results.Ensure -eq 'Present')
                     {
-                        $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                            -Results $Results
                         $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                             -ConnectionMode $ConnectionMode `
                             -ModulePath $PSScriptRoot `
@@ -583,7 +582,7 @@ function Export-TargetResource
                     Write-Verbose -Message "There was an issue retrieving the SiteGroups for $($Url)"
                 }
                 $j++
-                Write-Host $Global:M365DSCEmojiGreenCheckmark
+                Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
             }
 
             $i++
@@ -591,14 +590,14 @@ function Export-TargetResource
 
         if ($i -eq 1)
         {
-            Write-Host ''
+            Write-M365DSCHost -Message ''
         }
 
         return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `

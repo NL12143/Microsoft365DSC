@@ -15,47 +15,71 @@ Import-Module -Name (Join-Path -Path $M365DSCTestFolder `
         -Resolve)
 
 $Global:DscHelper = New-M365DscUnitTestHelper -StubModule $CmdletModule `
-    -DscResource 'IntuneDeviceCompliancePolicyMacOs' -GenericStubModule $GenericStubPath
+    -DscResource 'IntuneDeviceCompliancePolicyMacOS' -GenericStubModule $GenericStubPath
 
 Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
     InModuleScope -ModuleName $Global:DscHelper.ModuleName -ScriptBlock {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
 
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'Pass@word1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString ((New-Guid).ToString()) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
-            }
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
                 return 'Credentials'
             }
 
-            Mock -CommandName Update-MgDeviceManagementDeviceCompliancePolicy -MockWith {
+            Mock -CommandName Update-MgBetaDeviceManagementDeviceCompliancePolicy -MockWith {
             }
 
-            Mock -CommandName New-MgDeviceManagementDeviceCompliancePolicy -MockWith {
+            Mock -CommandName New-MgBetaDeviceManagementDeviceCompliancePolicy -MockWith {
             }
 
-            Mock -CommandName Remove-MgDeviceManagementDeviceCompliancePolicy -MockWith {
+            Mock -CommandName Remove-MgBetaDeviceManagementDeviceCompliancePolicy -MockWith {
             }
 
-            Mock -CommandName Get-MGDeviceManagementDeviceCompliancePolicyAssignment -MockWith {
+            Mock -CommandName Get-MgBetaDeviceManagementDeviceCompliancePolicy -MockWith {
+                return @{
+                    DisplayName          = 'MacOS DSC Policy'
+                    Description          = 'Test policy'
+                    Id                   = 'd95e706d-c92c-410d-a132-09e0b1032dbd'
+                    AdditionalProperties = @{
+                        '@odata.type'                               = '#microsoft.graph.macOSCompliancePolicy'
+                        PasswordRequired                            = $False
+                        PasswordBlockSimple                         = $False
+                        PasswordExpirationDays                      = 365
+                        PasswordMinimumLength                       = 6
+                        PasswordMinutesOfInactivityBeforeLock       = 5
+                        PasswordPreviousPasswordBlockCount          = 13
+                        PasswordMinimumCharacterSetCount            = 1
+                        PasswordRequiredType                        = 'DeviceDefault'
+                        OsMinimumVersion                            = 10
+                        OsMaximumVersion                            = 13
+                        SystemIntegrityProtectionEnabled            = $False
+                        DeviceThreatProtectionEnabled               = $False
+                        DeviceThreatProtectionRequiredSecurityLevel = 'Unavailable'
+                        StorageRequireEncryption                    = $False
+                        FirewallEnabled                             = $False
+                        FirewallBlockAllIncoming                    = $False
+                        FirewallEnableStealthMode                   = $False
+                    }
+                }
+            }
+
+            Mock -CommandName Get-MgBetaDeviceManagementDeviceCompliancePolicyAssignment -MockWith {
 
                 return @()
             }
-
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            Mock -CommandName Update-DeviceConfigurationPolicyAssignment -MockWith {
             }
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -85,7 +109,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Credential                                  = $Credential
                 }
 
-                Mock -CommandName Get-MgDeviceManagementDeviceCompliancePolicy -MockWith {
+                Mock -CommandName Get-MgBetaDeviceManagementDeviceCompliancePolicy -MockWith {
                     return $null
                 }
             }
@@ -100,7 +124,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should create the iOS Device Compliance Policy from the Set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName 'New-MgDeviceManagementDeviceCompliancePolicy' -Exactly 1
+                Should -Invoke -CommandName 'New-MgBetaDeviceManagementDeviceCompliancePolicy' -Exactly 1
             }
         }
 
@@ -117,7 +141,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     PasswordPreviousPasswordBlockCount          = 13
                     PasswordMinimumCharacterSetCount            = 1
                     PasswordRequiredType                        = 'DeviceDefault'
-                    OsMinimumVersion                            = 10
+                    OsMinimumVersion                            = 11 # Updated property
                     OsMaximumVersion                            = 13
                     SystemIntegrityProtectionEnabled            = $False
                     DeviceThreatProtectionEnabled               = $False
@@ -128,35 +152,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     FirewallEnableStealthMode                   = $False
                     Ensure                                      = 'Present'
                     Credential                                  = $Credential
-                }
-
-                Mock -CommandName Get-MgDeviceManagementDeviceCompliancePolicy -MockWith {
-                    return @{
-                        DisplayName          = 'MacOS DSC Policy'
-                        Description          = 'Test policy with different value'
-                        Id                   = 'd95e706d-c92c-410d-a132-09e0b1032dbd'
-                        AdditionalProperties = @{
-                            '@odata.type'                               = '#microsoft.graph.macOSCompliancePolicy'
-                            PasswordRequired                            = $False
-                            PasswordBlockSimple                         = $False
-                            PasswordExpirationDays                      = 365
-                            PasswordMinimumLength                       = 6
-                            PasswordMinutesOfInactivityBeforeLock       = 5
-                            PasswordPreviousPasswordBlockCount          = 13
-                            PasswordMinimumCharacterSetCount            = 1
-                            PasswordRequiredType                        = 'DeviceDefault'
-                            OsMinimumVersion                            = 10
-                            OsMaximumVersion                            = 13
-                            SystemIntegrityProtectionEnabled            = $False
-                            DeviceThreatProtectionEnabled               = $False
-                            DeviceThreatProtectionRequiredSecurityLevel = 'Unavailable'
-                            StorageRequireEncryption                    = $False
-                            FirewallEnabled                             = $False
-                            FirewallBlockAllIncoming                    = $False
-                            FirewallEnableStealthMode                   = $False
-                            RoleScopeTagIds                             = '0'
-                        }
-                    }
                 }
             }
 
@@ -170,7 +165,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should update the iOS Device Compliance Policy from the Set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName Update-MgDeviceManagementDeviceCompliancePolicy -Exactly 1
+                Should -Invoke -CommandName Update-MgBetaDeviceManagementDeviceCompliancePolicy -Exactly 1
             }
         }
 
@@ -199,37 +194,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Assignments                                 = @()
                     Ensure                                      = 'Present'
                     Credential                                  = $Credential
-                }
-
-                Mock -CommandName Get-MgDeviceManagementDeviceCompliancePolicy -MockWith {
-                    return @{
-                        DisplayName          = 'MacOS DSC Policy'
-                        Description          = 'Test policy'
-                        Id                   = 'd95e706d-c92c-410d-a132-09e0b1032dbd'
-                        AdditionalProperties = @{
-                            '@odata.type'                               = '#microsoft.graph.macOSCompliancePolicy'
-                            PasswordRequired                            = $False
-                            PasswordBlockSimple                         = $False
-                            PasswordExpirationDays                      = 365
-                            PasswordMinimumLength                       = 6
-                            PasswordMinutesOfInactivityBeforeLock       = 5
-                            PasswordPreviousPasswordBlockCount          = 13
-                            PasswordMinimumCharacterSetCount            = 1
-                            PasswordRequiredType                        = 'DeviceDefault'
-                            OsMinimumVersion                            = 10
-                            OsMaximumVersion                            = 13
-                            SystemIntegrityProtectionEnabled            = $False
-                            DeviceThreatProtectionEnabled               = $False
-                            DeviceThreatProtectionRequiredSecurityLevel = 'Unavailable'
-                            StorageRequireEncryption                    = $False
-                            FirewallEnabled                             = $False
-                            FirewallBlockAllIncoming                    = $False
-                            FirewallEnableStealthMode                   = $False
-                        }
-                    }
-                }
-                Mock -CommandName Get-MgDeviceManagementDeviceCompliancePolicyAssignment -MockWith {
-                    return @()
                 }
             }
 
@@ -263,35 +227,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Ensure                                      = 'Absent'
                     Credential                                  = $Credential
                 }
-
-                Mock -CommandName Get-MgDeviceManagementDeviceCompliancePolicy -MockWith {
-                    return @{
-                        DisplayName          = 'MacOS DSC Policy'
-                        Description          = 'Test policy'
-                        Id                   = 'd95e706d-c92c-410d-a132-09e0b1032dbd'
-                        AdditionalProperties = @{
-                            '@odata.type'                               = '#microsoft.graph.macOSCompliancePolicy'
-                            PasswordRequired                            = $False
-                            PasswordBlockSimple                         = $False
-                            PasswordExpirationDays                      = 365
-                            PasswordMinimumLength                       = 6
-                            PasswordMinutesOfInactivityBeforeLock       = 5
-                            PasswordPreviousPasswordBlockCount          = 13
-                            PasswordMinimumCharacterSetCount            = 1
-                            PasswordRequiredType                        = 'DeviceDefault'
-                            OsMinimumVersion                            = 10
-                            OsMaximumVersion                            = 13
-                            SystemIntegrityProtectionEnabled            = $False
-                            DeviceThreatProtectionEnabled               = $False
-                            DeviceThreatProtectionRequiredSecurityLevel = 'Unavailable'
-                            StorageRequireEncryption                    = $False
-                            FirewallEnabled                             = $False
-                            FirewallBlockAllIncoming                    = $False
-                            FirewallEnableStealthMode                   = $False
-                            RoleScopeTagIds                             = '0'
-                        }
-                    }
-                }
             }
 
             It 'Should return Present from the Get method' {
@@ -304,49 +239,22 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should remove the iOS Device Compliance Policy from the Set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName Remove-MgDeviceManagementDeviceCompliancePolicy -Exactly 1
+                Should -Invoke -CommandName Remove-MgBetaDeviceManagementDeviceCompliancePolicy -Exactly 1
             }
         }
 
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
-                }
-
-                Mock -CommandName Get-MgDeviceManagementDeviceCompliancePolicy -MockWith {
-                    return @{
-                        DisplayName          = 'MacOS DSC Policy'
-                        Description          = 'Test policy'
-                        Id                   = 'd95e706d-c92c-410d-a132-09e0b1032dbd'
-                        AdditionalProperties = @{
-                            '@odata.type'                               = '#microsoft.graph.macOSCompliancePolicy'
-                            PasswordRequired                            = $False
-                            PasswordBlockSimple                         = $False
-                            PasswordExpirationDays                      = 365
-                            PasswordMinimumLength                       = 6
-                            PasswordMinutesOfInactivityBeforeLock       = 5
-                            PasswordPreviousPasswordBlockCount          = 13
-                            PasswordMinimumCharacterSetCount            = 1
-                            PasswordRequiredType                        = 'DeviceDefault'
-                            OsMinimumVersion                            = 10
-                            OsMaximumVersion                            = 13
-                            SystemIntegrityProtectionEnabled            = $False
-                            DeviceThreatProtectionEnabled               = $False
-                            DeviceThreatProtectionRequiredSecurityLevel = 'Unavailable'
-                            StorageRequireEncryption                    = $False
-                            FirewallEnabled                             = $False
-                            FirewallBlockAllIncoming                    = $False
-                            FirewallEnableStealthMode                   = $False
-                            RoleScopeTagIds                             = '0'
-                        }
-                    }
                 }
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
 

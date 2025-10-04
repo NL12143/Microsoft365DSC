@@ -4,11 +4,13 @@ This example sets Power Platform tenant isolation settings.
 
 Configuration Example
 {
-    param(
+    param
+    (
         [Parameter(Mandatory = $true)]
         [PSCredential]
-        $credsGlobalAdmin
+        $Credscredential
     )
+
     Import-DscResource -ModuleName Microsoft365DSC
 
     node localhost
@@ -16,7 +18,7 @@ Configuration Example
         PPTenantIsolationSettings 'PowerPlatformTenantSettings'
         {
             IsSingleInstance = 'Yes'
-            Enable           = $true
+            Enabled          = $true
             Rules            = @(
                 MSFT_PPTenantRule
                 {
@@ -29,7 +31,7 @@ Configuration Example
                     Direction  = 'Both'
                 }
             )
-            Credential       = $credsGlobalAdmin
+            Credential       = $Credscredential
         }
     }
 }

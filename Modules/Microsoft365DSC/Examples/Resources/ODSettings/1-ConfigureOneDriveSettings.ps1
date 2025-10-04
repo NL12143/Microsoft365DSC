@@ -8,7 +8,7 @@ Configuration Example
     param(
         [Parameter(Mandatory = $true)]
         [PSCredential]
-        $credsGlobalAdmin
+        $Credscredential
     )
     Import-DscResource -ModuleName Microsoft365DSC
 
@@ -27,10 +27,9 @@ Configuration Example
             OneDriveForGuestsEnabled                  = $false
             ODBAccessRequests                         = "On"
             ODBMembersCanShare                        = "On"
-            NotifyOwnersWhenInvitationsAccepted       = $false
             NotificationsInOneDriveForBusinessEnabled = $false
             Ensure                                    = "Present"
-            Credential                                = $credsGlobalAdmin
+            Credential                                = $Credscredential
         }
     }
 }

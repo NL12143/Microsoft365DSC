@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_EXODkimSigningConfig'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -32,9 +34,9 @@ function Get-TargetResource
         $HeaderCanonicalization = 'Relaxed',
 
         [Parameter()]
-        [ValidateSet(1024)]
+        [ValidateSet(1024, 2048)]
         [uint16]
-        $KeySize = 1024,
+        $KeySize,
 
         [Parameter()]
         [System.Management.Automation.PSCredential]
@@ -62,19 +64,24 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Getting configuration of DkimSigningConfig for $Identity"
+
     if ($Global:CurrentModeIsExport)
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+        $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
             -InboundParameters $PSBoundParameters `
             -SkipModuleReload $true
     }
     else
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+        $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
             -InboundParameters $PSBoundParameters
     }
 
@@ -122,14 +129,15 @@ function Get-TargetResource
             BodyCanonicalization   = $DkimSigningConfig.BodyCanonicalization
             Enabled                = $DkimSigningConfig.Enabled
             HeaderCanonicalization = $DkimSigningConfig.HeaderCanonicalization
-            KeySize                = 1024
+            KeySize                = $DkimSigningConfig.Selector1KeySize
             Credential             = $Credential
             ApplicationId          = $ApplicationId
             CertificateThumbprint  = $CertificateThumbprint
             CertificatePath        = $CertificatePath
             CertificatePassword    = $CertificatePassword
-            Managedidentity        = $ManagedIdentity.IsPresent
+            ManagedIdentity        = $ManagedIdentity.IsPresent
             TenantId               = $TenantId
+            AccessTokens           = $AccessTokens
         }
 
         Write-Verbose -Message "Found DkimSigningConfig $($Identity)"
@@ -171,9 +179,9 @@ function Set-TargetResource
         $HeaderCanonicalization = 'Relaxed',
 
         [Parameter()]
-        [ValidateSet(1024)]
+        [ValidateSet(1024, 2048)]
         [uint16]
-        $KeySize = 1024,
+        $KeySize,
 
         [Parameter()]
         [System.Management.Automation.PSCredential]
@@ -201,7 +209,11 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Setting configuration of DkimSigningConfig for $Identity"
@@ -218,42 +230,26 @@ function Set-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
-        -InboundParameters $PSBoundParameters
+    $DkimSigningConfig = Get-TargetResource @PSBoundParameters
+    $PSBoundParameters = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
 
-    $DkimSigningConfigs = Get-DkimSigningConfig
-
-    $DkimSigningConfig = $DkimSigningConfigs | Where-Object -FilterScript { $_.Identity -eq $Identity }
-
-    if (('Present' -eq $Ensure ) -and ($null -eq $DkimSigningConfig))
+    if ($Ensure -eq 'Present' -and $DkimSigningConfig.Ensure -eq 'Absent')
     {
-        $DkimSigningConfigParams = [System.Collections.Hashtable]($PSBoundParameters)
-        $DkimSigningConfigParams.Remove('Ensure') | Out-Null
-        $DkimSigningConfigParams.Remove('Credential') | Out-Null
-        $DkimSigningConfigParams.Remove('ApplicationId') | Out-Null
-        $DkimSigningConfigParams.Remove('TenantId') | Out-Null
-        $DkimSigningConfigParams.Remove('CertificateThumbprint') | Out-Null
-        $DkimSigningConfigParams.Remove('CertificatePath') | Out-Null
-        $DkimSigningConfigParams.Remove('CertificatePassword') | Out-Null
-        $DkimSigningConfigParams.Remove('ManagedIdentity') | Out-Null
-        $DkimSigningConfigParams += @{
+        $PSBoundParameters += @{
             DomainName = $PSBoundParameters.Identity
         }
-        $DkimSigningConfigParams.Remove('Identity') | Out-Null
+        $PSBoundParameters.Remove('Identity') | Out-Null
         Write-Verbose -Message "Creating DkimSigningConfig $($Identity)."
-        New-DkimSigningConfig @DkimSigningConfigParams
+        New-DkimSigningConfig @PSBoundParameters
     }
-    elseif (('Present' -eq $Ensure ) -and ($null -ne $DkimSigningConfig))
+    elseif ($Ensure -eq 'Present' -and $DkimSigningConfig.Ensure -eq 'Present')
     {
-        $DkimSigningConfigParams = $PSBoundParameters
-        $DkimSigningConfigParams.Remove('Ensure') | Out-Null
-        $DkimSigningConfigParams.Remove('Credential') | Out-Null
-        $DkimSigningConfigParams.Remove('KeySize') | Out-Null
-        Write-Verbose -Message "Setting DkimSigningConfig $($Identity) with values: $(Convert-M365DscHashtableToString -Hashtable $DkimSigningConfigParams)"
-        Set-DkimSigningConfig @DkimSigningConfigParams -Confirm:$false
+        $PSBoundParameters.Remove('KeySize') | Out-Null
+        Write-Verbose -Message "Setting DkimSigningConfig $($Identity) with values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
+        Set-DkimSigningConfig @PSBoundParameters -Confirm:$false
     }
 
-    if (('Absent' -eq $Ensure ) -and ($DkimSigningConfig))
+    if ($Ensure -eq 'Absent' -and $DkimSigningConfig.Ensure -eq 'Present')
     {
         Write-Verbose -Message "Disabling DkimSigningConfig $($Identity) "
         Set-DkimSigningConfig -Identity $Identity -Enabled $false -Confirm:$false
@@ -294,9 +290,9 @@ function Test-TargetResource
         $HeaderCanonicalization = 'Relaxed',
 
         [Parameter()]
-        [ValidateSet(1024)]
+        [ValidateSet(1024, 2048)]
         [uint16]
-        $KeySize = 1024,
+        $KeySize,
 
         [Parameter()]
         [System.Management.Automation.PSCredential]
@@ -324,13 +320,15 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
 
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -338,31 +336,9 @@ function Test-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message "Testing configuration of DkimSigningConfig for $Identity"
-
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-
-    Write-Verbose -Message "Current Values: $(Convert-M365DscHashtableToString -Hashtable $CurrentValues)"
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('Credential') | Out-Null
-    $ValuesToCheck.Remove('ApplicationId') | Out-Null
-    $ValuesToCheck.Remove('TenantId') | Out-Null
-    $ValuesToCheck.Remove('CertificateThumbprint') | Out-Null
-    $ValuesToCheck.Remove('CertificatePath') | Out-Null
-    $ValuesToCheck.Remove('CertificatePassword') | Out-Null
-    $ValuesToCheck.Remove('ManagedIdentity') | Out-Null
-
-
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck $ValuesToCheck.Keys
-
-    Write-Verbose -Message "Test-TargetResource returned $TestResult"
-
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '')
+    return $result
 }
 
 function Export-TargetResource
@@ -397,8 +373,13 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
         -InboundParameters $PSBoundParameters `
         -SkipModuleReload $true
@@ -422,16 +403,21 @@ function Export-TargetResource
         $i = 1
         if ($DkimSigningConfigs.Length -eq 0)
         {
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         }
         else
         {
-            Write-Host "`r`n" -NoNewline
+            Write-M365DSCHost -Message "`r`n" -DeferWrite
         }
         $dscContent = ''
         foreach ($DkimSigningConfig in $DkimSigningConfigs)
         {
-            Write-Host "    |---[$i/$($DkimSigningConfigs.Length)] $($DkimSigningConfig.Identity)" -NoNewline
+            if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+            {
+                $Global:M365DSCExportResourceInstancesCount++
+            }
+
+            Write-M365DSCHost -Message "    |---[$i/$($DkimSigningConfigs.Length)] $($DkimSigningConfig.Identity)" -DeferWrite
             $Params = @{
                 Identity              = $DkimSigningConfig.Identity
                 Credential            = $Credential
@@ -439,12 +425,11 @@ function Export-TargetResource
                 TenantId              = $TenantId
                 CertificateThumbprint = $CertificateThumbprint
                 CertificatePassword   = $CertificatePassword
-                Managedidentity       = $ManagedIdentity.IsPresent
+                ManagedIdentity       = $ManagedIdentity.IsPresent
                 CertificatePath       = $CertificatePath
+                AccessTokens          = $AccessTokens
             }
             $Results = Get-TargetResource @Params
-            $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                -Results $Results
             $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                 -ConnectionMode $ConnectionMode `
                 -ModulePath $PSScriptRoot `
@@ -453,9 +438,14 @@ function Export-TargetResource
             $dscContent += $currentDSCBlock
             Save-M365DSCPartialExport -Content $currentDSCBlock `
                 -FileName $Global:PartialExportFileName
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
             $i++
         }
+    }
+    else
+    {
+        Write-M365DSCHost -Message "`r`n    $($Global:M365DSCEmojiYellowCircle) The current tenant is not registered to allow for DKIM Signing Config"
+        return ''
     }
     return $dscContent
 }

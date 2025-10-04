@@ -21,17 +21,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
 
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
-            }
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
@@ -53,9 +46,22 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             Mock -CommandName Remove-IntraOrganizationConnector -MockWith {
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            Mock -CommandName Get-IntraOrganizationConnector -MockWith {
+                return @{
+                    Ensure               = 'Present'
+                    Credential           = $Credential
+                    Identity             = 'TestIntraOrganizationConnector'
+                    DiscoveryEndpoint    = 'https://ExternalDiscovery.Contoso.com/autodiscover/autodiscover.svc'
+                    Enabled              = $true
+                    TargetAddressDomains = @('contoso.com', 'contoso.org')
+                }
             }
+
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -71,9 +77,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 }
 
                 Mock -CommandName Get-IntraOrganizationConnector -MockWith {
-                    return @{
-                        Identity = 'SomeOtherIOConnector'
-                    }
+                    return $null
                 }
             }
 
@@ -100,17 +104,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Enabled              = $true
                     TargetAddressDomains = @('contoso.com', 'contoso.org')
                 }
-
-                Mock -CommandName Get-IntraOrganizationConnector -MockWith {
-                    return @{
-                        Ensure               = 'Present'
-                        Credential           = $Credential
-                        Identity             = 'TestIntraOrganizationConnector'
-                        DiscoveryEndpoint    = 'https://ExternalDiscovery.Contoso.com/autodiscover/autodiscover.svc'
-                        Enabled              = $true
-                        TargetAddressDomains = @('contoso.com', 'contoso.org')
-                    }
-                }
             }
 
             It 'Should return true from the Test method' {
@@ -125,32 +118,8 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Credential           = $Credential
                     Identity             = 'TestIntraOrganizationConnector'
                     DiscoveryEndpoint    = 'https://ExternalDiscovery.Contoso.com/autodiscover/autodiscover.svc'
-                    Enabled              = $true
+                    Enabled              = $false # Drift
                     TargetAddressDomains = @('contoso.com', 'contoso.org')
-                }
-
-                Mock -CommandName Get-IntraOrganizationConnector -MockWith {
-                    return @{
-                        Ensure               = 'Present'
-                        Credential           = $Credential
-                        Identity             = 'TestIntraOrganizationConnector'
-                        Name                 = 'TestIntraOrganizationConnector'
-                        DiscoveryEndpoint    = 'https://Discovery.Contoso.org/autodiscover/autodiscover.svc'
-                        Enabled              = $true
-                        TargetAddressDomains = @('contoso.com', 'contoso.de')
-                    }
-                }
-
-                Mock -CommandName Set-IntraOrganizationConnector -MockWith {
-                    return @{
-                        Ensure               = 'Present'
-                        Credential           = $Credential
-                        Identity             = 'TestIntraOrganizationConnector'
-                        Name                 = 'TestIntraOrganizationConnector'
-                        DiscoveryEndpoint    = 'https://ExternalDiscovery.Contoso.com/autodiscover/autodiscover.svc'
-                        Enabled              = $true
-                        TargetAddressDomains = @('contoso.com', 'contoso.org')
-                    }
                 }
             }
 
@@ -158,26 +127,19 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 Test-TargetResource @testParams | Should -Be $false
             }
 
-            It 'Should Successfully call the Set method' {
+            It 'Should call the Set method' {
                 Set-TargetResource @testParams
+                Should -Invoke -CommandName Set-IntraOrganizationConnector -Exactly 1
             }
         }
 
         Context -Name 'IntraOrganizationConnector removal.' -Fixture {
             BeforeAll {
                 $testParams = @{
-                    Ensure            = 'Present'
+                    Ensure            = 'Absent'
                     Credential        = $Credential
                     Identity          = 'TestIntraOrganizationConnector'
                     DiscoveryEndpoint = 'https://ExternalDiscovery.Contoso.com/autodiscover/autodiscover.svc'
-                }
-
-                Mock -CommandName Get-IntraOrganizationConnector -MockWith {
-                    return @{}
-                }
-
-                Mock -CommandName Remove-IntraOrganizationConnector -MockWith {
-                    return @{}
                 }
             }
 
@@ -187,19 +149,22 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should Remove the Connector in the Set method' {
                 Set-TargetResource @testParams
+                Should -Invoke -CommandName Remove-IntraOrganizationConnector -Exactly 1
             }
         }
 
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
                 }
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

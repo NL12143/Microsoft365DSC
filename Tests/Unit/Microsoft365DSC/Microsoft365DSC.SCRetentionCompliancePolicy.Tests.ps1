@@ -21,17 +21,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
 
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
-            }
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
@@ -53,9 +46,14 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 }
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            Mock -CommandName Start-Sleep -MockWith {
             }
+
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -107,31 +105,31 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     return @{
                         Name                        = 'TestPolicy'
                         ExchangeLocation            = @{
-                            Name = "https://contoso.sharepoint.com/sites/demo"
+                            Name = 'https://contoso.sharepoint.com/sites/demo'
                         }
                         ExchangeLocationException   = @{
-                            Name = "https://contoso.sharepoint.com"
+                            Name = 'https://contoso.sharepoint.com'
                         }
                         OneDriveLocation            = @{
-                            Name = "https://contoso.sharepoint.com/sites/demo"
+                            Name = 'https://contoso.sharepoint.com/sites/demo'
                         }
                         OneDriveLocationException   = @{
-                            Name = "https://contoso.com"
+                            Name = 'https://contoso.com'
                         }
                         PublicFolderLocation        = @{
-                            Name = "\\contoso\PF"
+                            Name = '\\contoso\PF'
                         }
                         SkypeLocation               = @{
-                            Name = "https://contoso.sharepoint.com/sites/demo"
+                            Name = 'https://contoso.sharepoint.com/sites/demo'
                         }
                         SkypeLocationException      = @{
-                            Name = "https://contoso.sharepoint.com/"
+                            Name = 'https://contoso.sharepoint.com/'
                         }
                         SharePointLocation          = @{
-                            Name = "https://contoso.sharepoint.com/sites/demo"
+                            Name = 'https://contoso.sharepoint.com/sites/demo'
                         }
                         SharePointLocationException = @{
-                            Name = "https://contoso.com"
+                            Name = 'https://contoso.com'
                         }
                     }
                 }
@@ -182,6 +180,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
                 }
@@ -195,7 +194,8 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

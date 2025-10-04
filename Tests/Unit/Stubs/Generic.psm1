@@ -1,4 +1,3 @@
-
 function New-MgGroup
 {
     [CmdletBinding()]
@@ -33,24 +32,6 @@ function New-MgGroup
     )
 }
 
-function Get-MgGroup
-{
-    [CmdletBinding()]
-    param(
-        [Parameter()]
-        [System.String]
-        $GroupId,
-
-        [Parameter()]
-        [System.String]
-        $Filter,
-
-        [Parameter()]
-        [System.Boolean]
-        $All
-    )
-}
-
 function New-MgGroupOwnerByRef
 {
 
@@ -63,20 +44,6 @@ function New-MgGroupOwnerByRef
         [Parameter()]
         [System.Object]
         $BodyParameter
-    )
-}
-
-function Get-MgServicePrincipal
-{
-    [CmdletBinding()]
-    param(
-        [Parameter()]
-        [System.String]
-        $ServicePrincipalId,
-
-        [Parameter()]
-        [System.String]
-        $Filter
     )
 }
 function Confirm-M365DSCDependencies
@@ -147,7 +114,15 @@ function Update-MgServicePrincipal
 
         [Parameter()]
         [System.String[]]
-        $Tags
+        $Tags,
+
+        [Parameter()]
+        [PSObject]
+        $PasswordCredentials,
+
+        [Parameter()]
+        [PSObject]
+        $KeyCredentials
     )
 }
 
@@ -219,11 +194,81 @@ function New-MGServicePrincipal
 
         [Parameter()]
         [System.String[]]
-        $Tags
+        $Tags,
+
+        [Parameter()]
+        [PSObject]
+        $PasswordCredentials,
+
+        [Parameter()]
+        [PSObject]
+        $KeyCredentials
     )
 }
 
-function New-MgRoleManagementDirectoryRoleDefinition
+function Get-MgServicePrincipalOwner
+{
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        [String]
+        $ServicePrincipalId,
+
+   	    [Parameter()]
+		[String[]]
+		$ExpandProperty,
+
+   	    [Parameter()]
+		[String]
+		$Filter,
+
+   	    [Parameter()]
+		[String[]]
+		$Property,
+
+   	    [Parameter()]
+		[String]
+		$Search,
+
+   	    [Parameter()]
+		[Int32]
+		$Skip,
+
+   	    [Parameter()]
+		[String[]]
+		$Sort,
+
+   	    [Parameter()]
+		[Int32]
+		$Top,
+
+   	    [Parameter()]
+		[String]
+		$ConsistencyLevel,
+
+   	    [Parameter()]
+		[String]
+		$ResponseHeadersVariable,
+
+   	    [Parameter()]
+		[hashtable]
+		$Headers,
+
+   	    [Parameter()]
+		[Int32]
+		$PageSize,
+
+        [Parameter()]
+        [switch]
+        $All,
+
+        [Parameter()]
+		[String]
+		$CountVariable
+    )
+}
+
+function New-MgBetaRoleManagementDirectoryRoleDefinition
 {
     [CmdletBinding()]
     param(
@@ -261,7 +306,7 @@ function New-MgRoleManagementDirectoryRoleDefinition
     )
 }
 
-function Update-MgRoleManagementDirectoryRoleDefinition
+function Update-MgBetaRoleManagementDirectoryRoleDefinition
 {
     [CmdletBinding()]
     param(
@@ -303,21 +348,7 @@ function Update-MgRoleManagementDirectoryRoleDefinition
     )
 }
 
-function Get-MgRoleManagementDirectoryRoleDefinition
-{
-    [CmdletBinding()]
-    param(
-        [Parameter()]
-        [System.String]
-        $UnifiedRoleDefinitionId,
-
-        [Parameter()]
-        [System.String]
-        $Filter
-    )
-}
-
-function Remove-MgRoleManagementDirectoryRoleDefinition
+function Remove-MgBetaRoleManagementDirectoryRoleDefinition
 {
     [CmdletBinding()]
     param(
@@ -397,14 +428,81 @@ function Get-SPOAdministrationUrl
     )
 }
 
+function Connect-M365Tenant
+{
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        [System.String]
+        $Workload,
+
+        [Parameter()]
+        [System.String]
+        $Url,
+
+        [Parameter()]
+        [Alias('o365Credential')]
+        [System.Management.Automation.PSCredential]
+        $Credential,
+
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $ApplicationSecret,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [Switch]
+        $UseModernAuth,
+
+        [Parameter()]
+        [SecureString]
+        $CertificatePassword,
+
+        [Parameter()]
+        [System.String]
+        $CertificatePath,
+
+        [Parameter()]
+        [System.Boolean]
+        $SkipModuleReload = $false,
+
+        [Parameter()]
+        [Switch]
+        $Identity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens,
+
+        [Parameter()]
+        [System.Collections.Hashtable]
+        $Endpoints,
+
+        [Parameter()]
+        [ValidateScript(
+            { $Workload -eq 'ExchangeOnline' }
+        )]
+        [System.String[]]
+        $ExchangeOnlineCmdlets = @()
+    )
+}
+
 function New-M365DSCConnection
 {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [ValidateSet('ExchangeOnline', 'Intune', `
-                'SecurityComplianceCenter', 'MSOnline', 'PnP', 'PowerPlatforms', `
-                'MicrosoftTeams', 'MicrosoftGraph')]
         [System.String]
         $Workload,
 
@@ -418,12 +516,7 @@ function New-M365DSCConnection
 
         [Parameter()]
         [System.Boolean]
-        $SkipModuleReload,
-
-        [Parameter()]
-        [System.String]
-        [ValidateSet('v1.0', 'beta')]
-        $ProfileName = 'v1.0'
+        $SkipModuleReload
     )
 }
 
@@ -775,7 +868,9 @@ function Get-GlobalAddressList
     [OutputType([System.Collections.Hashtable])]
     param
     (
-
+        [Parameter()]
+        [System.String]
+        $Identity
     )
 }
 
@@ -1235,91 +1330,6 @@ function Update-MGPlannerPlan
     )
 }
 
-function Get-MGPlannerTask
-{
-    [CmdletBinding()]
-    Param(
-        [Parameter()]
-        [System.String]
-        $PlannerTaskId
-    )
-}
-
-function New-MGPlannerTask
-{
-    [CmdletBinding()]
-    Param(
-        [Parameter()]
-        [System.String]
-        $PlanId,
-
-        [Parameter()]
-        [System.String]
-        $Title,
-
-        [Parameter()]
-        [System.String]
-        $Description,
-
-        [Parameter()]
-        [System.String]
-        $StartDateTime,
-
-        [Parameter()]
-        [System.String]
-        $CompletedDateTime,
-
-        [Parameter()]
-        [ValidateRange(0, 100)]
-        [System.Uint32]
-        $PercentComplete,
-
-        [Parameter()]
-        [ValidateRange(0, 10)]
-        [System.UInt32]
-        $Priority
-    )
-}
-
-function Update-MGPlannerTask
-{
-    [CmdletBinding()]
-    Param(
-        [Parameter()]
-        [System.String]
-        $PlanId,
-
-        [Parameter()]
-        [System.String]
-        $Title,
-
-        [Parameter()]
-        [System.String]
-        $TaskId,
-
-        [Parameter()]
-        [System.String]
-        $Description,
-
-        [Parameter()]
-        [System.String]
-        $StartDateTime,
-
-        [Parameter()]
-        [System.String]
-        $CompletedDateTime,
-
-        [Parameter()]
-        [ValidateRange(0, 100)]
-        [System.Uint32]
-        $PercentComplete,
-
-        [Parameter()]
-        [ValidateRange(0, 10)]
-        [System.UInt32]
-        $Priority
-    )
-}
 
 function Get-MgPlannerPlanBucket
 {
@@ -1362,3 +1372,73 @@ function Update-MgPlannerBucket
         $BucketId
     )
 }
+
+function Get-EOPProtectionPolicyRule
+{
+    [CmdletBinding()]
+    Param(
+        [Parameter()]
+        [System.String]
+        $Identity,
+
+        [Parameter()]
+        [System.String]
+        $State
+    )
+}
+
+function Enable-EOPProtectionPolicyRule
+{
+    [CmdletBinding()]
+    Param(
+        [Parameter()]
+        [System.String]
+        $Identity
+    )
+}
+
+function Disable-EOPProtectionPolicyRule
+{
+    [CmdletBinding()]
+    Param(
+        [Parameter()]
+        [System.String]
+        $Identity
+    )
+}
+
+function Enable-SmtpDaneInbound
+{
+    [CmdletBinding()]
+    Param(
+        [Parameter()]
+        [System.String]
+        $DomainName
+    )
+}
+
+function Disable-SmtpDaneInbound
+{
+    [CmdletBinding()]
+    Param(
+        [Parameter()]
+        [System.String]
+        $DomainName
+    )
+}
+
+#region MSCloudLoginAssistant
+function Get-MSCloudLoginConnectionProfile{
+    [CmdletBinding()]
+    param
+    (
+        [Parameter()]
+        [System.String]
+        $Workload
+    )
+}
+
+function Reset-MSCloudLoginConnectionProfileContext
+{
+}
+#endregion

@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_SCLabelPolicy'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -81,78 +83,152 @@ function Get-TargetResource
         [System.String]
         $Ensure = 'Present',
 
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [System.Management.Automation.PSCredential]
-        $Credential
+        $Credential,
+
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [System.String]
+        $CertificatePath,
+
+        [Parameter()]
+        [System.Management.Automation.PSCredential]
+        $CertificatePassword,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Getting configuration of Sensitivity Label Policy for $Name"
-    if ($Global:CurrentModeIsExport)
-    {
-        $ConnectionMode = New-M365DSCConnection -Workload 'SecurityComplianceCenter' `
-            -InboundParameters $PSBoundParameters `
-            -SkipModuleReload $true
-    }
-    else
-    {
-        $ConnectionMode = New-M365DSCConnection -Workload 'SecurityComplianceCenter' `
-            -InboundParameters $PSBoundParameters
-    }
 
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
-
-    #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
-    $CommandName = $MyInvocation.MyCommand
-    $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
-        -CommandName $CommandName `
-        -Parameters $PSBoundParameters
-    Add-M365DSCTelemetryEvent -Data $data
-    #endregion
-
-    $nullReturn = $PSBoundParameters
-    $nullReturn.Ensure = 'Absent'
     try
     {
-        try
+        if (-not $Script:exportedInstance -or $Script:exportedInstance.Name -ne $Name)
         {
-            $policy = Get-LabelPolicy -Identity $Name -ErrorAction SilentlyContinue
-        }
-        catch
-        {
-            throw $_
-        }
+            if ($PSBoundParameters.ContainsKey('Labels') -and `
+                ($PSBoundParameters.ContainsKey('AddLabels') -or $PSBoundParameters.ContainsKey('RemoveLabels')))
+            {
+                throw 'You cannot use the Labels parameter and the AddLabels or RemoveLabels parameters at the same time.'
+            }
 
-        if ($null -eq $policy)
-        {
-            Write-Verbose -Message "Sensitivity label policy $($Name) does not exist."
-            return $nullReturn
+            if ($PSBoundParameters.ContainsKey('AddLabels') -and $PSBoundParameters.ContainsKey('RemoveLabels'))
+            {
+                # Check if AddLabels and RemoveLabels contain the same labels
+                [array]$diff = Compare-Object -ReferenceObject $AddLabels -DifferenceObject $RemoveLabels -ExcludeDifferent -IncludeEqual
+                if ($diff.Count -gt 0)
+                {
+                    throw 'Parameters AddLabels and RemoveLabels cannot contain the same labels. Make sure labels are not present in both parameters.'
+                }
+            }
+
+            $null = New-M365DSCConnection -Workload 'SecurityComplianceCenter' `
+                -InboundParameters $PSBoundParameters
+
+            #Ensure the proper dependencies are installed in the current environment.
+            Confirm-M365DSCDependencies
+
+            #region Telemetry
+            $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+            $CommandName = $MyInvocation.MyCommand
+            $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
+                -CommandName $CommandName `
+                -Parameters $PSBoundParameters
+            Add-M365DSCTelemetryEvent -Data $data
+            #endregion
+
+            $nullReturn = $PSBoundParameters
+            $nullReturn.Ensure = 'Absent'
+
+            try
+            {
+                $policy = Get-LabelPolicy -Identity $Name -ErrorAction SilentlyContinue -WarningAction Ignore
+            }
+            catch
+            {
+                throw $_
+            }
+
+            if ($null -eq $policy)
+            {
+                Write-Verbose -Message "Sensitivity label policy $($Name) does not exist."
+                return $nullReturn
+            }
         }
         else
         {
-            if ($null -ne $policy.Settings)
-            {
-                $advancedSettingsValue = Convert-StringToAdvancedSettings -AdvancedSettings $policy.Settings
-            }
-
-            Write-Verbose "Found existing Sensitivity Label policy $($Name)"
-            $result = @{
-                Name                         = $policy.Name
-                Comment                      = $policy.Comment
-                AdvancedSettings             = $advancedSettingsValue
-                Credential                   = $Credential
-                Ensure                       = 'Present'
-                Labels                       = $policy.Labels
-                ExchangeLocation             = Convert-ArrayList -CurrentProperty $policy.ExchangeLocation
-                ExchangeLocationException    = Convert-ArrayList -CurrentProperty $policy.ExchangeLocationException
-                ModernGroupLocation          = Convert-ArrayList -CurrentProperty $policy.ModernGroupLocation
-                ModernGroupLocationException = Convert-ArrayList -CurrentProperty $policy.ModernGroupLocationException
-            }
-
-            Write-Verbose -Message "Get-TargetResource Result: `n $(Convert-M365DscHashtableToString -Hashtable $result)"
-            return $result
+            Write-Verbose -Message "Retrieved policy from cache"
+            $policy = $Script:exportedInstance
         }
+
+        if ($null -ne $policy.Settings)
+        {
+            Write-Verbose -Message "Converting Settings"
+            $advancedSettingsValue = Convert-StringToAdvancedSettings -AdvancedSettings $policy.Settings
+        }
+
+        $ExchangeLocationValue = $null
+        if ($null -ne $policy.ExchangeLocation)
+        {
+            Write-Verbose -Message "Converting ExchangeLocation to an Array."
+            $ExchangeLocationValue = Convert-ArrayList -CurrentProperty $policy.ExchangeLocation
+        }
+
+        $ExchangeLocationExceptionValue = $null
+        if ($null -ne $policy.ExchangeLocationException)
+        {
+            Write-Verbose -Message "Converting ExchangeLocationException to an Array."
+            $ExchangeLocationExceptionValue = Convert-ArrayList -CurrentProperty $policy.ExchangeLocationException
+        }
+
+        $ModernGroupLocationValue = $null
+        if ($null -ne $policy.ModernGroupLocation)
+        {
+            Write-Verbose -Message "Converting ModernGroupLocation to an Array."
+            $ModernGroupLocationValue = Convert-ArrayList -CurrentProperty $policy.ModernGroupLocation
+        }
+
+        $ModernGroupLocationExceptionValue = $null
+        if ($null -ne $policy.ModernGroupLocationException)
+        {
+            Write-Verbose -Message "Converting ModernGroupLocationException to an Array."
+            $ModernGroupLocationExceptionValue = Convert-ArrayList -CurrentProperty $policy.ModernGroupLocationException
+        }
+
+        Write-Verbose "Found existing Sensitivity Label policy $($Name)"
+        $result = @{
+            Name                         = $policy.Name
+            Comment                      = $policy.Comment
+            AdvancedSettings             = $advancedSettingsValue
+            Credential                   = $Credential
+            ApplicationId                = $ApplicationId
+            TenantId                     = $TenantId
+            CertificateThumbprint        = $CertificateThumbprint
+            CertificatePath              = $CertificatePath
+            CertificatePassword          = $CertificatePassword
+            Ensure                       = 'Present'
+            Labels                       = $policy.Labels
+            ExchangeLocation             = $ExchangeLocationValue
+            ExchangeLocationException    = $ExchangeLocationExceptionValue
+            ModernGroupLocation          = $ModernGroupLocationValue
+            ModernGroupLocationException = $ModernGroupLocationExceptionValue
+            AccessTokens                 = $AccessTokens
+        }
+
+        Write-Verbose -Message "Get-TargetResource Result: `n $(Convert-M365DscHashtableToString -Hashtable $result)"
+        return $result
     }
     catch
     {
@@ -248,12 +324,52 @@ function Set-TargetResource
         [System.String]
         $Ensure = 'Present',
 
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [System.Management.Automation.PSCredential]
-        $Credential
+        $Credential,
+
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [System.String]
+        $CertificatePath,
+
+        [Parameter()]
+        [System.Management.Automation.PSCredential]
+        $CertificatePassword,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Setting configuration of Sensitivity label policy for $Name"
+
+    if ($PSBoundParameters.ContainsKey('Labels') -and `
+        ($PSBoundParameters.ContainsKey('AddLabels') -or $PSBoundParameters.ContainsKey('RemoveLabels')))
+    {
+        throw 'You cannot use the Labels parameter and the AddLabels or RemoveLabels parameters at the same time.'
+    }
+
+    if ($PSBoundParameters.ContainsKey('AddLabels') -and $PSBoundParameters.ContainsKey('RemoveLabels'))
+    {
+        # Check if AddLabels and RemoveLabels contain the same labels
+        [array]$diff = Compare-Object -ReferenceObject $AddLabels -DifferenceObject $RemoveLabels -ExcludeDifferent -IncludeEqual
+        if ($diff.Count -gt 0)
+        {
+            throw 'Parameters AddLabels and RemoveLabels cannot contain the same labels. Make sure labels are not present in both parameters.'
+        }
+    }
 
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
@@ -267,34 +383,36 @@ function Set-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'SecurityComplianceCenter' `
-        -InboundParameters $PSBoundParameters
-
     $CurrentPolicy = Get-TargetResource @PSBoundParameters
 
     if (('Present' -eq $Ensure) -and ('Absent' -eq $CurrentPolicy.Ensure))
     {
-        $CreationParams = $PSBoundParameters
+        Write-Verbose "Creating new Sensitivity label policy '$Name'."
+
+        $CreationParams = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
 
         if ($PSBoundParameters.ContainsKey('AdvancedSettings'))
         {
-            $advanced = Convert-CIMToAdvancedSettings $AdvancedSettings
+            $advanced = Convert-CIMToAdvancedSettings -AdvancedSettings $AdvancedSettings
             $CreationParams['AdvancedSettings'] = $advanced
         }
-        #Remove parameters not used in New-LabelPolicy
-        $CreationParams.Remove('Credential') | Out-Null
-        $CreationParams.Remove('Ensure') | Out-Null
+
+        if ($PSBoundParameters.ContainsKey('AddLabels'))
+        {
+            $CreationParams['Labels'] = $AddLabels
+        }
         $CreationParams.Remove('AddLabels') | Out-Null
+        $CreationParams.Remove('RemoveLabels') | Out-Null
+
+        # Remove parameters not used in New-LabelPolicy
         $CreationParams.Remove('AddExchangeLocation') | Out-Null
         $CreationParams.Remove('AddExchangeLocationException') | Out-Null
         $CreationParams.Remove('AddModernGroupLocation') | Out-Null
         $CreationParams.Remove('AddModernGroupLocationException') | Out-Null
-        $CreationParams.Remove('RemoveLabels') | Out-Null
         $CreationParams.Remove('RemoveExchangeLocation') | Out-Null
         $CreationParams.Remove('RemoveExchangeLocationException') | Out-Null
         $CreationParams.Remove('RemoveModernGroupLocation') | Out-Null
         $CreationParams.Remove('RemoveModernGroupLocationException') | Out-Null
-        Write-Verbose "Creating new Sensitivity label policy $Name."
 
         try
         {
@@ -302,50 +420,88 @@ function Set-TargetResource
         }
         catch
         {
-            Write-Warning "New-LabelPolicy is not available in tenant $($Credential.UserName.Split('@')[0])"
+            Write-Warning "New-LabelPolicy is not available in tenant $($Credential.UserName.Split('@')[1]): $_"
         }
         try
         {
             Start-Sleep 5
-            $SetParams = $PSBoundParameters
+            Write-Verbose "Updating Sensitivity label policy '$Name' settings."
+            $SetParams = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
 
             if ($PSBoundParameters.ContainsKey('AdvancedSettings'))
             {
-                $advanced = Convert-CIMToAdvancedSettings  $AdvancedSettings
+                $advanced = Convert-CIMToAdvancedSettings -AdvancedSettings $AdvancedSettings
                 $SetParams['AdvancedSettings'] = $advanced
             }
+
             #Remove unused parameters for Set-Label cmdlet
-            $SetParams.Remove('Credential') | Out-Null
-            $SetParams.Remove('Ensure') | Out-Null
             $SetParams.Remove('Name') | Out-Null
             $SetParams.Remove('ExchangeLocationException') | Out-Null
-            $SetParams.Remove('Labels') | Out-Null
             $SetParams.Remove('ExchangeLocation') | Out-Null
             $SetParams.Remove('ModernGroupLocation') | Out-Null
             $SetParams.Remove('ModernGroupLocationException') | Out-Null
+
+            # Labels are already set during creation, removing parameters
+            $SetParams.Remove('Labels') | Out-Null
+            $SetParams.Remove('AddLabels') | Out-Null
+            $SetParams.Remove('RemoveLabels') | Out-Null
 
             Set-LabelPolicy @SetParams -Identity $Name
         }
         catch
         {
-            Write-Warning "Set-LabelPolicy is not available in tenant $($Credential.UserName.Split('@')[0])"
+            Write-Warning "Set-LabelPolicy is not available in tenant $($Credential.UserName.Split('@')[1]): $_"
         }
     }
     elseif (('Present' -eq $Ensure) -and ('Present' -eq $CurrentPolicy.Ensure))
     {
-        $SetParams = $PSBoundParameters
+        Write-Verbose "Updating existing Sensitivity label policy '$Name'."
+
+        $SetParams = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
 
         if ($PSBoundParameters.ContainsKey('AdvancedSettings'))
         {
-            $advanced = Convert-CIMToAdvancedSettings  $AdvancedSettings
+            $advanced = Convert-CIMToAdvancedSettings -AdvancedSettings $AdvancedSettings
             $SetParams['AdvancedSettings'] = $advanced
         }
+
+        if ($PSBoundParameters.ContainsKey('Labels'))
+        {
+            [array]$diffs = Compare-Object -ReferenceObject $CurrentPolicy.Labels -DifferenceObject $Labels
+            if ($diffs.Count -gt 0)
+            {
+                $add = @()
+                $remove = @()
+                foreach ($diff in $diffs)
+                {
+                    if ($diff.SideIndicator -eq '<=')
+                    {
+                        Write-Verbose "Removing label $($diff.InputObject) from policy $Name."
+                        $remove += $diff.InputObject
+                    }
+                    elseif ($diff.SideIndicator -eq '=>')
+                    {
+                        Write-Verbose "Adding label $($diff.InputObject) to policy $Name."
+                        $add += $diff.InputObject
+                    }
+                }
+
+                if ($add.Count -gt 0)
+                {
+                    $SetParams['AddLabels'] = $add
+                }
+
+                if ($remove.Count -gt 0)
+                {
+                    $SetParams['RemoveLabels'] = $remove
+                }
+            }
+            $SetParams.Remove('Labels') | Out-Null
+        }
+
         #Remove unused parameters for Set-Label cmdlet
-        $SetParams.Remove('Credential') | Out-Null
-        $SetParams.Remove('Ensure') | Out-Null
         $SetParams.Remove('Name') | Out-Null
         $SetParams.Remove('ExchangeLocationException') | Out-Null
-        $SetParams.Remove('Labels') | Out-Null
         $SetParams.Remove('ExchangeLocation') | Out-Null
         $SetParams.Remove('ModernGroupLocation') | Out-Null
         $SetParams.Remove('ModernGroupLocationException') | Out-Null
@@ -356,7 +512,7 @@ function Set-TargetResource
         }
         catch
         {
-            Write-Warning "Set-LabelPolicy is not available in tenant $($Credential.UserName.Split('@')[0])"
+            Write-Warning "Set-LabelPolicy is not available in tenant $($Credential.UserName.Split('@')[1]): $_"
         }
     }
     elseif (('Absent' -eq $Ensure) -and ('Present' -eq $CurrentPolicy.Ensure))
@@ -370,10 +526,11 @@ function Set-TargetResource
         }
         catch
         {
-            Write-Warning "Remove-LabelPolicy is not available in tenant $($Credential.UserName.Split('@')[0])"
+            Write-Warning "Remove-LabelPolicy is not available in tenant $($Credential.UserName.Split('@')[1]): $_"
         }
     }
 }
+
 function Test-TargetResource
 {
     [CmdletBinding()]
@@ -457,15 +614,40 @@ function Test-TargetResource
         [System.String]
         $Ensure = 'Present',
 
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [System.Management.Automation.PSCredential]
-        $Credential
+        $Credential,
+
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [System.String]
+        $CertificatePath,
+
+        [Parameter()]
+        [System.Management.Automation.PSCredential]
+        $CertificatePassword,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
 
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -477,7 +659,6 @@ function Test-TargetResource
     $CurrentValues = Get-TargetResource @PSBoundParameters
 
     $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('Credential') | Out-Null
     $ValuesToCheck.Remove('AddLabels') | Out-Null
     $ValuesToCheck.Remove('AddExchangeLocation') | Out-Null
     $ValuesToCheck.Remove('AddExchangeLocationException') | Out-Null
@@ -496,6 +677,7 @@ function Test-TargetResource
         {
             return $false
         }
+        $ValuesToCheck.Remove('AdvancedSettings') | Out-Null
     }
 
     if ($null -ne $RemoveModernGroupLocation -or $null -ne $AddModernGroupLocation -or $null -ne $ModernGroupLocation)
@@ -509,9 +691,11 @@ function Test-TargetResource
         if ($null -eq $configData -and $null -ne $CurrentValues.ModernGroupLocation `
                 -and $null -ne $RemoveModernGroupLocation)
         {
-            #last entry removed so trigger drift
             return $false
         }
+        $ValuesToCheck.Remove('RemoveModernGroupLocation') | Out-Null
+        $ValuesToCheck.Remove('AddModernGroupLocation') | Out-Null
+        $ValuesToCheck.Remove('ModernGroupLocation') | Out-Null
     }
 
     if ($null -ne $RemoveModernGroupLocationException -or $null -ne $AddModernGroupLocationException `
@@ -527,9 +711,11 @@ function Test-TargetResource
         if ($null -eq $configData -and $null -ne $CurrentValues.ModernGroupLocationException `
                 -and $null -ne $RemoveModernGroupLocationException)
         {
-            #last entry removed so trigger drift
             return $false
         }
+        $ValuesToCheck.Remove('RemoveModernGroupLocationException') | Out-Null
+        $ValuesToCheck.Remove('AddModernGroupLocationException') | Out-Null
+        $ValuesToCheck.Remove('ModernGroupLocationException') | Out-Null
     }
 
     if ($null -ne $RemoveExchangeLocation -or $null -ne $AddExchangeLocation -or $null -ne $ExchangeLocation)
@@ -543,9 +729,11 @@ function Test-TargetResource
         if ($null -eq $configData -and $null -ne $CurrentValues.ExchangeLocation `
                 -and $null -ne $RemoveExchangeLocation)
         {
-            #last entry removed so trigger drift
             return $false
         }
+        $ValuesToCheck.Remove('RemoveExchangeLocation') | Out-Null
+        $ValuesToCheck.Remove('AddExchangeLocation') | Out-Null
+        $ValuesToCheck.Remove('ExchangeLocation') | Out-Null
     }
 
     if ($null -ne $RemoveExchangeLocationException -or $null -ne $AddExchangeLocationException -or $null -ne $ExchangeLocationException)
@@ -561,9 +749,11 @@ function Test-TargetResource
         if ($null -eq $configData -and $null -ne $CurrentValues.ExchangeLocationException `
                 -and $null -ne $RemoveExchangeLocationException)
         {
-            #last entry removed so trigger drift
             return $false
         }
+        $ValuesToCheck.Remove('RemoveExchangeLocationException') | Out-Null
+        $ValuesToCheck.Remove('AddExchangeLocationException') | Out-Null
+        $ValuesToCheck.Remove('ExchangeLocationException') | Out-Null
     }
 
     if ($null -ne $RemoveLabels -or $null -ne $AddLabels -or $null -ne $Labels)
@@ -579,9 +769,11 @@ function Test-TargetResource
         if ($null -eq $configData -and $null -ne $CurrentValues.Labels `
                 -and $null -ne $RemoveLabels)
         {
-            #last entry removed so trigger drift
             return $false
         }
+        $ValuesToCheck.Remove('RemoveLabels') | Out-Null
+        $ValuesToCheck.Remove('AddLabels') | Out-Null
+        $ValuesToCheck.Remove('Labels') | Out-Null
     }
 
     Write-Verbose -Message "Current Values: $(Convert-M365DscHashtableToString -Hashtable $CurrentValues)"
@@ -589,7 +781,7 @@ function Test-TargetResource
 
     $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
         -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $ValuesToCheck `
+        -DesiredValues $PSBoundParameters `
         -ValuesToCheck $ValuesToCheck.Keys
 
     Write-Verbose -Message "Test-TargetResource returned $TestResult"
@@ -602,13 +794,37 @@ function Export-TargetResource
     [OutputType([System.String])]
     param
     (
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [System.Management.Automation.PSCredential]
-        $Credential
+        $Credential,
+
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [System.String]
+        $CertificatePath,
+
+        [Parameter()]
+        [System.Management.Automation.PSCredential]
+        $CertificatePassword,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     $ConnectionMode = New-M365DSCConnection -Workload 'SecurityComplianceCenter' `
-        -InboundParameters $PSBoundParameters `
-        -SkipModuleReload $true
+        -InboundParameters $PSBoundParameters
 
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
@@ -624,46 +840,62 @@ function Export-TargetResource
 
     try
     {
-        [array]$policies = Get-LabelPolicy -ErrorAction Stop
+        [array]$policies = Get-LabelPolicy -ErrorAction Stop -WarningAction Ignore
 
         $dscContent = ''
         $i = 1
         if ($policies.Length -eq 0)
         {
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         }
         else
         {
-            Write-Host "`r`n" -NoNewline
+            Write-M365DSCHost -Message "`r`n" -DeferWrite
         }
         foreach ($policy in $policies)
         {
-            Write-Host "    |---[$i/$($policies.Count)] $($policy.Name)" -NoNewline
-
-            $Params = @{
-                Name       = $policy.Name
-                Credential = $Credential
+            if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+            {
+                $Global:M365DSCExportResourceInstancesCount++
             }
-            $Results = Get-TargetResource @Params
+
+            Write-M365DSCHost -Message "    |---[$i/$($policies.Count)] $($policy.Name)" -DeferWrite
+
+            $Script:exportedInstance = $policy
+            $Results = Get-TargetResource @PSBoundParameters -Name $policy.Name
 
             if ($null -ne $Results.AdvancedSettings)
             {
-                $Results.AdvancedSettings = ConvertTo-AdvancedSettingsString -AdvancedSettings $Results.AdvancedSettings
+                $complexMapping = @(
+                    @{
+                        Name            = 'AdvancedSettings'
+                        CimInstanceName = 'MSFT_SCLabelSetting'
+                        IsRequired      = $False
+                    }
+                )
+                $complexTypeStringResult = Get-M365DSCDRGComplexTypeToString `
+                    -ComplexObject $Results.AdvancedSettings `
+                    -CIMInstanceName 'MSFT_SCLabelSetting' `
+                    -ComplexTypeMapping $complexMapping
+
+                if (-not [String]::IsNullOrWhiteSpace($complexTypeStringResult))
+                {
+                    $Results.AdvancedSettings = $complexTypeStringResult
+                }
+                else
+                {
+                    $Results.Remove('AdvancedSettings') | Out-Null
+                }
             }
 
-            $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                -Results $Results
             $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                 -ConnectionMode $ConnectionMode `
                 -ModulePath $PSScriptRoot `
                 -Results $Results `
-                -Credential $Credential
-            if ($null -ne $Results.AdvancedSettings)
-            {
-                $currentDSCBlock = Convert-DSCStringParamToVariable -DSCBlock $currentDSCBlock -ParameterName 'AdvancedSettings'
-            }
+                -Credential $Credential `
+                -NoEscape @('AdvancedSettings')
 
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
             $dscContent += $currentDSCBlock
             Save-M365DSCPartialExport -Content $currentDSCBlock `
                 -FileName $Global:PartialExportFileName
@@ -672,7 +904,7 @@ function Export-TargetResource
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `
@@ -699,6 +931,7 @@ function Convert-StringToAdvancedSettings
     $settings = @()
     foreach ($setting in $AdvancedSettings)
     {
+        Write-Verbose -Message "SETTING: $setting"
         $settingString = $setting.Replace('[', '').Replace(']', '')
         $settingKey = $settingString.Split(',')[0]
 
@@ -706,7 +939,23 @@ function Convert-StringToAdvancedSettings
         {
             $startPos = $settingString.IndexOf(',', 0) + 1
             $valueString = $settingString.Substring($startPos, $settingString.Length - $startPos).Trim()
-            $values = $valueString.Split(',')
+            if ($valueString -like '*,*')
+            {
+                $values = $valueString -split ','
+            }
+            else
+            {
+                $values = $valueString
+            }
+
+            if ($settingKey -like '*defaultlabel*')
+            {
+                if ($values -ne 'None')
+                {
+                    $label = Get-Label -Identity $values
+                    $values = $label.DisplayName
+                }
+            }
 
             $entry = @{
                 Key   = $settingKey
@@ -715,6 +964,7 @@ function Convert-StringToAdvancedSettings
             $settings += $entry
         }
     }
+
     return $settings
 }
 
@@ -733,12 +983,34 @@ function Convert-CIMToAdvancedSettings
     foreach ($obj in $AdvancedSettings)
     {
         $settingsValues = ''
-        foreach ($objVal in $obj.Value)
+        if ($obj.Key -like '*defaultlabel*')
         {
-            $settingsValues += $objVal
-            $settingsValues += ','
+            if ($obj.Value -ne 'None')
+            {
+                $label = Get-Label | Where-Object -FilterScript { $_.DisplayName -eq $obj.Value }
+                if ($null -eq $label)
+                {
+                    Write-Error -Message "Label {$($obj.value)} doesn't exist. Please define the Sensitivy label first before trying to assign it to a policy."
+                }
+                else
+                {
+                    $settingsValues = $label.ImmutableId.ToString()
+                }
+            }
+            else
+            {
+                $settingsValues = 'None'
+            }
         }
-        $entry[$obj.Key] = $settingsValues.Substring(0, ($settingsValues.Length - 1))
+        else
+        {
+            foreach ($objVal in $obj.Value)
+            {
+                $settingsValues += $objVal
+                $settingsValues += ','
+            }
+        }
+        $entry[$obj.Key] = $settingsValues.TrimEnd(',')
     }
 
     return $entry
@@ -763,39 +1035,21 @@ function Test-AdvancedSettings
         $foundKey = $CurrentProperty | Where-Object { $_.Key -eq $desiredSetting.Key }
         if ($null -ne $foundKey)
         {
-            if ($foundKey.Value.ToString() -ne $desiredSetting.Value.ToString())
+            $checkValue = $desiredSetting.Value
+            if ($checkValue.GetType().BaseType -eq 'array' -or $checkValue.GetType().Name -contains 'string[]')
+            {
+                $checkValue = $desiredSetting.Value[0]
+            }
+            if ($foundKey.Value.ToString() -ne $checkValue.ToString())
             {
                 $foundSettings = $false
-                break;
+                break
             }
         }
     }
 
-    Write-Verbose -Message "Test AdvancedSettings  returns $foundSettings"
+    Write-Verbose -Message "Test AdvancedSettings returned {$foundSettings}"
     return $foundSettings
-}
-
-function ConvertTo-AdvancedSettingsString
-{
-    [CmdletBinding()]
-    [OutputType([System.String])]
-    param
-    (
-        [Parameter(Mandatory = $true)]
-        $AdvancedSettings
-    )
-
-    $StringContent = "@(`r`n"
-    foreach ($advancedSetting in $AdvancedSettings)
-    {
-        $StringContent += "                MSFT_SCLabelSetting`r`n"
-        $StringContent += "                {`r`n"
-        $StringContent += "                    Key   = '$($advancedSetting.Key.Replace("'", "''"))'`r`n"
-        $StringContent += "                    Value = '$($advancedSetting.Value.Replace("'", "''"))'`r`n"
-        $StringContent += "                }`r`n"
-    }
-    $StringContent += '            )'
-    return $StringContent
 }
 
 function Convert-ArrayList
@@ -804,18 +1058,17 @@ function Convert-ArrayList
     [OutputType([System.Collections.ArrayList])]
     param
     (
-        [Parameter ()]
+        [Parameter()]
         $CurrentProperty
     )
 
-    [System.Collections.ArrayList]$currentItems = @()
+    $currentItems = [System.Collections.ArrayList]::new()
     foreach ($currentProp in $CurrentProperty)
     {
         $currentItems.Add($currentProp.Name) | Out-Null
     }
 
     return $currentItems
-
 }
 
 function New-PolicyData
@@ -824,20 +1077,20 @@ function New-PolicyData
     [OutputType([System.Collections.ArrayList])]
     param
     (
-        [Parameter ()]
+        [Parameter()]
         $configData,
 
-        [Parameter ()]
+        [Parameter()]
         $currentData,
 
-        [Parameter ()]
+        [Parameter()]
         $removedData,
 
-        [Parameter ()]
+        [Parameter()]
         $additionalData
     )
 
-    [System.Collections.ArrayList]$desiredData = @()
+    $desiredData = [System.Collections.ArrayList]::new()
     foreach ($currItem in $currentData)
     {
         if (!$desiredData.Contains($currItem))

@@ -1,37 +1,47 @@
-﻿{
-    "description": "This resource configures the Azure AD Tenant Details.",
-    "permissions": {
-        "graph": {
-            "delegated": {
-                "read": [
-                    {
-                        "name": "Organization.Read.All"
-                    }
-                ],
-                "update": [
-                    {
-                        "name": "Organization.Read.All"
-                    },
-                    {
-                        "name": "Organization.ReadWrite.All"
-                    }
-                ]
-            },
-            "application": {
-                "read": [
-                    {
-                        "name": "Organization.Read.All"
-                    }
-                ],
-                "update": [
-                    {
-                        "name": "Organization.Read.All"
-                    },
-                    {
-                        "name": "Organization.ReadWrite.All"
-                    }
-                ]
-            }
-        }
+{
+  "resourceName": "AADTenantDetails",
+  "description": "This resource configures the Azure AD Tenant Details.",
+  "roles": {
+    "read": [],
+    "update": [
+      "Billing Administrator"
+    ]
+  },
+  "permissions": {
+    "graph": {
+      "delegated": {
+        "read": [
+          {
+            "name": "Organization.Read.All"
+          }
+        ],
+        "update": [
+          {
+            "name": "Organization.ReadWrite.All"
+          }
+        ]
+      },
+      "application": {
+        "read": [
+          {
+            "name": "Organization.Read.All"
+          }
+        ],
+        "update": [
+          {
+            "name": "Organization.ReadWrite.All"
+          }
+        ]
+      }
     }
+  },
+  "requiredModules": [
+    "Microsoft.Graph.Authentication",
+    "Microsoft.Graph.Beta.Identity.DirectoryManagement"
+  ],
+  "supportedEnvironments": [
+    "Global",
+    "USGov"
+  ],
+  "mode": "Configuration"
 }

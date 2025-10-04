@@ -1,88 +1,156 @@
 @{
     Dependencies = @(
         @{
+            ModuleName      = 'Az.Accounts'
+            RequiredVersion = '5.0.1'
+        },
+        @{
+            ModuleName      = 'Az.ResourceGraph'
+            RequiredVersion = '1.2.1'
+        },
+        @{
+            ModuleName      = 'Az.Resources'
+            RequiredVersion = '8.0.0'
+        },
+        @{
+            ModuleName      = 'Az.Security'
+            RequiredVersion = '1.6.2'
+        },
+        @{
+            ModuleName      = 'Az.SecurityInsights'
+            RequiredVersion = '3.2.0'
+        },
+        @{
             ModuleName      = 'DSCParser'
-            RequiredVersion = '1.3.0.6'
+            RequiredVersion = '2.0.0.20'
         },
         @{
             ModuleName      = 'ExchangeOnlineManagement'
-            RequiredVersion = '3.0.0'
+            RequiredVersion = '3.9.0'
         },
         @{
             ModuleName      = 'Microsoft.Graph.Applications'
-            RequiredVersion = '1.18.0'
+            RequiredVersion = '2.28.0'
+        },
+        @{
+            ModuleName      = 'Microsoft.Graph.Beta.Applications'
+            Requiredversion = '2.28.0'
         },
         @{
             ModuleName      = 'Microsoft.Graph.Authentication'
-            RequiredVersion = '1.18.0'
+            RequiredVersion = '2.28.0'
         },
         @{
-            ModuleName      = 'Microsoft.Graph.DeviceManagement'
-            RequiredVersion = '1.18.0'
+            ModuleName      = 'Microsoft.Graph.Beta.DeviceManagement'
+            RequiredVersion = '2.28.0'
         },
         @{
-            ModuleName      = 'Microsoft.Graph.DeviceManagement.Administration'
-            RequiredVersion = '1.18.0'
+            ModuleName      = 'Microsoft.Graph.Beta.Devices.CorporateManagement'
+            RequiredVersion = '2.28.0'
         },
         @{
-            ModuleName      = 'Microsoft.Graph.DeviceManagement.Enrolment'
-            RequiredVersion = '1.18.0'
+            ModuleName      = 'Microsoft.Graph.Beta.DeviceManagement.Administration'
+            RequiredVersion = '2.28.0'
         },
         @{
-            ModuleName      = 'Microsoft.Graph.Devices.CorporateManagement'
-            RequiredVersion = '1.18.0'
+            ModuleName      = 'Microsoft.Graph.Beta.DeviceManagement.Enrollment'
+            RequiredVersion = '2.28.0'
         },
         @{
-            ModuleName      = 'Microsoft.Graph.Groups'
-            RequiredVersion = '1.18.0'
+            ModuleName      = 'Microsoft.Graph.Beta.NetworkAccess'
+            RequiredVersion = '2.28.0'
         },
         @{
             ModuleName      = 'Microsoft.Graph.Identity.DirectoryManagement'
-            RequiredVersion = '1.18.0'
+            RequiredVersion = '2.28.0'
         },
         @{
-            ModuleName      = 'Microsoft.Graph.Identity.Governance'
-            RequiredVersion = '1.18.0'
+            ModuleName      = 'Microsoft.Graph.Beta.Identity.DirectoryManagement'
+            RequiredVersion = '2.28.0'
+        },
+        @{
+            ModuleName      = 'Microsoft.Graph.Beta.Identity.Governance'
+            RequiredVersion = '2.28.0'
+        },
+        @{
+            ModuleName      = 'Microsoft.Graph.Beta.Identity.SignIns'
+            RequiredVersion = '2.28.0'
         },
         @{
             ModuleName      = 'Microsoft.Graph.Identity.SignIns'
-            RequiredVersion = '1.18.0'
+            RequiredVersion = '2.28.0'
+        },
+        @{
+            ModuleName      = 'Microsoft.Graph.Beta.Reports'
+            RequiredVersion = '2.28.0'
+        },
+        @{
+            ModuleName      = 'Microsoft.Graph.Beta.Search'
+            RequiredVersion = '2.28.0'
+        },
+        @{
+            ModuleName      = 'Microsoft.Graph.Beta.Teams'
+            RequiredVersion = '2.28.0'
+        },
+        @{
+            ModuleName      = 'Microsoft.Graph.DeviceManagement.Administration'
+            RequiredVersion = '2.28.0'
+        },
+        @{
+            ModuleName      = 'Microsoft.Graph.Beta.DirectoryObjects'
+            RequiredVersion = '2.28.0'
+        },
+        @{
+            ModuleName      = 'Microsoft.Graph.Groups'
+            RequiredVersion = '2.28.0'
+        },
+        @{
+            ModuleName      = 'Microsoft.Graph.Beta.Groups'
+            RequiredVersion = '2.28.0'
         },
         @{
             ModuleName      = 'Microsoft.Graph.Planner'
-            RequiredVersion = '1.18.0'
+            RequiredVersion = '2.28.0'
         },
         @{
-            ModuleName      = 'Microsoft.Graph.Teams'
-            RequiredVersion = '1.18.0'
+            ModuleName      = 'Microsoft.Graph.Sites'
+            RequiredVersion = '2.28.0'
         },
         @{
             ModuleName      = 'Microsoft.Graph.Users'
-            RequiredVersion = '1.18.0'
+            RequiredVersion = '2.28.0'
         },
         @{
             ModuleName      = 'Microsoft.Graph.Users.Actions'
-            RequiredVersion = '1.18.0'
-        },
-        @{
-            ModuleName      = 'Microsoft.PowerApps.Administration.PowerShell'
-            RequiredVersion = '2.0.154'
+            RequiredVersion = '2.28.0'
         },
         @{
             ModuleName      = 'MicrosoftTeams'
-            RequiredVersion = '4.9.1'
+            RequiredVersion = '7.3.1'
         },
         @{
             ModuleName      = "MSCloudLoginAssistant"
-            RequiredVersion = "1.0.98"
+            RequiredVersion = "1.1.52"
         },
         @{
             ModuleName      = 'PnP.PowerShell'
             RequiredVersion = '1.12.0'
+            InstallLocation = 'WindowsPowerShell'
+        },
+        @{
+            ModuleName      = 'PSDesiredStateConfiguration'
+            RequiredVersion = '2.0.7'
+            PowerShellCore  = $true
+            ExplicitLoading = $true
+            Prefix          = 'Pwsh'
         },
         @{
             ModuleName      = 'ReverseDSC'
-            RequiredVersion = '2.0.0.13'
+            RequiredVersion = '2.0.0.30'
+        },
+        @{
+            ModuleName      = 'PSParallelPipeline'
+            RequiredVersion = '1.2.5'
         }
     )
 }

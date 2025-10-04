@@ -20,17 +20,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
     InModuleScope -ModuleName $Global:DscHelper.ModuleName -ScriptBlock {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
-            }
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
@@ -44,20 +37,47 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             }
 
             Mock -CommandName New-AntiPhishPolicy -MockWith {
-                return @{
-
-                }
             }
 
             Mock -CommandName Set-AntiPhishPolicy -MockWith {
-                return @{
+            }
 
+            Mock -CommandName Remove-AntiPhishPolicy -MockWith {
+            }
+
+            Mock -CommandName Get-AntiPhishPolicy -MockWith {
+                return @{
+                    Ensure                              = 'Present'
+                    Identity                            = 'TestPolicy'
+                    PhishThresholdLevel                 = '2'
+                    AdminDisplayName                    = 'DSC Test Policy'
+                    Enabled                             = $true
+                    EnableFirstContactSafetyTips        = $false
+                    EnableAuthenticationSafetyTip       = $true
+                    EnableMailboxIntelligence           = $true
+                    EnableOrganizationDomainsProtection = $false
+                    EnableSimilarDomainsSafetyTips      = $false
+                    EnableSimilarUsersSafetyTips        = $false
+                    EnableTargetedDomainsProtection     = $false
+                    EnableTargetedUserProtection        = $false
+                    EnableUnusualCharactersSafetyTips   = $false
+                    EnableViaTag                        = $false
+                    IsDefault                           = $false
+                    TreatSoftPassAsAuthenticated        = $true
+                    AuthenticationFailAction            = 'Quarantine'
+                    TargetedDomainActionRecipients      = @('test@contoso.com', 'test@fabrikam.com')
+                    TargetedUserProtectionAction        = 'BccMessage'
+                    TargetedUserActionRecipients        = @('test@contoso.com', 'test@fabrikam.com')
+                    TargetedDomainsToProtect            = @('fabrikam.com', 'contoso.com')
+                    TargetedUsersToProtect              = @('fabrikam.com', 'contoso.com')
                 }
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
             }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -70,9 +90,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 }
 
                 Mock -CommandName Get-AntiPhishPolicy -MockWith {
-                    return @{
-                        Identity = 'SomeOtherPolicy'
-                    }
+                    return $null
                 }
             }
 
@@ -86,8 +104,8 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the Set method' {
                 Set-TargetResource @testParams
+                Should -Invoke -CommandName New-AntiPhishPolicy -Exactly 1
             }
-
         }
 
         Context -Name 'AntiPhishPolicy update not required.' -Fixture {
@@ -116,34 +134,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     TargetedDomainsToProtect            = @('fabrikam.com', 'contoso.com')
                     TargetedUsersToProtect              = @('fabrikam.com', 'contoso.com')
                 }
-
-                Mock -CommandName Get-AntiPhishPolicy -MockWith {
-                    return @{
-                        Ensure                              = 'Present'
-                        Identity                            = 'TestPolicy'
-                        PhishThresholdLevel                 = '2'
-                        AdminDisplayName                    = 'DSC Test Policy'
-                        Enabled                             = $true
-                        EnableFirstContactSafetyTips        = $false
-                        EnableAuthenticationSafetyTip       = $true
-                        EnableMailboxIntelligence           = $true
-                        EnableOrganizationDomainsProtection = $false
-                        EnableSimilarDomainsSafetyTips      = $false
-                        EnableSimilarUsersSafetyTips        = $false
-                        EnableTargetedDomainsProtection     = $false
-                        EnableTargetedUserProtection        = $false
-                        EnableUnusualCharactersSafetyTips   = $false
-                        EnableViaTag                        = $false
-                        IsDefault                           = $false
-                        TreatSoftPassAsAuthenticated        = $true
-                        AuthenticationFailAction            = 'Quarantine'
-                        TargetedDomainActionRecipients      = @('test@contoso.com', 'test@fabrikam.com')
-                        TargetedUserProtectionAction        = 'BccMessage'
-                        TargetedUserActionRecipients        = @('test@contoso.com', 'test@fabrikam.com')
-                        TargetedDomainsToProtect            = @('fabrikam.com', 'contoso.com')
-                        TargetedUsersToProtect              = @('fabrikam.com', 'contoso.com')
-                    }
-                }
             }
 
             It 'Should return true from the Test method' {
@@ -159,7 +149,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Identity                            = 'TestPolicy'
                     PhishThresholdLevel                 = '2'
                     AdminDisplayName                    = 'DSC Test Policy'
-                    Enabled                             = $true
+                    Enabled                             = $false # Drift
                     EnableFirstContactSafetyTips        = $false
                     EnableMailboxIntelligence           = $true
                     EnableOrganizationDomainsProtection = $false
@@ -176,37 +166,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     TargetedUserActionRecipients        = @('test@contoso.com', 'test@fabrikam.com')
                     TargetedDomainsToProtect            = @('fabrikam.com', 'contoso.com')
                     TargetedUsersToProtect              = @('fabrikam.com', 'contoso.com')
-                }
-
-                Mock -CommandName Get-AntiPhishPolicy -MockWith {
-                    return @{
-                        Identity                            = 'TestPolicy'
-                        PhishThresholdLevel                 = '2'
-                        AdminDisplayName                    = 'DSC Test Policy'
-                        Enabled                             = $false
-                        EnableFirstContactSafetyTips        = $true
-                        EnableMailboxIntelligence           = $false
-                        EnableOrganizationDomainsProtection = $true
-                        EnableSimilarDomainsSafetyTips      = $true
-                        EnableSimilarUsersSafetyTips        = $true
-                        EnableTargetedDomainsProtection     = $true
-                        EnableTargetedUserProtection        = $true
-                        EnableUnusualCharactersSafetyTips   = $true
-                        EnableViaTag                        = $true
-                        MakeDefault                         = $true
-                        AuthenticationFailAction            = 'MoveToJmf'
-                        TargetedDomainActionRecipients      = @()
-                        TargetedUserProtectionAction        = 'NoAction'
-                        TargetedUserActionRecipients        = @()
-                        TargetedDomainsToProtect            = @()
-                        TargetedUsersToProtect              = @()
-                    }
-                }
-
-                Mock -CommandName Set-AntiPhishPolicy -MockWith {
-                    return @{
-
-                    }
                 }
             }
 
@@ -227,18 +186,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Credential = $Credential
                     Identity   = 'TestPolicy'
                 }
-
-                Mock -CommandName Get-AntiPhishPolicy -MockWith {
-                    return @{
-                        Identity = 'TestPolicy'
-                    }
-                }
-
-                Mock -CommandName Remove-AntiPhishPolicy -MockWith {
-                    return @{
-
-                    }
-                }
             }
 
             It 'Should return false from the Test method' {
@@ -247,25 +194,22 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should Remove the Policy in the Set method' {
                 Set-TargetResource @testParams
+                Should -Invoke -CommandName Remove-AntiPhishPolicy -Exactly 1
             }
         }
 
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
-                }
-
-                Mock -CommandName Get-AntiPhishPolicy -MockWith {
-                    return @{
-                        Identity = 'TestPolicy'
-                    }
                 }
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

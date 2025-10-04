@@ -1,0 +1,37 @@
+{
+  "resourceName": "EXOServicePrincipal",
+  "description": "Use this resource to to view information about service principals, create service principals, to remove service principals, to change service principals in your cloud-based organization.",
+  "roles": {
+    "read": [
+      "Exchange Admin"
+    ],
+    "update": [
+      "Exchange Admin"
+    ]
+  },
+  "permissions": {
+    "Office 365 Exchange Online": {
+      "application": {
+        "read": [
+          {
+            "name": "Exchange.ManageAsApp"
+          }
+        ],
+        "update": [
+          {
+            "name": "Exchange.ManageAsApp"
+          }
+        ]
+      }
+    }
+  },
+  "requiredModules": [
+    "Microsoft.Graph.Applications",
+    "Microsoft.Graph.Authentication"
+  ],
+  "supportedEnvironments": [
+    "Global",
+    "USGov"
+  ],
+  "mode": "Data"
+}

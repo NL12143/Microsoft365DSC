@@ -20,17 +20,14 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
     InModuleScope -ModuleName $Global:DscHelper.ModuleName -ScriptBlock {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
             $Global:PartialExportFileName = 'c:\TestPath'
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
+
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-                return 'FakeDSCContent'
-            }
             Mock -CommandName Save-M365DSCPartialExport -MockWith {
             }
 
@@ -40,22 +37,36 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             Mock -CommandName Remove-PSSession -MockWith {
             }
 
-            Mock -CommandName Update-MgRoleManagementDirectoryRoleDefinition -MockWith {
+            Mock -CommandName Update-MgBetaRoleManagementDirectoryRoleDefinition -MockWith {
             }
 
-            Mock -CommandName Remove-MgRoleManagementDirectoryRoleDefinition -MockWith {
+            Mock -CommandName Remove-MgBetaRoleManagementDirectoryRoleDefinition -MockWith {
             }
 
-            Mock -CommandName New-MgRoleManagementDirectoryRoleDefinition -MockWith {
+            Mock -CommandName New-MgBetaRoleManagementDirectoryRoleDefinition -MockWith {
+            }
+
+            Mock -CommandName Get-MgBetaRoleManagementDirectoryRoleDefinition -MockWith {
+                return @{
+                    DisplayName = 'Role1'
+                    Description = 'This is a custom role'
+                    ResourceScopes = '/'
+                    IsEnabled = 'True'
+                    RolePermissions = @{AllowedResourceActions = 'microsoft.directory/applicationPolicies/allProperties/read', 'microsoft.directory/applicationPolicies/allProperties/update', 'microsoft.directory/applicationPolicies/basic/update' }
+                    Version = '1.0'
+                    Id = '12345-12345-12345-12345-12345'
+                }
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
                 return 'Credentials'
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
             }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -72,21 +83,21 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Credential      = $Credential
                 }
 
-                Mock -CommandName Get-MgRoleManagementDirectoryRoleDefinition -MockWith {
+                Mock -CommandName Get-MgBetaRoleManagementDirectoryRoleDefinition -MockWith {
                     return $null
                 }
             }
 
             It 'Should return values from the get method' {
                 (Get-TargetResource @testParams).Ensure | Should -Be 'Absent'
-                Should -Invoke -CommandName 'Get-MgRoleManagementDirectoryRoleDefinition' -Exactly 1
+                Should -Invoke -CommandName 'Get-MgBetaRoleManagementDirectoryRoleDefinition' -Exactly 1
             }
             It 'Should return false from the test method' {
                 Test-TargetResource @testParams | Should -Be $false
             }
             It 'Should create the role definition from the set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName 'New-MgRoleManagementDirectoryRoleDefinition' -Exactly 1
+                Should -Invoke -CommandName 'New-MgBetaRoleManagementDirectoryRoleDefinition' -Exactly 1
             }
         }
 
@@ -103,27 +114,11 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Credential      = $Credential
                     Id              = '12345-12345-12345-12345-12345'
                 }
-
-                Mock -CommandName New-M365DSCConnection -MockWith {
-                    return 'Credential'
-                }
-
-                Mock -CommandName Get-MgRoleManagementDirectoryRoleDefinition -MockWith {
-                    $AADRoleDef = New-Object PSCustomObject
-                    $AADRoleDef | Add-Member -MemberType NoteProperty -Name DisplayName -Value 'Role1'
-                    $AADRoleDef | Add-Member -MemberType NoteProperty -Name Description -Value 'Role description'
-                    $AADRoleDef | Add-Member -MemberType NoteProperty -Name ResourceScopes -Value '/'
-                    $AADRoleDef | Add-Member -MemberType NoteProperty -Name IsEnabled -Value 'True'
-                    $AADRoleDef | Add-Member -MemberType NoteProperty -Name RolePermissions -Value @{AllowedResourceActions = 'microsoft.directory/applicationPolicies/allProperties/read', 'microsoft.directory/applicationPolicies/allProperties/update', 'microsoft.directory/applicationPolicies/basic/update' }
-                    $AADRoleDef | Add-Member -MemberType NoteProperty -Name Version -Value '1.0'
-                    $AADRoleDef | Add-Member -MemberType NoteProperty -Name Id -Value '12345-12345-12345-12345-12345'
-                    return $AADRoleDef
-                }
             }
 
             It 'Should return values from the get method' {
                 (Get-TargetResource @testParams).Ensure | Should -Be 'Present'
-                Should -Invoke -CommandName 'Get-MgRoleManagementDirectoryRoleDefinition' -Exactly 1
+                Should -Invoke -CommandName 'Get-MgBetaRoleManagementDirectoryRoleDefinition' -Exactly 1
             }
 
             It 'Should return false from the test method' {
@@ -132,7 +127,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should remove the app from the set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName 'Remove-MgRoleManagementDirectoryRoleDefinition' -Exactly 1
+                Should -Invoke -CommandName 'Remove-MgBetaRoleManagementDirectoryRoleDefinition' -Exactly 1
             }
         }
         Context -Name 'The role definition exists and values are already in the desired state' -Fixture {
@@ -142,31 +137,16 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Description     = 'This is a custom role'
                     ResourceScopes  = '/'
                     IsEnabled       = $true
-                    RolePermissions = 'microsoft.directory/applicationPolicies/allProperties/read'
+                    RolePermissions = 'microsoft.directory/applicationPolicies/allProperties/read', 'microsoft.directory/applicationPolicies/allProperties/update', 'microsoft.directory/applicationPolicies/basic/update'
                     Version         = '1.0'
                     Ensure          = 'Present'
                     Credential      = $Credential
-                }
-
-                Mock -CommandName New-M365DSCConnection -MockWith {
-                    return 'Credential'
-                }
-
-                Mock -CommandName Get-MgRoleManagementDirectoryRoleDefinition -MockWith {
-                    $AADRoleDef = New-Object PSCustomObject
-                    $AADRoleDef | Add-Member -MemberType NoteProperty -Name DisplayName -Value 'Role1'
-                    $AADRoleDef | Add-Member -MemberType NoteProperty -Name Description -Value 'This is a custom role'
-                    $AADRoleDef | Add-Member -MemberType NoteProperty -Name ResourceScopes -Value '/'
-                    $AADRoleDef | Add-Member -MemberType NoteProperty -Name IsEnabled -Value 'True'
-                    $AADRoleDef | Add-Member -MemberType NoteProperty -Name RolePermissions -Value @{AllowedResourceActions = 'microsoft.directory/applicationPolicies/allProperties/read' }
-                    $AADRoleDef | Add-Member -MemberType NoteProperty -Name Version -Value '1.0'
-                    return $AADRoleDef
                 }
             }
 
             It 'Should return Values from the get method' {
                 Get-TargetResource @testParams
-                Should -Invoke -CommandName 'Get-MgRoleManagementDirectoryRoleDefinition' -Exactly 1
+                Should -Invoke -CommandName 'Get-MgBetaRoleManagementDirectoryRoleDefinition' -Exactly 1
             }
 
             It 'Should return true from the test method' {
@@ -178,7 +158,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             BeforeAll {
                 $testParams = @{
                     DisplayName     = 'Role1'
-                    Description     = 'This is a custom role created by M365DSC.'#drift
+                    Description     = 'This is a custom role created by M365DSC.' # Drift
                     ResourceScopes  = '/'
                     IsEnabled       = $true
                     RolePermissions = 'microsoft.directory/applicationPolicies/allProperties/read', 'microsoft.directory/applicationPolicies/allProperties/update', 'microsoft.directory/applicationPolicies/basic/update'
@@ -186,26 +166,11 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Ensure          = 'Present'
                     Credential      = $Credential
                 }
-
-                Mock -CommandName New-M365DSCConnection -MockWith {
-                    return 'Credential'
-                }
-
-                Mock -CommandName Get-MgRoleManagementDirectoryRoleDefinition -MockWith {
-                    $AADRoleDef = New-Object PSCustomObject
-                    $AADRoleDef | Add-Member -MemberType NoteProperty -Name DisplayName -Value 'Role1'
-                    $AADRoleDef | Add-Member -MemberType NoteProperty -Name Description -Value 'This is a custom role'
-                    $AADRoleDef | Add-Member -MemberType NoteProperty -Name ResourceScopes -Value '/'
-                    $AADRoleDef | Add-Member -MemberType NoteProperty -Name IsEnabled -Value 'True'
-                    $AADRoleDef | Add-Member -MemberType NoteProperty -Name RolePermissions -Value @{AllowedResourceActions = 'microsoft.directory/applicationPolicies/allProperties/read', 'microsoft.directory/applicationPolicies/allProperties/update', 'microsoft.directory/applicationPolicies/basic/update' }
-                    $AADRoleDef | Add-Member -MemberType NoteProperty -Name Version -Value '1.0'
-                    return $AADRoleDef
-                }
             }
 
             It 'Should return values from the get method' {
                 Get-TargetResource @testParams
-                Should -Invoke -CommandName 'Get-MgRoleManagementDirectoryRoleDefinition' -Exactly 1
+                Should -Invoke -CommandName 'Get-MgBetaRoleManagementDirectoryRoleDefinition' -Exactly 1
             }
 
             It 'Should return false from the test method' {
@@ -214,35 +179,22 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName 'Update-MgRoleManagementDirectoryRoleDefinition' -Exactly 1
+                Should -Invoke -CommandName 'Update-MgBetaRoleManagementDirectoryRoleDefinition' -Exactly 1
             }
         }
 
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
-                }
-
-                Mock -CommandName New-M365DSCConnection -MockWith {
-                    return 'Credential'
-                }
-
-                Mock -CommandName Get-MgRoleManagementDirectoryRoleDefinition -MockWith {
-                    $AADRoleDef = New-Object PSCustomObject
-                    $AADRoleDef | Add-Member -MemberType NoteProperty -Name DisplayName -Value 'Role1'
-                    $AADRoleDef | Add-Member -MemberType NoteProperty -Name Description -Value 'This is a custom role'
-                    $AADRoleDef | Add-Member -MemberType NoteProperty -Name ResourceScopes -Value '/'
-                    $AADRoleDef | Add-Member -MemberType NoteProperty -Name IsEnabled -Value 'True'
-                    $AADRoleDef | Add-Member -MemberType NoteProperty -Name RolePermissions -Value @{AllowedResourceActions = 'microsoft.directory/applicationPolicies/allProperties/read', 'microsoft.directory/applicationPolicies/allProperties/update', 'microsoft.directory/applicationPolicies/basic/update' }
-                    $AADRoleDef | Add-Member -MemberType NoteProperty -Name Version -Value '1.0'
-                    return $AADRoleDef
                 }
             }
 
             It 'Should reverse engineer resource from the export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

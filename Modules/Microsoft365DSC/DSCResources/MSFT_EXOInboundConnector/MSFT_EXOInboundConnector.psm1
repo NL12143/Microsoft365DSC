@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_EXOInboundConnector'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -105,19 +107,24 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     Write-Verbose -Message "Getting configuration of InboundConnector for $($Identity)"
 
     if ($Global:CurrentModeIsExport)
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+        $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
             -InboundParameters $PSBoundParameters `
             -SkipModuleReload $true
     }
     else
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+        $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
             -InboundParameters $PSBoundParameters
     }
 
@@ -177,8 +184,9 @@ function Get-TargetResource
                 CertificateThumbprint        = $CertificateThumbprint
                 CertificatePath              = $CertificatePath
                 CertificatePassword          = $CertificatePassword
-                Managedidentity              = $ManagedIdentity.IsPresent
+                ManagedIdentity              = $ManagedIdentity.IsPresent
                 TenantId                     = $TenantId
+                AccessTokens                 = $AccessTokens
             }
 
             Write-Verbose -Message "Found InboundConnector $($Identity)"
@@ -304,7 +312,11 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
@@ -320,20 +332,12 @@ function Set-TargetResource
 
     Write-Verbose -Message "Setting configuration of InboundConnector for $($Identity)"
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+    $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
         -InboundParameters $PSBoundParameters
 
     $InboundConnectors = Get-InboundConnector
     $InboundConnector = $InboundConnectors | Where-Object -FilterScript { $_.Identity -eq $Identity }
-    $InboundConnectorParams = [System.Collections.Hashtable]($PSBoundParameters)
-    $InboundConnectorParams.Remove('Ensure') | Out-Null
-    $InboundConnectorParams.Remove('Credential') | Out-Null
-    $InboundConnectorParams.Remove('ApplicationId') | Out-Null
-    $InboundConnectorParams.Remove('TenantId') | Out-Null
-    $InboundConnectorParams.Remove('CertificateThumbprint') | Out-Null
-    $InboundConnectorParams.Remove('CertificatePath') | Out-Null
-    $InboundConnectorParams.Remove('CertificatePassword') | Out-Null
-    $InboundConnectorParams.Remove('ManagedIdentity') | Out-Null
+    $InboundConnectorParams = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
 
     if (('Present' -eq $Ensure ) -and ($null -eq $InboundConnector))
     {
@@ -461,7 +465,11 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
@@ -501,13 +509,6 @@ function Test-TargetResource
     {
         $ValuesToCheck.SenderDomains = $senderDomains
     }
-    $ValuesToCheck.Remove('Credential') | Out-Null
-    $ValuesToCheck.Remove('ApplicationId') | Out-Null
-    $ValuesToCheck.Remove('TenantId') | Out-Null
-    $ValuesToCheck.Remove('CertificateThumbprint') | Out-Null
-    $ValuesToCheck.Remove('CertificatePath') | Out-Null
-    $ValuesToCheck.Remove('CertificatePassword') | Out-Null
-    $ValuesToCheck.Remove('ManagedIdentity') | Out-Null
 
     $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
         -Source $($MyInvocation.MyCommand.Source) `
@@ -551,8 +552,13 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
         -InboundParameters $PSBoundParameters `
         -SkipModuleReload $true
@@ -575,16 +581,21 @@ function Export-TargetResource
 
         if ($InboundConnectors.Length -eq 0)
         {
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         }
         else
         {
-            Write-Host "`r`n" -NoNewline
+            Write-M365DSCHost -Message "`r`n" -DeferWrite
         }
         $i = 1
         foreach ($InboundConnector in $InboundConnectors)
         {
-            Write-Host "    |---[$i/$($InboundConnectors.Length)] $($InboundConnector.Identity)" -NoNewline
+            if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+            {
+                $Global:M365DSCExportResourceInstancesCount++
+            }
+
+            Write-M365DSCHost -Message "    |---[$i/$($InboundConnectors.Length)] $($InboundConnector.Identity)" -DeferWrite
 
             $Params = @{
                 Identity              = $InboundConnector.Identity
@@ -593,13 +604,12 @@ function Export-TargetResource
                 TenantId              = $TenantId
                 CertificateThumbprint = $CertificateThumbprint
                 CertificatePassword   = $CertificatePassword
-                Managedidentity       = $ManagedIdentity.IsPresent
+                ManagedIdentity       = $ManagedIdentity.IsPresent
                 CertificatePath       = $CertificatePath
+                AccessTokens          = $AccessTokens
             }
 
             $Results = Get-TargetResource @Params
-            $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                -Results $Results
             $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                 -ConnectionMode $ConnectionMode `
                 -ModulePath $PSScriptRoot `
@@ -608,14 +618,14 @@ function Export-TargetResource
             $dscContent += $currentDSCBlock
             Save-M365DSCPartialExport -Content $currentDSCBlock `
                 -FileName $Global:PartialExportFileName
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
             $i++
         }
         return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `

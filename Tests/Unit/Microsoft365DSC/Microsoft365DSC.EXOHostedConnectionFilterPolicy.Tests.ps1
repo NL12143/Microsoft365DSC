@@ -20,17 +20,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
     InModuleScope -ModuleName $Global:DscHelper.ModuleName -ScriptBlock {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
-            }
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
@@ -52,9 +45,24 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             Mock -CommandName Remove-HostedConnectionFilterPolicy -MockWith {
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            Mock -CommandName Get-HostedConnectionFilterPolicy -MockWith {
+                return @{
+                    Ensure           = 'Present'
+                    Identity         = 'TestPolicy'
+                    Credential       = $Credential
+                    AdminDisplayName = 'This policiy is a test'
+                    EnableSafeList   = $true
+                    IPAllowList      = @('192.168.1.100', '10.1.1.0/24', '172.16.5.1-172.16.5.150')
+                    IPBlockList      = @('10.1.1.13', '172.16.5.2')
+                    MakeDefault      = $false
+                }
             }
+
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -72,9 +80,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 }
 
                 Mock -CommandName Get-HostedConnectionFilterPolicy -MockWith {
-                    return @{
-                        Identity = 'SomeOtherPolicy'
-                    }
+                    return $null
                 }
             }
 
@@ -84,6 +90,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the Set method' {
                 Set-TargetResource @testParams
+                Should -Invoke -CommandName New-HostedConnectionFilterPolicy -Exactly 1
             }
         }
 
@@ -99,19 +106,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     IPBlockList      = @('10.1.1.13', '172.16.5.2')
                     MakeDefault      = $false
                 }
-
-                Mock -CommandName Get-HostedConnectionFilterPolicy -MockWith {
-                    return @{
-                        Ensure           = 'Present'
-                        Identity         = 'TestPolicy'
-                        Credential       = $Credential
-                        AdminDisplayName = 'This policiy is a test'
-                        EnableSafeList   = $true
-                        IPAllowList      = @('192.168.1.100', '10.1.1.0/24', '172.16.5.1-172.16.5.150')
-                        IPBlockList      = @('10.1.1.13', '172.16.5.2')
-                        MakeDefault      = $false
-                    }
-                }
             }
 
             It 'Should return true from the Test method' {
@@ -126,23 +120,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Identity         = 'TestPolicy'
                     Credential       = $Credential
                     AdminDisplayName = 'This policiy is a test'
-                    EnableSafeList   = $true
+                    EnableSafeList   = $false # Drift
                     IPAllowList      = @('192.168.1.100', '10.1.1.0/24', '172.16.5.1-172.16.5.150')
                     IPBlockList      = @('10.1.1.13', '172.16.5.2')
                     MakeDefault      = $false
-                }
-
-                Mock -CommandName Get-HostedConnectionFilterPolicy -MockWith {
-                    return @{
-                        Ensure           = 'Present'
-                        Identity         = 'TestPolicy'
-                        Credential       = $Credential
-                        AdminDisplayName = 'This different description'
-                        EnableSafeList   = $false
-                        IPAllowList      = @('192.168.1.100')
-                        IPBlockList      = @('10.1.1.13')
-                        MakeDefault      = $false
-                    }
                 }
             }
 
@@ -152,6 +133,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the Set method' {
                 Set-TargetResource @testParams
+                Should -Invoke -CommandName Set-HostedConnectionFilterPolicy -Exactly 1
             }
         }
 
@@ -162,12 +144,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Identity   = 'TestPolicy'
                     Credential = $Credential
                 }
-
-                Mock -CommandName Get-HostedConnectionFilterPolicy -MockWith {
-                    return @{
-                        Identity = 'TestPolicy'
-                    }
-                }
             }
 
             It 'Should return false from the Test method' {
@@ -176,25 +152,22 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the Set method' {
                 Set-TargetResource @testParams
+                Should -Invoke -CommandName Remove-HostedConnectionFilterPolicy -Exactly 1
             }
         }
 
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
-                }
-
-                Mock -CommandName Get-HostedConnectionFilterPolicy -MockWith {
-                    return @{
-                        Identity = 'TestPolicy'
-                    }
                 }
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

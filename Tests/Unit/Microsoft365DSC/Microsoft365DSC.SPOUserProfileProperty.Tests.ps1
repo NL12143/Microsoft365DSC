@@ -22,23 +22,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
 
         BeforeAll {
-            if ($null -eq (Get-Module PnP.PowerShell))
-            {
-                Import-Module PnP.PowerShell
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            }
-
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
-
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
-            }
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
@@ -54,17 +41,19 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 return 'contoso.com'
             }
 
-            Mock -CommandName Invoke-M365DSCCommand -MockWith {
-            }
-
             Mock -CommandName Start-Job -MockWith {
             }
 
             Mock -CommandName Get-Job -MockWith {
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
+
+            Mock -CommandName Write-Warning -MockWith {
             }
         }
 
@@ -109,7 +98,11 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 Mock -CommandName Get-PnPUserProfileProperty -MockWith {
                     return @{
                         AccountName           = 'john.smith@contoso.com'
-                        UserProfileProperties = @{'MyOldKey' = 'MyValue' }
+                        UserProfileProperties = @(
+                            @{
+                                MyOldKey = 'MyValue'
+                            }
+                        )
                     }
                 }
             }
@@ -126,6 +119,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
                 }
@@ -133,19 +127,21 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 Mock -CommandName Get-PnPUserProfileProperty -MockWith {
                     return @{
                         AccountName           = 'john.smith@contoso.com'
-                        UserProfileProperties = @{MyOldKey = MyValue }
+                        UserProfileProperties = @{MyOldKey = 'MyValue' }
                     }
                 }
 
-                Mock -CommandName Get-MgUser -MockWith {
+                Mock -CommandName Get-PnPUser -MockWith {
                     return @{
-                        UserPrincipalName = 'john.smith@contoso.com'
+                        PrincipalType = 'User'
+                        Email         = 'john.smith@contoso.com'
                     }
                 }
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }#inmodulescope

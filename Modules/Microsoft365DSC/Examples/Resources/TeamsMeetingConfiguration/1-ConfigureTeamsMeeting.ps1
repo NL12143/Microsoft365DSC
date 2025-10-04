@@ -7,7 +7,7 @@ Configuration Example
     param(
         [Parameter(Mandatory = $true)]
         [PSCredential]
-        $credsGlobalAdmin
+        $Credscredential
     )
     Import-DscResource -ModuleName Microsoft365DSC
 
@@ -26,10 +26,10 @@ Configuration Example
             CustomFooterText            = "This is some custom footer text"
             DisableAnonymousJoin        = $False
             EnableQoS                   = $False
-            HelpURL                     = "https://github.com/Microsoft/Office365DSC/Help"
-            LegalURL                    = "https://github.com/Microsoft/Office365DSC/Legal"
-            LogoURL                     = "https://github.com/Microsoft/Office365DSC/Logo.png"
-            Credential                  = $credsglobaladmin
+            HelpURL                     = "https://github.com/Microsoft/Microsoft365DSC/Help"
+            LegalURL                    = "https://github.com/Microsoft/Microsoft365DSC/Legal"
+            LogoURL                     = "https://github.com/Microsoft/Microsoft365DSC/Logo.png"
+            Credential                  = $Credscredential
         }
     }
 }

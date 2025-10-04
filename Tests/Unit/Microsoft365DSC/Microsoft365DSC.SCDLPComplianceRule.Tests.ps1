@@ -21,15 +21,8 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
 
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
-
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
-            }
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
             Mock -CommandName Confirm-M365DSCDependencies -MockWith {
             }
@@ -53,9 +46,21 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 }
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            Mock -CommandName Get-DlpSensitiveInformationType -MockWith {
+                return @(
+                    [PSCustomObject]@{Name = 'ABA Routing Number'; Id = 'cb353f78-2b72-4c3c-8827-92ebe4f69fdf' },
+                    [PSCustomObject]@{Name = 'Argentina Unique Tax Identification Key (CUIT/CUIL)'; Id = '98da3da1-9199-4571-b7c4-b6522980b507' },
+                    [PSCustomObject]@{Name = 'Argentina National Identity (DNI) Number'; Id = 'eefbb00e-8282-433c-8620-8f1da3bffdb2' },
+                    [PSCustomObject]@{Name = 'EU Debit Card Number'; Id = '0e9b3178-9678-47dd-a509-37222ca96b42' }
+                    [PSCustomObject]@{Name = 'SCSEDM001-SCHEMA-CUSTOMERDATA'; Id = '00000000-0000-0000-0000-000000000000' }
+                )
             }
+
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -65,6 +70,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Ensure                              = 'Present'
                     Policy                              = 'MyParentPolicy'
                     Comment                             = ''
+                    AdvancedRule                        = "`"{\r\n  \`"Version\`": \`"1.0\`",\r\n  \`"Condition\`": {\r\n    \`"Operator\`": \`"And\`",\r\n    \`"SubConditions\`": [\r\n      {\r\n        \`"ConditionName\`": \`"AccessScope\`",\r\n        \`"Value\`": \`"InOrganization\`"\r\n      },\r\n      {\r\n        \`"ConditionName\`": \`"ContentContainsSensitiveInformation\`",\r\n        \`"Value\`": {\r\n          \`"maxconfidence\`": \`"100\`",\r\n          \`"name\`": \`"EU Debit Card Number\`",\r\n          \`"maxcount\`": \`"9\`",\r\n          \`"minconfidence\`": \`"75\`",\r\n          \`"classifiertype\`": \`"Content\`",\r\n          \`"mincount\`": \`"1\`",\r\n          \`"confidencelevel\`": \`"Medium\`"\r\n        }\r\n      }\r\n    ]\r\n  }\r\n}`"";
                     ContentContainsSensitiveInformation = (New-CimInstance -ClassName MSFT_SCDLPContainsSensitiveInformation -Property @{
                             SensitiveInformation = [CIMInstance[]]@(New-CimInstance -ClassName  MSFT_SCDLPSensitiveInformation -Property @{
                                     name           = 'ABA Routing Number'
@@ -105,6 +111,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Ensure                              = 'Present'
                     Policy                              = 'MyParentPolicy'
                     Comment                             = ''
+                    AdvancedRule                        = "`"{\r\n  \`"Version\`": \`"1.0\`",\r\n  \`"Condition\`": {\r\n    \`"Operator\`": \`"And\`",\r\n    \`"SubConditions\`": [\r\n      {\r\n        \`"ConditionName\`": \`"ContentContainsSensitiveInformation\`",\r\n        \`"Value\`": [\r\n          {\r\n            \`"Groups\`": [\r\n              {\r\n                \`"Name\`": \`"Default\`",\r\n                \`"Operator\`": \`"Or\`",\r\n                \`"Sensitivetypes\`": [\r\n                  {\r\n                    \`"Name\`": \`"SCSEDM001-SCHEMA-CUSTOMERDATA\`",\r\n                    \`"Id\`": null,\r\n                    \`"Mincount\`": 5,\r\n                    \`"Maxcount\`": 9,\r\n                    \`"Confidencelevel\`": \`"High\`",\r\n                    \`"Minconfidence\`": 85,\r\n                    \`"Maxconfidence\`": 100\r\n                  }\r\n                ]\r\n              }\r\n            ],\r\n            \`"Operator\`": \`"And\`"\r\n          }\r\n        ]\r\n      }\r\n    ]\r\n  }\r\n}`"";
                     ContentContainsSensitiveInformation = New-CimInstance -ClassName MSFT_SCDLPContainsSensitiveInformation -Property @{
                         Operator = 'And'
                         Groups   = [CIMInstance[]]@(
@@ -120,7 +127,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                                         classifiertype = 'Content'
                                         mincount       = '1'
                                         maxcount       = '-1'
-                                    } -ClientOnly;
+                                    } -ClientOnly
                                     New-CimInstance -ClassName MSFT_SCDLPSensitiveInformation -Property @{
                                         name           = 'Argentina Unique Tax Identification Key (CUIT/CUIL)'
                                         id             = '98da3da1-9199-4571-b7c4-b6522980b507'
@@ -156,7 +163,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             }
         }
 
-        Context -Name 'Rule already exists, and should' -Fixture {
+        Context -Name 'Rule already exists, and should with ContentContainsSensitiveInformation' -Fixture {
             BeforeAll {
                 $testParams = @{
                     Ensure                              = 'Present'
@@ -184,6 +191,69 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                         Comment                             = 'New Comment'
                         ParentPolicyName                    = 'MyParentPolicy'
                         ContentContainsSensitiveInformation = @(@{maxconfidence = '100'; id = 'cb353f78-2b72-4c3c-8827-92ebe4f69fdf'; minconfidence = '75'; rulePackId = '00000000-0000-0000-0000-000000000000'; classifiertype = 'Content'; name = 'ABA Routing Number'; mincount = '1'; maxcount = '-1'; })
+                        BlockAccess                         = $False
+                    }
+                }
+            }
+
+            It 'Should return true from the Test method' {
+                Test-TargetResource @testParams | Should -Be $true
+            }
+
+            It 'Should recreate from the Set method' {
+                Set-TargetResource @testParams
+            }
+
+            It 'Should return Present from the Get method' {
+                    (Get-TargetResource @testParams).Ensure | Should -Be 'Present'
+            }
+        }
+
+        Context -Name 'Rule already exists, and should with AdvancedRules' -Fixture {
+            BeforeAll {
+                $testParams = @{
+                    Ensure                              = 'Present'
+                    Policy                              = 'MyParentPolicy'
+                    Comment                             = 'New comment'
+                    AdvancedRule                        = "`"{\r\n  \`"Version\`": \`"1.0\`",\r\n  \`"Condition\`": {\r\n    \`"Operator\`": \`"And\`",\r\n    \`"SubConditions\`": [\r\n      {\r\n        \`"ConditionName\`": \`"AccessScope\`",\r\n        \`"Value\`": \`"InOrganization\`"\r\n      },\r\n      {\r\n        \`"ConditionName\`": \`"ContentContainsSensitiveInformation\`",\r\n        \`"Value\`": {\r\n          \`"name\`": \`"EU Debit Card Number\`",\r\n          \`"maxconfidence\`": \`"100\`",\r\n          \`"minconfidence\`": \`"75\`",\r\n          \`"classifiertype\`": \`"Content\`",\r\n          \`"mincount\`": \`"1\`",\r\n          \`"maxcount\`": \`"9\`",\r\n          \`"confidencelevel\`": \`"Medium\`"\r\n        }\r\n      }\r\n    ]\r\n  }\r\n}`"";
+                    BlockAccess                         = $False
+                    Name                                = 'TestPolicy'
+                    Credential                          = $Credential
+                }
+
+                Mock -CommandName Get-DLPComplianceRule -MockWith {
+                    return @{
+                        Name                                = 'TestPolicy'
+                        Comment                             = 'New Comment'
+                        ParentPolicyName                    = 'MyParentPolicy'
+                        AdvancedRule                        = @'
+{
+  "Version": "1.0",
+  "Condition": {
+    "Operator": "And",
+    "SubConditions": [
+    {
+      "ConditionName": "AccessScope",
+      "Value": "InOrganization"
+    },
+      {
+        "ConditionName": "ContentContainsSensitiveInformation",
+        "Value": [
+          {
+            "name": "EU Debit Card Number",
+            "maxconfidence": "100",
+            "minconfidence": "75",
+            "classifiertype": "Content",
+            "mincount": "1",
+            "maxcount": "9",
+            "confidencelevel": "Medium"
+          }
+        ]
+      }
+    ]
+  }
+}
+'@;
                         BlockAccess                         = $False
                     }
                 }
@@ -240,12 +310,9 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
-                }
-
-                Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-                    return "SCDLPComplianceRule Test{ContentContainsSensitiveInformation = `"`$Test`"}"
                 }
 
                 Mock -CommandName Get-DLPComplianceRule -MockWith {
@@ -260,7 +327,8 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

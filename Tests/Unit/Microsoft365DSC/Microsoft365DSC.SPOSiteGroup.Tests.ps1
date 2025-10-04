@@ -22,26 +22,13 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
 
         BeforeAll {
-            if ($null -eq (Get-Module PnP.PowerShell))
-            {
-                Import-Module PnP.PowerShell
-
-            }
-
-            $secpasswd = ConvertTo-SecureString 'Pass@word1)' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
-
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
-            }
+            $secpasswd = ConvertTo-SecureString ((New-Guid).ToString()) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
             Mock -CommandName Set-PnPGroupPermissions -MockWith {
             }
 
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
@@ -54,9 +41,11 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 }
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
             }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -65,14 +54,14 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 $testParams = @{
                     URL              = 'https://contoso.sharepoint.com/sites/TestSite'
                     Identity         = 'TestSiteGroup'
-                    Owner            = 'admin@Office365DSC.onmicrosoft.com'
+                    Owner            = 'admin@Microsoft365DSC.onmicrosoft.com'
                     PermissionLevels = @('Edit', 'Read')
                     Ensure           = 'Present'
                     Credential       = $Credential
                 }
 
                 Mock -CommandName New-M365DSCConnection -MockWith {
-                    return 'Credential'
+                    return 'Credentials'
                 }
 
                 Mock -CommandName Get-PnPTenantSite -MockWith {
@@ -114,14 +103,14 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 $testParams = @{
                     URL              = 'https://contoso.sharepoint.com/sites/TestSite'
                     Identity         = 'TestSiteGroup'
-                    Owner            = 'admin@Office365DSC.onmicrosoft.com'
+                    Owner            = 'admin@Microsoft365DSC.onmicrosoft.com'
                     PermissionLevels = @('Edit', 'Read')
                     Ensure           = 'Present'
                     Credential       = $Credential
                 }
 
                 Mock -CommandName New-M365DSCConnection -MockWith {
-                    return 'Credential'
+                    return 'Credentials'
                 }
 
                 Mock -CommandName Get-PnPTenantSite -MockWith {
@@ -135,7 +124,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                         URL   = 'https://contoso.sharepoint.com/sites/TestSite'
                         Title = 'TestSiteGroup'
                         Owner = @{
-                            LoginName = 'admin@Office365DSC.onmicrosoft.com'
+                            LoginName = 'admin@Microsoft365DSC.onmicrosoft.com'
                         }
                     }
                 }
@@ -174,14 +163,14 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 $testParams = @{
                     URL              = 'https://contoso.sharepoint.com/sites/TestSite'
                     Identity         = 'TestSiteGroup'
-                    Owner            = 'admin@Office365DSC.onmicrosoft.com'
+                    Owner            = 'admin@Microsoft365DSC.onmicrosoft.com'
                     PermissionLevels = @('Edit', 'Read')
                     Ensure           = 'Present'
                     Credential       = $Credential
                 }
 
                 Mock -CommandName New-M365DSCConnection -MockWith {
-                    return 'Credential'
+                    return 'Credentials'
                 }
 
                 Mock -CommandName Get-PnPGroup -MockWith {
@@ -189,7 +178,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                         URL   = 'https://contoso.sharepoint.com/sites/TestSite'
                         Title = 'TestSiteGroup'
                         Owner = @{
-                            LoginName = 'admin@Office365DSC.onmicrosoft.com'
+                            LoginName = 'admin@Microsoft365DSC.onmicrosoft.com'
                         }
                     }
                 }
@@ -234,21 +223,21 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 $testParams = @{
                     URL              = 'https://contoso.sharepoint.com/sites/TestSite'
                     Identity         = 'TestSiteGroup'
-                    Owner            = 'admin@Office365DSC.onmicrosoft.com'
+                    Owner            = 'admin@Microsoft365DSC.onmicrosoft.com'
                     PermissionLevels = @('Edit', 'Read')
                     Ensure           = 'Absent'
                     Credential       = $Credential
                 }
 
                 Mock -CommandName New-M365DSCConnection -MockWith {
-                    return 'Credential'
+                    return 'Credentials'
                 }
 
                 Mock -CommandName Get-PnPGroup -MockWith {
                     return @{
                         URL        = 'https://contoso.sharepoint.com/sites/TestSite'
                         Title      = 'TestSiteGroup'
-                        OwnerLogin = 'admin@Office365DSC.onmicrosoft.com'
+                        OwnerLogin = 'admin@Microsoft365DSC.onmicrosoft.com'
                         Roles      = @('Edit', 'Read')
                     }
                 }
@@ -292,12 +281,13 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
                 }
 
                 Mock -CommandName New-M365DSCConnection -MockWith {
-                    return 'Credential'
+                    return 'Credentials'
                 }
 
                 Mock -CommandName Get-PnPTenantSite -MockWith {
@@ -310,14 +300,15 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     return @{
                         URL        = 'https://contoso.sharepoint.com/sites/TestSite'
                         Title      = 'TestSiteGroup'
-                        OwnerLogin = 'admin@Office365DSC.onmicrosoft.com'
+                        OwnerLogin = 'admin@Microsoft365DSC.onmicrosoft.com'
                         Roles      = @('Edit', 'Read')
                     }
                 }
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

@@ -4,58 +4,99 @@
 
 | Parameter | Attribute | DataType | Description | Allowed Values |
 | --- | --- | --- | --- | --- |
-| **dataType** | Write | String | The type of the target assignment. |#microsoft.graph.groupAssignmentTarget, #microsoft.graph.allLicensedUsersAssignmentTarget, #microsoft.graph.allDevicesAssignmentTarget, #microsoft.graph.exclusionGroupAssignmentTarget, #microsoft.graph.configurationManagerCollectionAssignmentTarget|
-| **deviceAndAppManagementAssignmentFilterType** | Write | String | The type of filter of the target assignment i.e. Exclude or Include. Possible values are:none, include, exclude. |none, include, exclude|
-| **deviceAndAppManagementAssignmentFilterId** | Write | String | The Id of the filter for the target assignment. ||
-| **groupId** | Write | String | The group Id that is the target of the assignment. ||
-| **collectionId** | Write | String | The collection Id that is the target of the assignment.(ConfigMgr) ||
-| **DisplayName** | Key | String | Display name of the Windows 10 device compliance policy. ||
-| **Description** | Write | String | Description of the Windows 10 device compliance policy. ||
-| **Assignments** | Write | InstanceArray[] | Represents the assignment to the Intune policy. ||
-| **PasswordRequired** | Write | Boolean | PasswordRequired of the Windows 10 device compliance policy. ||
-| **PasswordBlockSimple** | Write | Boolean | PasswordBlockSimple of the Windows 10 device compliance policy. ||
-| **PasswordRequiredToUnlockFromIdle** | Write | Boolean | PasswordRequiredToUnlockFromIdle of the Windows 10 device compliance policy. ||
-| **PasswordMinutesOfInactivityBeforeLock** | Write | UInt32 | PasswordMinutesOfInactivityBeforeLock of the Windows 10 device compliance policy. ||
-| **PasswordExpirationDays** | Write | UInt32 | PasswordExpirationDays of the Windows 10 device compliance policy. ||
-| **PasswordMinimumLength** | Write | UInt32 | PasswordMinimumLength of the Windows 10 device compliance policy. ||
-| **PasswordMinimumCharacterSetCount** | Write | UInt32 | PasswordMinimumCharacterSetCount of the Windows 10 device compliance policy. ||
-| **PasswordRequiredType** | Write | String | PasswordRequiredType of the Windows 10 device compliance policy. |DeviceDefault, Alphanumeric, Numeric|
-| **PasswordPreviousPasswordBlockCount** | Write | UInt32 | PasswordPreviousPasswordBlockCount of the Windows 10 device compliance policy. ||
-| **RequireHealthyDeviceReport** | Write | Boolean | RequireHealthyDeviceReport of the Windows 10 device compliance policy. ||
-| **OsMinimumVersion** | Write | String | OsMinimumVersion of the Windows 10 device compliance policy. ||
-| **OsMaximumVersion** | Write | String | OsMaximumVersion of the Windows 10 device compliance policy. ||
-| **MobileOsMinimumVersion** | Write | String | MobileOsMinimumVersion of the Windows 10 device compliance policy. ||
-| **MobileOsMaximumVersion** | Write | String | MobileOsMaximumVersion of the Windows 10 device compliance policy. ||
-| **EarlyLaunchAntiMalwareDriverEnabled** | Write | Boolean | EarlyLaunchAntiMalwareDriverEnabled of the Windows 10 device compliance policy. ||
-| **BitLockerEnabled** | Write | Boolean | BitLockerEnabled of the Windows 10 device compliance policy. ||
-| **SecureBootEnabled** | Write | Boolean | SecureBootEnabled of the Windows 10 device compliance policy. ||
-| **CodeIntegrityEnabled** | Write | Boolean | CodeIntegrityEnabled of the Windows 10 device compliance policy. ||
-| **StorageRequireEncryption** | Write | Boolean | StorageRequireEncryption of the Windows 10 device compliance policy. ||
-| **ActiveFirewallRequired** | Write | Boolean | ActiveFirewallRequired of the Windows 10 device compliance policy. ||
-| **DefenderEnabled** | Write | Boolean | DefenderEnabled of the Windows 10 device compliance policy. ||
-| **DefenderVersion** | Write | String | DefenderVersion of the Windows 10 device compliance policy. ||
-| **SignatureOutOfDate** | Write | Boolean | SignatureOutOfDate of the Windows 10 device compliance policy. ||
-| **RTPEnabled** | Write | Boolean | RTPEnabled of the Windows 10 device compliance policy. ||
-| **AntivirusRequired** | Write | Boolean | AntivirusRequired of the Windows 10 device compliance policy. ||
-| **AntiSpywareRequired** | Write | Boolean | AntiSpywareRequired of the Windows 10 device compliance policy. ||
-| **DeviceThreatProtectionEnabled** | Write | Boolean | DeviceThreatProtectionEnabled of the Windows 10 device compliance policy. ||
-| **DeviceThreatProtectionRequiredSecurityLevel** | Write | String | DeviceThreatProtectionRequiredSecurityLevel of the Windows 10 device compliance policy. |Unavailable, Secured, Low, Medium, High, NotSet|
-| **ConfigurationManagerComplianceRequired** | Write | Boolean | ConfigurationManagerComplianceRequired of the Windows 10 device compliance policy. ||
-| **TPMRequired** | Write | Boolean | TPMRequired of the Windows 10 device compliance policy. ||
-| **DeviceCompliancePolicyScript** | Write | String | DeviceCompliancePolicyScript of the Windows 10 device compliance policy. ||
-| **ValidOperatingSystemBuildRanges** | Write | StringArray[] | ValidOperatingSystemBuildRanges of the Windows 10 device compliance policy. ||
-| **Ensure** | Write | String | Present ensures the policy exists, absent ensures it is removed. |Present, Absent|
-| **Credential** | Write | PSCredential | Credentials of the Intune Admin ||
-| **ApplicationId** | Write | String | Id of the Azure Active Directory application to authenticate with. ||
-| **TenantId** | Write | String | Id of the Azure Active Directory tenant used for authentication. ||
-| **ApplicationSecret** | Write | PSCredential | Secret of the Azure Active Directory tenant used for authentication. ||
-| **CertificateThumbprint** | Write | String | Thumbprint of the Azure Active Directory application's authentication certificate to use for authentication. ||
-| **ManagedIdentity** | Write | Boolean | Managed ID being used for authentication. ||
+| **Id** | Write | String | The id of the Windows 10 device compliance policy. | |
+| **DisplayName** | Key | String | Display name of the Windows 10 device compliance policy. | |
+| **Description** | Write | String | Description of the Windows 10 device compliance policy. | |
+| **RoleScopeTagIds** | Write | StringArray[] | List of Scope Tags for this Entity instance. | |
+| **Assignments** | Write | MSFT_DeviceManagementConfigurationPolicyAssignments[] | Represents the assignment to the Intune policy. | |
+| **PasswordRequired** | Write | Boolean | PasswordRequired of the Windows 10 device compliance policy. | |
+| **PasswordBlockSimple** | Write | Boolean | PasswordBlockSimple of the Windows 10 device compliance policy. | |
+| **PasswordRequiredToUnlockFromIdle** | Write | Boolean | PasswordRequiredToUnlockFromIdle of the Windows 10 device compliance policy. | |
+| **PasswordMinutesOfInactivityBeforeLock** | Write | UInt32 | PasswordMinutesOfInactivityBeforeLock of the Windows 10 device compliance policy. | |
+| **PasswordExpirationDays** | Write | UInt32 | PasswordExpirationDays of the Windows 10 device compliance policy. | |
+| **PasswordMinimumLength** | Write | UInt32 | PasswordMinimumLength of the Windows 10 device compliance policy. | |
+| **PasswordMinimumCharacterSetCount** | Write | UInt32 | PasswordMinimumCharacterSetCount of the Windows 10 device compliance policy. | |
+| **PasswordRequiredType** | Write | String | PasswordRequiredType of the Windows 10 device compliance policy. | `DeviceDefault`, `Alphanumeric`, `Numeric` |
+| **PasswordPreviousPasswordBlockCount** | Write | UInt32 | PasswordPreviousPasswordBlockCount of the Windows 10 device compliance policy. | |
+| **RequireHealthyDeviceReport** | Write | Boolean | RequireHealthyDeviceReport of the Windows 10 device compliance policy. | |
+| **OsMinimumVersion** | Write | String | OsMinimumVersion of the Windows 10 device compliance policy. | |
+| **OsMaximumVersion** | Write | String | OsMaximumVersion of the Windows 10 device compliance policy. | |
+| **MobileOsMinimumVersion** | Write | String | MobileOsMinimumVersion of the Windows 10 device compliance policy. | |
+| **MobileOsMaximumVersion** | Write | String | MobileOsMaximumVersion of the Windows 10 device compliance policy. | |
+| **EarlyLaunchAntiMalwareDriverEnabled** | Write | Boolean | EarlyLaunchAntiMalwareDriverEnabled of the Windows 10 device compliance policy. | |
+| **BitLockerEnabled** | Write | Boolean | BitLockerEnabled of the Windows 10 device compliance policy. | |
+| **SecureBootEnabled** | Write | Boolean | SecureBootEnabled of the Windows 10 device compliance policy. | |
+| **CodeIntegrityEnabled** | Write | Boolean | CodeIntegrityEnabled of the Windows 10 device compliance policy. | |
+| **StorageRequireEncryption** | Write | Boolean | StorageRequireEncryption of the Windows 10 device compliance policy. | |
+| **ActiveFirewallRequired** | Write | Boolean | ActiveFirewallRequired of the Windows 10 device compliance policy. | |
+| **DefenderEnabled** | Write | Boolean | DefenderEnabled of the Windows 10 device compliance policy. | |
+| **DefenderVersion** | Write | String | DefenderVersion of the Windows 10 device compliance policy. | |
+| **SignatureOutOfDate** | Write | Boolean | SignatureOutOfDate of the Windows 10 device compliance policy. | |
+| **RTPEnabled** | Write | Boolean | RTPEnabled of the Windows 10 device compliance policy. | |
+| **AntivirusRequired** | Write | Boolean | AntivirusRequired of the Windows 10 device compliance policy. | |
+| **AntiSpywareRequired** | Write | Boolean | AntiSpywareRequired of the Windows 10 device compliance policy. | |
+| **DeviceThreatProtectionEnabled** | Write | Boolean | DeviceThreatProtectionEnabled of the Windows 10 device compliance policy. | |
+| **DeviceThreatProtectionRequiredSecurityLevel** | Write | String | DeviceThreatProtectionRequiredSecurityLevel of the Windows 10 device compliance policy. | `Unavailable`, `Secured`, `Low`, `Medium`, `High`, `NotSet` |
+| **ConfigurationManagerComplianceRequired** | Write | Boolean | ConfigurationManagerComplianceRequired of the Windows 10 device compliance policy. | |
+| **TpmRequired** | Write | Boolean | TpmRequired of the Windows 10 device compliance policy. | |
+| **DeviceCompliancePolicyScript** | Write | MSFT_MicrosoftGraphDeviceCompliancePolicyScript | DeviceCompliancePolicyScript of the Windows 10 device compliance policy. | |
+| **ValidOperatingSystemBuildRanges** | Write | MSFT_MicrosoftGraphOperatingSystemVersionRange[] | ValidOperatingSystemBuildRanges of the Windows 10 device compliance policy. | |
+| **ScheduledActionsForRule** | Write | MSFT_MicrosoftGraphDeviceComplianceScheduledActionsForRuleConfiguration[] | Actions to take for noncompliant devices. | |
+| **Ensure** | Write | String | Present ensures the policy exists, absent ensures it is removed. | `Present`, `Absent` |
+| **Credential** | Write | PSCredential | Credentials of the Intune Admin | |
+| **ApplicationId** | Write | String | Id of the Azure Active Directory application to authenticate with. | |
+| **TenantId** | Write | String | Id of the Azure Active Directory tenant used for authentication. | |
+| **ApplicationSecret** | Write | PSCredential | Secret of the Azure Active Directory tenant used for authentication. | |
+| **CertificateThumbprint** | Write | String | Thumbprint of the Azure Active Directory application's authentication certificate to use for authentication. | |
+| **ManagedIdentity** | Write | Boolean | Managed ID being used for authentication. | |
+| **AccessTokens** | Write | StringArray[] | Access token used for authentication. | |
+
+### MSFT_DeviceManagementConfigurationPolicyAssignments
+
+#### Parameters
+
+| Parameter | Attribute | DataType | Description | Allowed Values |
+| --- | --- | --- | --- | --- |
+| **dataType** | Write | String | The type of the target assignment. | `#microsoft.graph.cloudPcManagementGroupAssignmentTarget`, `#microsoft.graph.groupAssignmentTarget`, `#microsoft.graph.allLicensedUsersAssignmentTarget`, `#microsoft.graph.allDevicesAssignmentTarget`, `#microsoft.graph.exclusionGroupAssignmentTarget`, `#microsoft.graph.configurationManagerCollectionAssignmentTarget` |
+| **deviceAndAppManagementAssignmentFilterType** | Write | String | The type of filter of the target assignment i.e. Exclude or Include. Possible values are:none, include, exclude. | `none`, `include`, `exclude` |
+| **deviceAndAppManagementAssignmentFilterId** | Write | String | The Id of the filter for the target assignment. | |
+| **deviceAndAppManagementAssignmentFilterDisplayName** | Write | String | The display name of the filter for the target assignment. | |
+| **groupId** | Write | String | The group Id that is the target of the assignment. | |
+| **groupDisplayName** | Write | String | The group Display Name that is the target of the assignment. | |
+| **collectionId** | Write | String | The collection Id that is the target of the assignment.(ConfigMgr) | |
+
+### MSFT_MicrosoftGraphOperatingSystemVersionRange
+
+#### Parameters
+
+| Parameter | Attribute | DataType | Description | Allowed Values |
+| --- | --- | --- | --- | --- |
+| **Description** | Write | String | The description of this range (e.g. Valid 1702 builds) | |
+| **LowestVersion** | Write | String | The lowest inclusive version that this range contains. | |
+| **HighestVersion** | Write | String | The highest inclusive version that this range contains. | |
+
+### MSFT_MicrosoftGraphDeviceCompliancePolicyScript
+
+#### Parameters
+
+| Parameter | Attribute | DataType | Description | Allowed Values |
+| --- | --- | --- | --- | --- |
+| **DisplayName** | Key | String | Device compliance script name. | |
+| **RulesContent** | Write | String | Rules content of the custom settings. | |
+
+### MSFT_MicrosoftGraphDeviceComplianceScheduledActionsForRuleConfiguration
+
+#### Parameters
+
+| Parameter | Attribute | DataType | Description | Allowed Values |
+| --- | --- | --- | --- | --- |
+| **ActionType** | Write | String | The action type of the compliance policy action. | `block`, `notification`, `retire` |
+| **GracePeriodHours** | Write | UInt32 | Number of hours the device can be in grace period. | |
+| **NotificationMessageCCList** | Write | StringArray[] | Display names of the groups that should be notified if the compliance fails. | |
+| **NotificationTemplate** | Write | String | Display name of the Notification Template used in the compliance policy. Can only be used with ActionType 'notification'. | |
 
 
-# IntuneDeviceCompliancePolicyWindows10
-
-### Description
+## Description
 
 This resource configures the settings of Windows 10 compliance policies
 in your cloud-based organization.
@@ -244,19 +285,53 @@ Surface Hubs that run Windows 10 Team OS do not support the Microsoft Defender f
 * In the category Password, set Require a password to unlock mobile devices to the _(default)_ of Not configured.
 * In the category Microsoft Defender for Endpoint, set Require the device to be at or under the machine risk score to the _(default)_ of Not configured.
 
+## Permissions
+
+### Microsoft Graph
+
+To authenticate with the Microsoft Graph API, this resource required the following permissions:
+
+#### Delegated permissions
+
+- **Read**
+
+    - Group.Read.All, DeviceManagementConfiguration.Read.All, DeviceManagementScripts.Read.All
+
+- **Update**
+
+    - Group.Read.All, DeviceManagementConfiguration.ReadWrite.All
+
+#### Application permissions
+
+- **Read**
+
+    - Group.Read.All, DeviceManagementConfiguration.Read.All, DeviceManagementScripts.Read.All
+
+- **Update**
+
+    - Group.Read.All, DeviceManagementConfiguration.ReadWrite.All
+
 ## Examples
 
 ### Example 1
 
-This example creates a new Device Comliance Policy for MacOS.
+This example creates a new Device Comliance Policy for Windows.
 
 ```powershell
 Configuration Example
 {
     param(
-        [Parameter(Mandatory = $true)]
-        [PSCredential]
-        $credsGlobalAdmin
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint
     )
     Import-DscResource -ModuleName Microsoft365DSC
 
@@ -264,18 +339,17 @@ Configuration Example
     {
         IntuneDeviceCompliancePolicyWindows10 'ConfigureDeviceCompliancePolicyWindows10'
         {
-            DisplayName                                 = "Windows 10 DSC Policy"
-            Description                                 = "Test policy"
+            DisplayName                                 = 'Windows 10 DSC Policy'
+            Description                                 = 'Test policy'
             PasswordRequired                            = $False
             PasswordBlockSimple                         = $False
             PasswordRequiredToUnlockFromIdle            = $True
             PasswordMinutesOfInactivityBeforeLock       = 15
             PasswordExpirationDays                      = 365
             PasswordMinimumLength                       = 6
-            PasswordMinutesOfInactivityBeforeLock       = 5
             PasswordPreviousPasswordBlockCount          = 13
             PasswordMinimumCharacterSetCount            = 1
-            PasswordRequiredType                        = "Devicedefault"
+            PasswordRequiredType                        = 'Devicedefault'
             RequireHealthyDeviceReport                  = $True
             OsMinimumVersion                            = 10
             OsMaximumVersion                            = 10.19
@@ -288,19 +362,28 @@ Configuration Example
             StorageRequireEncryption                    = $True
             ActiveFirewallRequired                      = $True
             DefenderEnabled                             = $True
-            DefenderVersion                             = ""
+            DefenderVersion                             = ''
             SignatureOutOfDate                          = $True
             RtpEnabled                                  = $True
             AntivirusRequired                           = $True
             AntiSpywareRequired                         = $True
             DeviceThreatProtectionEnabled               = $True
-            DeviceThreatProtectionRequiredSecurityLevel = "Medium"
+            DeviceThreatProtectionRequiredSecurityLevel = 'Medium'
             ConfigurationManagerComplianceRequired      = $False
             TPMRequired                                 = $False
             deviceCompliancePolicyScript                = $null
             ValidOperatingSystemBuildRanges             = @()
+            ScheduledActionsForRule                     = @(
+                MSFT_MicrosoftGraphDeviceComplianceScheduledActionsForRuleConfiguration
+                {
+                    ActionType         = 'block'
+                    GracePeriodHours   = 0
+                }
+            )
             Ensure                                      = 'Present'
-            Credential                                  = $credsGlobalAdmin
+            ApplicationId         = $ApplicationId;
+            TenantId              = $TenantId;
+            CertificateThumbprint = $CertificateThumbprint;
         }
     }
 }
@@ -308,25 +391,111 @@ Configuration Example
 
 ### Example 2
 
-This example removes an existing Device Compliance Policy for MacOS devices
+This example creates a new Device Comliance Policy for Windows.
 
 ```powershell
 Configuration Example
 {
     param(
-        [Parameter(Mandatory = $true)]
-        [PSCredential]
-        $credsGlobalAdmin
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint
     )
     Import-DscResource -ModuleName Microsoft365DSC
 
     node localhost
     {
-        IntuneDeviceCompliancePolicyWindows10 'RemoveDeviceCompliancePolicyWindows10'
+        IntuneDeviceCompliancePolicyWindows10 'ConfigureDeviceCompliancePolicyWindows10'
         {
-            DisplayName          = 'Demo Windows 10 Device Compliance Policy'
-            Ensure               = 'Absent'
-            Credential           = $credsGlobalAdmin
+            DisplayName                                 = 'Windows 10 DSC Policy'
+            Description                                 = 'Test policy'
+            PasswordRequired                            = $False
+            PasswordBlockSimple                         = $False
+            PasswordRequiredToUnlockFromIdle            = $True
+            PasswordMinutesOfInactivityBeforeLock       = 15
+            PasswordExpirationDays                      = 365
+            PasswordMinimumLength                       = 8 # Updated Property
+            PasswordPreviousPasswordBlockCount          = 13
+            PasswordMinimumCharacterSetCount            = 1
+            PasswordRequiredType                        = 'Devicedefault'
+            RequireHealthyDeviceReport                  = $True
+            OsMinimumVersion                            = 10
+            OsMaximumVersion                            = 10.19
+            MobileOsMinimumVersion                      = 10
+            MobileOsMaximumVersion                      = 10.19
+            EarlyLaunchAntiMalwareDriverEnabled         = $False
+            BitLockerEnabled                            = $False
+            SecureBootEnabled                           = $True
+            CodeIntegrityEnabled                        = $True
+            StorageRequireEncryption                    = $True
+            ActiveFirewallRequired                      = $True
+            DefenderEnabled                             = $True
+            DefenderVersion                             = ''
+            SignatureOutOfDate                          = $True
+            RtpEnabled                                  = $True
+            AntivirusRequired                           = $True
+            AntiSpywareRequired                         = $True
+            DeviceThreatProtectionEnabled               = $True
+            DeviceThreatProtectionRequiredSecurityLevel = 'Medium'
+            ConfigurationManagerComplianceRequired      = $False
+            TPMRequired                                 = $False
+            deviceCompliancePolicyScript                = $null
+            ValidOperatingSystemBuildRanges             = @()
+            ScheduledActionsForRule                     = @(
+                MSFT_MicrosoftGraphDeviceComplianceScheduledActionsForRuleConfiguration
+                {
+                    ActionType         = 'block'
+                    GracePeriodHours   = 0
+                }
+            )
+            Ensure                                      = 'Present'
+            ApplicationId         = $ApplicationId;
+            TenantId              = $TenantId;
+            CertificateThumbprint = $CertificateThumbprint;
+        }
+    }
+}
+```
+
+### Example 3
+
+This example creates a new Device Comliance Policy for Windows.
+
+```powershell
+Configuration Example
+{
+    param(
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint
+    )
+    Import-DscResource -ModuleName Microsoft365DSC
+
+    node localhost
+    {
+        IntuneDeviceCompliancePolicyWindows10 'ConfigureDeviceCompliancePolicyWindows10'
+        {
+            DisplayName                                 = 'Windows 10 DSC Policy'
+            Ensure                                      = 'Absent'
+            ApplicationId         = $ApplicationId;
+            TenantId              = $TenantId;
+            CertificateThumbprint = $CertificateThumbprint;
         }
     }
 }

@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_SCRetentionCompliancePolicy'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -89,160 +91,194 @@ function Get-TargetResource
         [System.String]
         $Ensure = 'Present',
 
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [System.Management.Automation.PSCredential]
-        $Credential
+        $Credential,
+
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [System.String]
+        $CertificatePath,
+
+        [Parameter()]
+        [System.Management.Automation.PSCredential]
+        $CertificatePassword,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Getting configuration of RetentionCompliancePolicy for $Name"
-    if ($Global:CurrentModeIsExport)
-    {
-        $ConnectionMode = New-M365DSCConnection -Workload 'SecurityComplianceCenter' `
-            -InboundParameters $PSBoundParameters `
-            -SkipModuleReload $true
-    }
-    else
-    {
-        $ConnectionMode = New-M365DSCConnection -Workload 'SecurityComplianceCenter' `
-            -InboundParameters $PSBoundParameters
-    }
 
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
-
-    #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
-    $CommandName = $MyInvocation.MyCommand
-    $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
-        -CommandName $CommandName `
-        -Parameters $PSBoundParameters
-    Add-M365DSCTelemetryEvent -Data $data
-    #endregion
-
-    $nullReturn = $PSBoundParameters
-    $nullReturn.Ensure = 'Absent'
     try
     {
-        $PolicyObject = Get-RetentionCompliancePolicy $Name -DistributionDetail -ErrorAction SilentlyContinue
-
-        if ($null -eq $PolicyObject)
+        if (-not $Script:exportedInstance -or $Script:exportedInstance.Name -ne $Name)
         {
-            Write-Verbose -Message "RetentionCompliancePolicy $($Name) does not exist."
-            return $nullReturn
+            $null = New-M365DSCConnection -Workload 'SecurityComplianceCenter' `
+                -InboundParameters $PSBoundParameters
+
+            #Ensure the proper dependencies are installed in the current environment.
+            Confirm-M365DSCDependencies
+
+            #region Telemetry
+            $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+            $CommandName = $MyInvocation.MyCommand
+            $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
+                -CommandName $CommandName `
+                -Parameters $PSBoundParameters
+            Add-M365DSCTelemetryEvent -Data $data
+            #endregion
+
+            $nullReturn = $PSBoundParameters
+            $nullReturn.Ensure = 'Absent'
+
+            $PolicyObject = Get-RetentionCompliancePolicy $Name -DistributionDetail -ErrorAction SilentlyContinue
+
+            if ($null -eq $PolicyObject)
+            {
+                Write-Verbose -Message "RetentionCompliancePolicy $($Name) does not exist."
+                return $nullReturn
+            }
         }
         else
         {
-            Write-Verbose "Found existing RetentionCompliancePolicy $($Name)"
-
-            if ($PolicyObject.TeamsPolicy)
-            {
-                $result = @{
-                    Ensure                        = 'Present'
-                    Name                          = $PolicyObject.Name
-                    Comment                       = $PolicyObject.Comment
-                    Enabled                       = $PolicyObject.Enabled
-                    RestrictiveRetention          = $PolicyObject.RestrictiveRetention
-                    TeamsChannelLocation          = @()
-                    TeamsChannelLocationException = @()
-                    TeamsChatLocation             = @()
-                    TeamsChatLocationException    = @()
-                    Credential                    = $Credential
-                }
-
-                if ($PolicyObject.TeamsChannelLocation.Count -gt 0)
-                {
-                    $result.TeamsChannelLocation = [array]$PolicyObject.TeamsChannelLocation.Name
-                }
-                if ($PolicyObject.TeamsChatLocation.Count -gt 0)
-                {
-                    $result.TeamsChatLocation = [array]$PolicyObject.TeamsChatLocation.Name
-                }
-                if ($PolicyObject.TeamsChannelLocationException.Count -gt 0)
-                {
-                    $result.TeamsChannelLocationException = [array]$PolicyObject.TeamsChannelLocationException.Name
-                }
-                if ($PolicyObject.TeamsChatLocationException.Count -gt 0)
-                {
-                    $result.TeamsChatLocationException = $PolicyObject.TeamsChatLocationException.Name
-                }
-            }
-            else
-            {
-                $result = @{
-                    Ensure                       = 'Present'
-                    Name                         = $PolicyObject.Name
-                    Comment                      = $PolicyObject.Comment
-                    DynamicScopeLocation         = @()
-                    Enabled                      = $PolicyObject.Enabled
-                    ExchangeLocation             = @()
-                    ExchangeLocationException    = @()
-                    ModernGroupLocation          = @()
-                    ModernGroupLocationException = @()
-                    OneDriveLocation             = @()
-                    OneDriveLocationException    = @()
-                    PublicFolderLocation         = @()
-                    RestrictiveRetention         = $PolicyObject.RestrictiveRetention
-                    SharePointLocation           = @()
-                    SharePointLocationException  = @()
-                    SkypeLocation                = @()
-                    SkypeLocationException       = @()
-                    Credential                   = $Credential
-                }
-
-                if ($PolicyObject.DynamicScopeLocation.Count -gt 0)
-                {
-                    $result.DynamicScopeLocation = [array]$PolicyObject.DynamicScopeLocation.Name
-                }
-                if ($PolicyObject.ExchangeLocation.Count -gt 0)
-                {
-                    $result.ExchangeLocation = [array]$PolicyObject.ExchangeLocation.Name
-                }
-                if ($PolicyObject.ModernGroupLocation.Count -gt 0)
-                {
-                    $result.ModernGroupLocation = [array]$PolicyObject.ModernGroupLocation.Name
-                }
-                if ($PolicyObject.OneDriveLocation.Count -gt 0)
-                {
-                    $result.OneDriveLocation = [array]$PolicyObject.OneDriveLocation.Name
-                }
-                if ($PolicyObject.PublicFolderLocation.Count -gt 0)
-                {
-                    $result.PublicFolderLocation = [array]$PolicyObject.PublicFolderLocation.Name
-                }
-                if ($PolicyObject.SharePointLocation.Count -gt 0)
-                {
-                    $result.SharePointLocation = [array]$PolicyObject.SharePointLocation.Name
-                }
-                if ($PolicyObject.SkypeLocation.Count -gt 0)
-                {
-                    $result.SkypeLocation = [array]$PolicyObject.SkypeLocation.Name
-                }
-                if ($PolicyObject.ExchangeLocationException.Count -gt 0)
-                {
-                    $result.ExchangeLocationException = [array]$PolicyObject.ExchangeLocationException.Name
-                }
-                if ($PolicyObject.ModernGroupLocationException.Count -gt 0)
-                {
-                    $result.ModernGroupLocationException = [array]$PolicyObject.ModernGroupLocationException.Name
-                }
-                if ($PolicyObject.OneDriveLocationException.Count -gt 0)
-                {
-                    $result.OneDriveLocationException = [array]$PolicyObject.OneDriveLocationException.Name
-                }
-                if ($PolicyObject.SharePointLocationException.Count -gt 0)
-                {
-                    $result.SharePointLocationException = [array]$PolicyObject.SharePointLocationException.Name
-                }
-                if ($PolicyObject.SkypeLocationException.Count -gt 0)
-                {
-                    $result.SkypeLocationException = [array]$PolicyObject.SkypeLocationException.Name
-                }
-            }
-
-            Write-Verbose -Message "Found RetentionCompliancePolicy $($Name)"
-            Write-Verbose -Message "Get-TargetResource Result: `n $(Convert-M365DscHashtableToString -Hashtable $result)"
-            return $result
+            $PolicyObject = $Script:exportedInstance
         }
+
+        Write-Verbose "Found existing RetentionCompliancePolicy $($Name)"
+
+        if ($PolicyObject.TeamsPolicy)
+        {
+            $result = @{
+                Ensure                        = 'Present'
+                Name                          = $PolicyObject.Name
+                Comment                       = $PolicyObject.Comment
+                Enabled                       = $PolicyObject.Enabled
+                RestrictiveRetention          = $PolicyObject.RestrictiveRetention
+                TeamsChannelLocation          = @()
+                TeamsChannelLocationException = @()
+                TeamsChatLocation             = @()
+                TeamsChatLocationException    = @()
+                Credential                    = $Credential
+                ApplicationId                 = $ApplicationId
+                TenantId                      = $TenantId
+                CertificateThumbprint         = $CertificateThumbprint
+                CertificatePath               = $CertificatePath
+                CertificatePassword           = $CertificatePassword
+                AccessTokens                  = $AccessTokens
+            }
+
+            if ($PolicyObject.TeamsChannelLocation.Count -gt 0)
+            {
+                $result.TeamsChannelLocation = [array]$PolicyObject.TeamsChannelLocation.Name
+            }
+            if ($PolicyObject.TeamsChatLocation.Count -gt 0)
+            {
+                $result.TeamsChatLocation = [array]$PolicyObject.TeamsChatLocation.Name
+            }
+            if ($PolicyObject.TeamsChannelLocationException.Count -gt 0)
+            {
+                $result.TeamsChannelLocationException = [array]$PolicyObject.TeamsChannelLocationException.Name
+            }
+            if ($PolicyObject.TeamsChatLocationException.Count -gt 0)
+            {
+                $result.TeamsChatLocationException = $PolicyObject.TeamsChatLocationException.Name
+            }
+        }
+        else
+        {
+            $result = @{
+                Ensure                       = 'Present'
+                Name                         = $PolicyObject.Name
+                Comment                      = $PolicyObject.Comment
+                DynamicScopeLocation         = @()
+                Enabled                      = $PolicyObject.Enabled
+                ExchangeLocation             = @()
+                ExchangeLocationException    = @()
+                ModernGroupLocation          = @()
+                ModernGroupLocationException = @()
+                OneDriveLocation             = @()
+                OneDriveLocationException    = @()
+                PublicFolderLocation         = @()
+                RestrictiveRetention         = $PolicyObject.RestrictiveRetention
+                SharePointLocation           = @()
+                SharePointLocationException  = @()
+                SkypeLocation                = @()
+                SkypeLocationException       = @()
+                Credential                   = $Credential
+                ApplicationId                = $ApplicationId
+                TenantId                     = $TenantId
+                CertificateThumbprint        = $CertificateThumbprint
+                CertificatePath              = $CertificatePath
+                CertificatePassword          = $CertificatePassword
+                AccessTokens                 = $AccessTokens
+            }
+
+            if ($PolicyObject.DynamicScopeLocation.Count -gt 0)
+            {
+                $result.DynamicScopeLocation = [array]$PolicyObject.DynamicScopeLocation.Name
+            }
+            if ($PolicyObject.ExchangeLocation.Count -gt 0)
+            {
+                $result.ExchangeLocation = [array]$PolicyObject.ExchangeLocation.Name
+            }
+            if ($PolicyObject.ModernGroupLocation.Count -gt 0)
+            {
+                $result.ModernGroupLocation = [array]$PolicyObject.ModernGroupLocation.Name
+            }
+            if ($PolicyObject.OneDriveLocation.Count -gt 0)
+            {
+                $result.OneDriveLocation = [array]$PolicyObject.OneDriveLocation.Name
+            }
+            if ($PolicyObject.PublicFolderLocation.Count -gt 0)
+            {
+                $result.PublicFolderLocation = [array]$PolicyObject.PublicFolderLocation.Name
+            }
+            if ($PolicyObject.SharePointLocation.Count -gt 0)
+            {
+                $result.SharePointLocation = [array]$PolicyObject.SharePointLocation.Name
+            }
+            if ($PolicyObject.SkypeLocation.Count -gt 0)
+            {
+                $result.SkypeLocation = [array]$PolicyObject.SkypeLocation.Name
+            }
+            if ($PolicyObject.ExchangeLocationException.Count -gt 0)
+            {
+                $result.ExchangeLocationException = [array]$PolicyObject.ExchangeLocationException.Name
+            }
+            if ($PolicyObject.ModernGroupLocationException.Count -gt 0)
+            {
+                $result.ModernGroupLocationException = [array]$PolicyObject.ModernGroupLocationException.Name
+            }
+            if ($PolicyObject.OneDriveLocationException.Count -gt 0)
+            {
+                $result.OneDriveLocationException = [array]$PolicyObject.OneDriveLocationException.Name
+            }
+            if ($PolicyObject.SharePointLocationException.Count -gt 0)
+            {
+                $result.SharePointLocationException = [array]$PolicyObject.SharePointLocationException.Name
+            }
+            if ($PolicyObject.SkypeLocationException.Count -gt 0)
+            {
+                $result.SkypeLocationException = [array]$PolicyObject.SkypeLocationException.Name
+            }
+        }
+
+        Write-Verbose -Message "Found RetentionCompliancePolicy $($Name)"
+        Write-Verbose -Message "Get-TargetResource Result: `n $(Convert-M365DscHashtableToString -Hashtable $result)"
+        return $result
     }
     catch
     {
@@ -346,9 +382,33 @@ function Set-TargetResource
         [System.String]
         $Ensure = 'Present',
 
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [System.Management.Automation.PSCredential]
-        $Credential
+        $Credential,
+
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [System.String]
+        $CertificatePath,
+
+        [Parameter()]
+        [System.Management.Automation.PSCredential]
+        $CertificatePassword,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     if ($null -eq $SharePointLocation -and $null -eq $ExchangeLocation -and $null -eq $OneDriveLocation -and `
@@ -358,7 +418,7 @@ function Set-TargetResource
         throw 'You need to specify at least one Location for this Policy.'
     }
 
-    if ($null -ne $SkypeLocation -and $SkypeLocation.ToLower() -eq 'all')
+    if ($null -ne $SkypeLocation -and $SkypeLocation -eq 'all')
     {
         throw 'Skype Location must be a any value that uniquely identifies the user.Ex Name, email address, GUID'
     }
@@ -377,17 +437,12 @@ function Set-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'SecurityComplianceCenter' `
-        -InboundParameters $PSBoundParameters
-
     $CurrentPolicy = Get-TargetResource @PSBoundParameters
 
     $isTeamsBased = $false
     if ($null -eq $TeamsChannelLocation -and $null -eq $TeamsChatLocation)
     {
-        $CreationParams = $PSBoundParameters
-        $CreationParams.Remove('Credential')
-        $CreationParams.Remove('Ensure')
+        $CreationParams = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
         $CreationParams.Remove('Name')
         $CreationParams.Add('Identity', $Name)
         $CreationParams.Remove('TeamsChannelLocation')
@@ -404,14 +459,14 @@ function Set-TargetResource
                     $null -ne $ExchangeLocation)
             {
                 $ToBeRemoved = $CurrentPolicy.ExchangeLocation | `
-                    Where-Object { $ExchangeLocation -NotContains $_ }
+                        Where-Object { $ExchangeLocation -NotContains $_ }
                 if ($null -ne $ToBeRemoved)
                 {
                     $CreationParams.Add('RemoveExchangeLocation', $ToBeRemoved)
                 }
 
                 $ToBeAdded = $ExchangeLocation | `
-                    Where-Object { $CurrentPolicy.ExchangeLocation -NotContains $_ }
+                        Where-Object { $CurrentPolicy.ExchangeLocation -NotContains $_ }
                 if ($null -ne $ToBeAdded)
                 {
                     $CreationParams.Add('AddExchangeLocation', $ToBeAdded)
@@ -426,14 +481,14 @@ function Set-TargetResource
                     $null -ne $ExchangeLocationException)
             {
                 $ToBeRemoved = $CurrentPolicy.ExchangeLocationException | `
-                    Where-Object { $ExchangeLocationException -NotContains $_ }
+                        Where-Object { $ExchangeLocationException -NotContains $_ }
                 if ($null -ne $ToBeRemoved)
                 {
                     $CreationParams.Add('RemoveExchangeLocationException', $ToBeRemoved)
                 }
 
                 $ToBeAdded = $ExchangeLocationException | `
-                    Where-Object { $CurrentPolicy.ExchangeLocationException -NotContains $_ }
+                        Where-Object { $CurrentPolicy.ExchangeLocationException -NotContains $_ }
                 if ($null -ne $ToBeAdded)
                 {
                     $CreationParams.Add('AddExchangeLocationException', $ToBeAdded)
@@ -447,14 +502,14 @@ function Set-TargetResource
                     $null -ne $ModernGroupLocation)
             {
                 $ToBeRemoved = $CurrentPolicy.ModernGroupLocation | `
-                    Where-Object { $ModernGroupLocation -NotContains $_ }
+                        Where-Object { $ModernGroupLocation -NotContains $_ }
                 if ($null -ne $ToBeRemoved)
                 {
                     $CreationParams.Add('RemoveModernGroupLocation', $ToBeRemoved)
                 }
 
                 $ToBeAdded = $ModernGroupLocation | `
-                    Where-Object { $CurrentPolicy.ModernGroupLocation -NotContains $_ }
+                        Where-Object { $CurrentPolicy.ModernGroupLocation -NotContains $_ }
                 if ($null -ne $ToBeAdded)
                 {
                     $CreationParams.Add('AddModernGroupLocation', $ToBeAdded)
@@ -468,14 +523,14 @@ function Set-TargetResource
                     $null -ne $ModernGroupLocationException)
             {
                 $ToBeRemoved = $CurrentPolicy.ModernGroupLocationException | `
-                    Where-Object { $ModernGroupLocationException -NotContains $_ }
+                        Where-Object { $ModernGroupLocationException -NotContains $_ }
                 if ($null -ne $ToBeRemoved)
                 {
                     $CreationParams.Add('RemoveModernGroupLocationException', $ToBeRemoved)
                 }
 
                 $ToBeAdded = $ModernGroupLocationException | `
-                    Where-Object { $CurrentPolicy.ModernGroupLocationException -NotContains $_ }
+                        Where-Object { $CurrentPolicy.ModernGroupLocationException -NotContains $_ }
                 if ($null -ne $ToBeAdded)
                 {
                     $CreationParams.Add('AddModernGroupLocationException', $ToBeAdded)
@@ -489,14 +544,14 @@ function Set-TargetResource
                     $null -ne $OneDriveLocation)
             {
                 $ToBeRemoved = $CurrentPolicy.OneDriveLocation | `
-                    Where-Object { $OneDriveLocation -NotContains $_ }
+                        Where-Object { $OneDriveLocation -NotContains $_ }
                 if ($null -ne $ToBeRemoved)
                 {
                     $CreationParams.Add('RemoveOneDriveLocation', $ToBeRemoved)
                 }
 
                 $ToBeAdded = $OneDriveLocation | `
-                    Where-Object { $CurrentPolicy.OneDriveLocation -NotContains $_ }
+                        Where-Object { $CurrentPolicy.OneDriveLocation -NotContains $_ }
                 if ($null -ne $ToBeAdded)
                 {
                     $CreationParams.Add('AddOneDriveLocation', $ToBeAdded)
@@ -510,14 +565,14 @@ function Set-TargetResource
                     $null -ne $OneDriveLocationException)
             {
                 $ToBeRemoved = $CurrentPolicy.OneDriveLocationException | `
-                    Where-Object { $OneDriveLocationException -NotContains $_ }
+                        Where-Object { $OneDriveLocationException -NotContains $_ }
                 if ($null -ne $ToBeRemoved)
                 {
                     $CreationParams.Add('RemoveOneDriveLocationException', $ToBeRemoved)
                 }
 
                 $ToBeAdded = $OneDriveLocationException | `
-                    Where-Object { $CurrentPolicy.OneDriveLocationException -NotContains $_ }
+                        Where-Object { $CurrentPolicy.OneDriveLocationException -NotContains $_ }
                 if ($null -ne $ToBeAdded)
                 {
                     $CreationParams.Add('AddOneDriveLocationException', $ToBeAdded)
@@ -531,14 +586,14 @@ function Set-TargetResource
                     $null -ne $PublicFolderLocation)
             {
                 $ToBeRemoved = $CurrentPolicy.PublicFolderLocation | `
-                    Where-Object { $PublicFolderLocation -NotContains $_ }
+                        Where-Object { $PublicFolderLocation -NotContains $_ }
                 if ($null -ne $ToBeRemoved)
                 {
                     $CreationParams.Add('RemovePublicFolderLocation', $ToBeRemoved)
                 }
 
                 $ToBeAdded = $PublicFolderLocation | `
-                    Where-Object { $CurrentPolicy.PublicFolderLocation -NotContains $_ }
+                        Where-Object { $CurrentPolicy.PublicFolderLocation -NotContains $_ }
                 if ($null -ne $ToBeAdded)
                 {
                     $CreationParams.Add('AddPublicFolderLocation', $ToBeAdded)
@@ -552,14 +607,14 @@ function Set-TargetResource
                     $null -ne $SharePointLocation)
             {
                 $ToBeRemoved = $CurrentPolicy.SharePointLocation | `
-                    Where-Object { $SharePointLocation -NotContains $_ }
+                        Where-Object { $SharePointLocation -NotContains $_ }
                 if ($null -ne $ToBeRemoved)
                 {
                     $CreationParams.Add('RemoveSharePointLocation', $ToBeRemoved)
                 }
 
                 $ToBeAdded = $SharePointLocation | `
-                    Where-Object { $CurrentPolicy.SharePointLocation -NotContains $_ }
+                        Where-Object { $CurrentPolicy.SharePointLocation -NotContains $_ }
                 if ($null -ne $ToBeAdded)
                 {
                     $CreationParams.Add('AddSharePointLocation', $ToBeAdded)
@@ -573,14 +628,14 @@ function Set-TargetResource
                     $null -ne $SharePointLocationException)
             {
                 $ToBeRemoved = $CurrentPolicy.SharePointLocationException | `
-                    Where-Object { $SharePointLocationException -NotContains $_ }
+                        Where-Object { $SharePointLocationException -NotContains $_ }
                 if ($null -ne $ToBeRemoved)
                 {
                     $CreationParams.Add('RemoveSharePointLocationException', $ToBeRemoved)
                 }
 
                 $ToBeAdded = $SharePointLocationException | `
-                    Where-Object { $CurrentPolicy.SharePointLocationException -NotContains $_ }
+                        Where-Object { $CurrentPolicy.SharePointLocationException -NotContains $_ }
                 if ($null -ne $ToBeAdded)
                 {
                     $CreationParams.Add('AddSharePointLocationException', $ToBeAdded)
@@ -594,14 +649,14 @@ function Set-TargetResource
                     $null -ne $SkypeLocation)
             {
                 $ToBeRemoved = $CurrentPolicy.SkypeLocation | `
-                    Where-Object { $SkypeLocation -NotContains $_ }
+                        Where-Object { $SkypeLocation -NotContains $_ }
                 if ($null -ne $ToBeRemoved)
                 {
                     $CreationParams.Add('RemoveSkypeLocation', $ToBeRemoved)
                 }
 
                 $ToBeAdded = $SkypeLocation | `
-                    Where-Object { $CurrentPolicy.SkypeLocation -NotContains $_ }
+                        Where-Object { $CurrentPolicy.SkypeLocation -NotContains $_ }
                 if ($null -ne $ToBeAdded)
                 {
                     $CreationParams.Add('AddSkypeLocation', $ToBeAdded)
@@ -615,14 +670,14 @@ function Set-TargetResource
                     $null -ne $SkypeLocationException)
             {
                 $ToBeRemoved = $CurrentPolicy.SkypeLocationException | `
-                    Where-Object { $SkypeLocationException -NotContains $_ }
+                        Where-Object { $SkypeLocationException -NotContains $_ }
                 if ($null -ne $ToBeRemoved)
                 {
                     $CreationParams.Add('RemoveSkypeLocationException', $ToBeRemoved)
                 }
 
                 $ToBeAdded = $SkypeLocationException | `
-                    Where-Object { $CurrentPolicy.SkypeLocationException -NotContains $_ }
+                        Where-Object { $CurrentPolicy.SkypeLocationException -NotContains $_ }
                 if ($null -ne $ToBeAdded)
                 {
                     $CreationParams.Add('AddSkypeLocationException', $ToBeAdded)
@@ -636,10 +691,10 @@ function Set-TargetResource
         $isTeamsBased = $true
         Write-Verbose -Message "Policy $Name is a Teams Policy"
         $CreationParams = @{
-            Identity                      = $Name
-            Comment                       = $Comment
-            Enabled                       = $Enabled
-            RestrictiveRetention          = $RestrictiveRetention
+            Identity             = $Name
+            Comment              = $Comment
+            Enabled              = $Enabled
+            RestrictiveRetention = $RestrictiveRetention
         }
 
         if ($null -ne $TeamsChannelLocation)
@@ -665,7 +720,7 @@ function Set-TargetResource
                 $null -ne $TeamsChatLocation)
         {
             $ToBeRemoved = $CurrentPolicy.TeamsChatLocation | `
-                Where-Object { $TeamsChatLocation -NotContains $_ }
+                    Where-Object { $TeamsChatLocation -NotContains $_ }
             if ($null -ne $ToBeRemoved)
             {
                 Write-Verbose -Message 'Adding the RemoveTeamsChatLocation property.'
@@ -673,7 +728,7 @@ function Set-TargetResource
             }
 
             $ToBeAdded = $TeamsChatLocation | `
-                Where-Object { $CurrentPolicy.TeamsChatLocation -NotContains $_ }
+                    Where-Object { $CurrentPolicy.TeamsChatLocation -NotContains $_ }
             if ($null -ne $ToBeAdded)
             {
                 Write-Verbose -Message 'Adding the AddTeamsChatLocation property.'
@@ -687,7 +742,7 @@ function Set-TargetResource
                 $null -ne $TeamsChatLocationException)
         {
             $ToBeRemoved = $CurrentPolicy.TeamsChatLocationException | `
-                Where-Object { $TeamsChatLocationException -NotContains $_ }
+                    Where-Object { $TeamsChatLocationException -NotContains $_ }
             if ($null -ne $ToBeRemoved)
             {
                 Write-Verbose -Message 'Adding the RemoveTeamsChatLocationException property.'
@@ -695,7 +750,7 @@ function Set-TargetResource
             }
 
             $ToBeAdded = $TeamsChatLocationException | `
-                Where-Object { $CurrentPolicy.TeamsChatLocationException -NotContains $_ }
+                    Where-Object { $CurrentPolicy.TeamsChatLocationException -NotContains $_ }
             if ($null -ne $ToBeAdded)
             {
                 Write-Verbose -Message 'Adding the AddTeamsChatLocationException property.'
@@ -709,7 +764,7 @@ function Set-TargetResource
                 $null -ne $TeamsChannelLocation)
         {
             $ToBeRemoved = $CurrentPolicy.TeamsChannelLocation | `
-                Where-Object { $TeamsChannelLocation -NotContains $_ }
+                    Where-Object { $TeamsChannelLocation -NotContains $_ }
             if ($null -ne $ToBeRemoved)
             {
                 Write-Verbose -Message 'Adding the RemoveTeamsChannelLocation property.'
@@ -717,7 +772,7 @@ function Set-TargetResource
             }
 
             $ToBeAdded = $TeamsChannelLocation | `
-                Where-Object { $CurrentPolicy.TeamsChannelLocation -NotContains $_ }
+                    Where-Object { $CurrentPolicy.TeamsChannelLocation -NotContains $_ }
             if ($null -ne $ToBeAdded)
             {
                 Write-Verbose -Message 'Adding the AddTeamsChannelLocation property.'
@@ -731,7 +786,7 @@ function Set-TargetResource
                 $null -ne $TeamsChannelLocationException)
         {
             $ToBeRemoved = $CurrentPolicy.TeamsChannelChannelLocationException | `
-                Where-Object { $TeamsChannelLocationException -NotContains $_ }
+                    Where-Object { $TeamsChannelLocationException -NotContains $_ }
             if ($null -ne $ToBeRemoved)
             {
                 Write-Verbose -Message 'Adding the RemoveTeamsChannelLocationException property.'
@@ -739,7 +794,7 @@ function Set-TargetResource
             }
 
             $ToBeAdded = $TeamsChannelLocationException | `
-                Where-Object { $CurrentPolicy.TeamsChannelLocationException -NotContains $_ }
+                    Where-Object { $CurrentPolicy.TeamsChannelLocationException -NotContains $_ }
             if ($null -ne $ToBeAdded)
             {
                 Write-Verbose -Message 'Adding the AddTeamsChannelLocationException property.'
@@ -749,26 +804,48 @@ function Set-TargetResource
     }
     if (('Present' -eq $Ensure) -and ('Absent' -eq $CurrentPolicy.Ensure))
     {
-        $CreationParams.Add("Name", $Name)
-        $CreationParams.Remove("Identity") | Out-Null
+        $CreationParams.Add('Name', $Name)
+        $CreationParams.Remove('Identity') | Out-Null
         Write-Verbose -Message "Creating new Retention Compliance Policy $Name with values: $(Convert-M365DscHashtableToString -Hashtable $CreationParams)"
         New-RetentionCompliancePolicy @CreationParams
     }
     elseif (('Present' -eq $Ensure) -and ('Present' -eq $CurrentPolicy.Ensure))
     {
         # Remove Teams specific parameters
-        $CreationParams.Remove("TeamsChatLocationException") | Out-Null
-        $CreationParams.Remove("TeamsChannelLocationException") | Out-Null
-        $CreationParams.Remove("TeamsChannelLocation") | Out-Null
-        $CreationParams.Remove("TeamsChatLocation") | Out-Null
+        $CreationParams.Remove('TeamsChatLocationException') | Out-Null
+        $CreationParams.Remove('TeamsChannelLocationException') | Out-Null
+        $CreationParams.Remove('TeamsChannelLocation') | Out-Null
+        $CreationParams.Remove('TeamsChatLocation') | Out-Null
 
         if ($isTeamsBased)
         {
-            $CreationParams.Remove("RestrictiveRetention") | Out-Null
+            $CreationParams.Remove('RestrictiveRetention') | Out-Null
         }
 
         Write-Verbose "Updating Policy with values: $(Convert-M365DscHashtableToString -Hashtable $CreationParams)"
-        Set-RetentionCompliancePolicy @CreationParams
+        $success = $false
+        $retries = 1
+        while (!$success -and $retries -le 10)
+        {
+            try
+            {
+                Set-RetentionCompliancePolicy @CreationParams -Force -ErrorAction Stop
+                $success = $true
+            }
+            catch
+            {
+                if ($_.Exception.Message -like '*are being deployed. Once deployed, additional actions can be performed*')
+                {
+                    Write-Verbose -Message "The policy has pending changes being deployed. Waiting 30 seconds for a maximum of 300 seconds (5 minutes). Total time waited so far {$($retries * 30) seconds}"
+                    Start-Sleep -Seconds 30
+                }
+                else
+                {
+                    $success = $true
+                }
+            }
+            $retries++
+        }
     }
     elseif (('Absent' -eq $Ensure) -and ('Present' -eq $CurrentPolicy.Ensure))
     {
@@ -868,15 +945,37 @@ function Test-TargetResource
         [System.String]
         $Ensure = 'Present',
 
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [System.Management.Automation.PSCredential]
-        $Credential
+        $Credential,
+
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [System.String]
+        $CertificatePath,
+
+        [Parameter()]
+        [System.Management.Automation.PSCredential]
+        $CertificatePassword,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
 
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -884,24 +983,9 @@ function Test-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message "Testing configuration of RetentionCompliancePolicy for $Name"
-
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-
-    Write-Verbose -Message "Current Values: $(Convert-M365DscHashtableToString -Hashtable $CurrentValues)"
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('Credential') | Out-Null
-
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck $ValuesToCheck.Keys
-
-    Write-Verbose -Message "Test-TargetResource returned $TestResult"
-
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '')
+    return $result
 }
 
 function Export-TargetResource
@@ -910,13 +994,37 @@ function Export-TargetResource
     [OutputType([System.String])]
     param
     (
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [System.Management.Automation.PSCredential]
-        $Credential
+        $Credential,
+
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [System.String]
+        $CertificatePath,
+
+        [Parameter()]
+        [System.Management.Automation.PSCredential]
+        $CertificatePassword,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     $ConnectionMode = New-M365DSCConnection -Workload 'SecurityComplianceCenter' `
-        -InboundParameters $PSBoundParameters `
-        -SkipModuleReload $true
+        -InboundParameters $PSBoundParameters
 
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
@@ -932,28 +1040,29 @@ function Export-TargetResource
 
     try
     {
-        [array]$policies = Get-RetentionCompliancePolicy -ErrorAction Stop
+        [array]$policies = Get-RetentionCompliancePolicy -DistributionDetail -ErrorAction Stop
 
         $i = 1
         if ($policies.Length -eq 0)
         {
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         }
         else
         {
-            Write-Host "`r`n" -NoNewline
+            Write-M365DSCHost -Message "`r`n" -DeferWrite
         }
         $dscContent = ''
         foreach ($policy in $policies)
         {
-            Write-Host "    |---[$i/$($policies.Length)] $($policy.Name)" -NoNewline
-            $Params = @{
-                Credential = $Credential
-                Name       = $policy.Name
+            if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+            {
+                $Global:M365DSCExportResourceInstancesCount++
             }
-            $Results = Get-TargetResource @Params
-            $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                -Results $Results
+
+            Write-M365DSCHost -Message "    |---[$i/$($policies.Length)] $($policy.Name)" -DeferWrite
+
+            $Script:exportedInstance = $policy
+            $Results = Get-TargetResource @PSBoundParameters -Name $policy.Name
             $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                 -ConnectionMode $ConnectionMode `
                 -ModulePath $PSScriptRoot `
@@ -962,16 +1071,16 @@ function Export-TargetResource
             $dscContent += $currentDSCBlock
             Save-M365DSCPartialExport -Content $currentDSCBlock `
                 -FileName $Global:PartialExportFileName
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
             $i++
         }
         return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
-        New-M365DSCLogEntry -Message "Error during Export:" `
+        New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `
             -Source $($MyInvocation.MyCommand.Source) `
             -TenantId $TenantId `

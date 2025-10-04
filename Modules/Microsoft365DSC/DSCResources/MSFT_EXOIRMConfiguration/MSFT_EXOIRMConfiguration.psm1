@@ -1,12 +1,15 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_EXOIRMConfiguration'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
     [OutputType([System.Collections.Hashtable])]
     param
     (
-        [Parameter()]
+        [Parameter(Mandatory = $true)]
         [System.String]
-        $Identity,
+        [ValidateSet('Yes')]
+        $IsSingleInstance,
 
         [Parameter()]
         [System.Boolean]
@@ -100,19 +103,24 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     Write-Verbose -Message 'Getting IRM Configuration'
 
     if ($Global:CurrentModeIsExport)
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+        $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
             -InboundParameters $PSBoundParameters `
             -SkipModuleReload $true
     }
     else
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+        $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
             -InboundParameters $PSBoundParameters
     }
 
@@ -135,8 +143,20 @@ function Get-TargetResource
     {
         $IRMConfiguration = Get-IRMConfiguration -ErrorAction Stop
 
+        $RMSOnlineKeySharingLocationValue = $null
+        if ($IRMConfiguration.RMSOnlineKeySharingLocation)
+        {
+            $RMSOnlineKeySharingLocationValue = $IRMConfiguration.RMSOnlineKeySharingLocation.ToString()
+        }
+
+        $LicensingLocationValue = $null
+        if ($IRMConfiguration.LicensingLocation)
+        {
+            $LicensingLocationValue = $IRMConfiguration.LicensingLocation.ToString()
+        }
+
         $result = @{
-            Identity                                   = $IRMConfiguration.Identity
+            IsSingleInstance                           = 'Yes'
             AutomaticServiceUpdateEnabled              = $IRMConfiguration.AutomaticServiceUpdateEnabled
             AzureRMSLicensingEnabled                   = $IRMConfiguration.AzureRMSLicensingEnabled
             DecryptAttachmentForEncryptOnly            = $IRMConfiguration.DecryptAttachmentForEncryptOnly
@@ -144,9 +164,9 @@ function Get-TargetResource
             EnablePdfEncryption                        = $IRMConfiguration.EnablePdfEncryption
             InternalLicensingEnabled                   = $IRMConfiguration.InternalLicensingEnabled
             JournalReportDecryptionEnabled             = $IRMConfiguration.JournalReportDecryptionEnabled
-            LicensingLocation                          = $IRMConfiguration.LicensingLocation
+            LicensingLocation                          = $LicensingLocationValue
             RejectIfRecipientHasNoRights               = $IRMConfiguration.RejectIfRecipientHasNoRights
-            RMSOnlineKeySharingLocation                = $IRMConfiguration.RMSOnlineKeySharingLocation
+            RMSOnlineKeySharingLocation                = $RMSOnlineKeySharingLocationValue
             SearchEnabled                              = $IRMConfiguration.SearchEnabled
             SimplifiedClientAccessDoNotForwardDisabled = $IRMConfiguration.SimplifiedClientAccessDoNotForwardDisabled
             SimplifiedClientAccessEnabled              = $IRMConfiguration.SimplifiedClientAccessEnabled
@@ -158,8 +178,9 @@ function Get-TargetResource
             CertificateThumbprint                      = $CertificateThumbprint
             CertificatePath                            = $CertificatePath
             CertificatePassword                        = $CertificatePassword
-            Managedidentity                            = $ManagedIdentity.IsPresent
+            ManagedIdentity                            = $ManagedIdentity.IsPresent
             TenantId                                   = $TenantId
+            AccessTokens                               = $AccessTokens
         }
 
         Write-Verbose -Message 'Found IRM configuration '
@@ -183,9 +204,10 @@ function Set-TargetResource
     [CmdletBinding()]
     param
     (
-        [Parameter()]
+        [Parameter(Mandatory = $true)]
         [System.String]
-        $Identity,
+        [ValidateSet('Yes')]
+        $IsSingleInstance,
 
         [Parameter()]
         [System.Boolean]
@@ -279,7 +301,11 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
@@ -295,19 +321,11 @@ function Set-TargetResource
 
     Write-Verbose -Message 'Setting configuration of Resource Configuration'
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+    $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
         -InboundParameters $PSBoundParameters
 
-    $IRMConfigurationParams = [System.Collections.Hashtable]($PSBoundParameters)
-    $IRMConfigurationParams.Remove('Ensure') | Out-Null
-    $IRMConfigurationParams.Remove('Credential') | Out-Null
-    $IRMConfigurationParams.Remove('ApplicationId') | Out-Null
-    $IRMConfigurationParams.Remove('TenantId') | Out-Null
-    $IRMConfigurationParams.Remove('CertificateThumbprint') | Out-Null
-    $IRMConfigurationParams.Remove('CertificatePath') | Out-Null
-    $IRMConfigurationParams.Remove('CertificatePassword') | Out-Null
-    $IRMConfigurationParams.Remove('ManagedIdentity') | Out-Null
-    $IRMConfigurationParams.Remove('Identity') | Out-Null
+    $IRMConfigurationParams = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
+    $IRMConfigurationParams.Remove('IsSingleInstance') | Out-Null
 
     if (('Present' -eq $Ensure ) -and ($Null -ne $IRMConfigurationParams))
     {
@@ -324,9 +342,10 @@ function Test-TargetResource
     [OutputType([System.Boolean])]
     param
     (
-        [Parameter()]
+        [Parameter(Mandatory = $true)]
         [System.String]
-        $Identity,
+        [ValidateSet('Yes')]
+        $IsSingleInstance,
 
         [Parameter()]
         [System.Boolean]
@@ -420,13 +439,15 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
 
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -434,30 +455,9 @@ function Test-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message 'Testing configuration of IRM Configuration '
-
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-
-    Write-Verbose -Message "Current Values: $(Convert-M365DscHashtableToString -Hashtable $CurrentValues)"
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('Credential') | Out-Null
-    $ValuesToCheck.Remove('ApplicationId') | Out-Null
-    $ValuesToCheck.Remove('TenantId') | Out-Null
-    $ValuesToCheck.Remove('CertificateThumbprint') | Out-Null
-    $ValuesToCheck.Remove('CertificatePath') | Out-Null
-    $ValuesToCheck.Remove('CertificatePassword') | Out-Null
-    $ValuesToCheck.Remove('ManagedIdentity') | Out-Null
-
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck $ValuesToCheck.Keys
-
-    Write-Verbose -Message "Test-TargetResource returned $($TestResult)"
-
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '')
+    return $result
 }
 
 function Export-TargetResource
@@ -466,19 +466,6 @@ function Export-TargetResource
     [OutputType([System.String])]
     param
     (
-        [Parameter()]
-        [System.String]
-        $Identity,
-
-        [Parameter()]
-        [System.String[]]
-        $ResourcePropertySchema,
-
-        [Parameter()]
-        [ValidateSet('Present', 'Absent')]
-        [System.String]
-        $Ensure = 'Present',
-
         [Parameter()]
         [System.Management.Automation.PSCredential]
         $Credential,
@@ -505,8 +492,13 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' -InboundParameters $PSBoundParameters -SkipModuleReload $true
 
     #Ensure the proper dependencies are installed in the current environment.
@@ -523,26 +515,30 @@ function Export-TargetResource
     #endregion
     try
     {
+        if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+        {
+            $Global:M365DSCExportResourceInstancesCount++
+        }
+
         $IRMConfiguration = Get-IRMConfiguration -ErrorAction Stop
         $dscContent = ''
-        Write-Host "`r`n" -NoNewline
+        Write-M365DSCHost -Message "`r`n" -DeferWrite
 
-        Write-Host "    |---[1/1] $($IRMConfiguration.Identity)" -NoNewline
+        Write-M365DSCHost -Message  "    |---[1/1] $($IRMConfiguration.Identity)" -DeferWrite
 
         $Params = @{
-            Identity              = $IRMConfiguration.Identity
+            IsSingleInstance      = 'Yes'
             Credential            = $Credential
             ApplicationId         = $ApplicationId
             TenantId              = $TenantId
             CertificateThumbprint = $CertificateThumbprint
             CertificatePassword   = $CertificatePassword
-            Managedidentity       = $ManagedIdentity.IsPresent
+            ManagedIdentity       = $ManagedIdentity.IsPresent
             CertificatePath       = $CertificatePath
+            AccessTokens          = $AccessTokens
         }
 
         $Results = Get-TargetResource @Params
-        $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-            -Results $Results
         $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
             -ConnectionMode $ConnectionMode `
             -ModulePath $PSScriptRoot `
@@ -551,12 +547,12 @@ function Export-TargetResource
         $dscContent += $currentDSCBlock
         Save-M365DSCPartialExport -Content $currentDSCBlock `
             -FileName $Global:PartialExportFileName
-        Write-Host $Global:M365DSCEmojiGreenCheckMark
+        Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `

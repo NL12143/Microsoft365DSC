@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_SPOTenantSettings'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -8,6 +10,15 @@ function Get-TargetResource
         [ValidateSet('Yes')]
         [String]
         $IsSingleInstance,
+
+        [Parameter()]
+        [System.Boolean]
+        $EnableAzureADB2BIntegration,
+
+        [Parameter()]
+        [ValidateSet('ExternalUserAndGuestSharing', 'Disabled', 'ExternalUserSharingOnly', 'ExistingExternalUserSharingOnly')]
+        [System.String]
+        $OneDriveSharingCapability,
 
         [Parameter()]
         [System.UInt32]
@@ -29,11 +40,6 @@ function Get-TargetResource
         [System.Boolean]
         $LegacyAuthProtocolsEnabled,
 
-        # DEPRECATED
-        [Parameter()]
-        [System.Boolean]
-        $RequireAcceptingAccountMatchInvitedAccount,
-
         [Parameter()]
         [System.String]
         $SignInAccelerationDomain,
@@ -41,10 +47,6 @@ function Get-TargetResource
         [Parameter()]
         [System.Boolean]
         $UsePersistentCookiesForExplorerView,
-
-        [Parameter()]
-        [System.Boolean]
-        $UserVoiceForFeedbackEnabled,
 
         [Parameter()]
         [System.Boolean]
@@ -79,14 +81,13 @@ function Get-TargetResource
         $HideDefaultThemes,
 
         [Parameter()]
+        [System.Boolean]
+        $HideSyncButtonOnTeamSite,
+
+        [Parameter()]
         [ValidateSet('AllowExternalSharing', 'BlockExternalSharing')]
         [System.String]
         $MarkNewFilesSensitiveByDefault,
-
-        [Parameter()]
-        [ValidateSet('AllowFullAccess', 'AllowLimitedAccess', 'BlockAccess')]
-        [System.String]
-        $ConditionalAccessPolicy,
 
         [Parameter()]
         [System.Guid[]]
@@ -95,6 +96,42 @@ function Get-TargetResource
         [Parameter()]
         [System.Boolean]
         $IsFluidEnabled,
+
+        [Parameter()]
+        [System.Boolean]
+        $SocialBarOnSitePagesDisabled,
+
+        [Parameter()]
+        [System.Boolean]
+        $CommentsOnSitePagesDisabled,
+
+        [Parameter()]
+        [System.Boolean]
+        $EnableAIPIntegration,
+
+        [Parameter()]
+        [System.String]
+        $TenantDefaultTimezone,
+
+        [Parameter()]
+        [System.Boolean]
+        $ExemptNativeUsersFromTenantLevelRestricedAccessControl,
+
+        [Parameter()]
+        [System.String[]]
+        $AllowSelectSGsInODBListInTenant,
+
+        [Parameter()]
+        [System.String[]]
+        $DenySelectSGsInODBListInTenant,
+
+        [Parameter()]
+        [System.String[]]
+        $DenySelectSecurityGroupsInSPSitesList,
+
+        [Parameter()]
+        [System.String[]]
+        $AllowSelectSecurityGroupsInSPSitesList,
 
         [Parameter()]
         [ValidateSet('Present', 'Absent')]
@@ -131,35 +168,43 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message 'Getting configuration for SPO Tenant'
-    $ConnectionMode = New-M365DSCConnection -Workload 'PNP' -InboundParameters $PSBoundParameters
-
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
-
-    #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
-    $CommandName = $MyInvocation.MyCommand
-    $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
-        -CommandName $CommandName `
-        -Parameters $PSBoundParameters
-    Add-M365DSCTelemetryEvent -Data $data
-    #endregion
-
-    if ($PSBoundParameters.ContainsKey('RequireAcceptingAccountMatchInvitedAccount'))
-    {
-        Write-Warning 'RequireAcceptingAccountMatchInvitedAccount is deprecated. Please remove this parameter from your configuration.'
-    }
-    $nullReturn = $PSBoundParameters
-    $nullReturn.Ensure = 'Absent'
 
     try
     {
-        $SPOTenantSettings = Get-PnPTenant -ErrorAction Stop
+        if (-not $Script:ExportMode)
+        {
+            $null = New-M365DSCConnection -Workload 'MicrosoftGraph' `
+                -InboundParameters $PSBoundParameters
 
+            $null = New-M365DSCConnection -Workload 'PNP' `
+                -InboundParameters $PSBoundParameters
+
+            #Ensure the proper dependencies are installed in the current environment.
+            Confirm-M365DSCDependencies
+
+            #region Telemetry
+            $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+            $CommandName = $MyInvocation.MyCommand
+            $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
+                -CommandName $CommandName `
+                -Parameters $PSBoundParameters
+            Add-M365DSCTelemetryEvent -Data $data
+            #endregion
+        }
+
+        $nullReturn = $PSBoundParameters
+        $nullReturn.Ensure = 'Absent'
+
+        $SPOTenantSettings = Get-PnPTenant -ErrorAction Stop
+        $SPOTenantGraphSettings = Get-MgAdminSharepointSetting -Property TenantDefaultTimeZone # get tenantDefaultTimezone
         $CompatibilityRange = $SPOTenantSettings.CompatibilityRange.Split(',')
         $MinCompat = $null
         $MaxCompat = $null
@@ -169,36 +214,60 @@ function Get-TargetResource
             $MaxCompat = $CompatibilityRange[1]
         }
 
+        # Additional Properties via REST
+        $parametersToRetrieve = @('ExemptNativeUsersFromTenantLevelRestricedAccessControl',
+            'AllowSelectSGsInODBListInTenant',
+            'DenySelectSGsInODBListInTenant',
+            'DenySelectSecurityGroupsInSPSitesList',
+            'AllowSelectSecurityGroupsInSPSitesList',
+            'EnableAzureADB2BIntegration',
+            'OneDriveSharingCapability')
+
+        $response = Invoke-PnPSPRestMethod -Method Get `
+            -Url "$((Get-MSCloudLoginConnectionProfile -Workload PnP).AdminUrl)/_api/SPO.Tenant?`$select=$($parametersToRetrieve -join ',')"
+
+
         return @{
-            IsSingleInstance                              = 'Yes'
-            MinCompatibilityLevel                         = $MinCompat
-            MaxCompatibilityLevel                         = $MaxCompat
-            SearchResolveExactEmailOrUPN                  = $SPOTenantSettings.SearchResolveExactEmailOrUPN
-            OfficeClientADALDisabled                      = $SPOTenantSettings.OfficeClientADALDisabled
-            LegacyAuthProtocolsEnabled                    = $SPOTenantSettings.LegacyAuthProtocolsEnabled
-            SignInAccelerationDomain                      = $SPOTenantSettings.SignInAccelerationDomain
-            UsePersistentCookiesForExplorerView           = $SPOTenantSettings.UsePersistentCookiesForExplorerView
-            UserVoiceForFeedbackEnabled                   = $SPOTenantSettings.UserVoiceForFeedbackEnabled
-            PublicCdnEnabled                              = $SPOTenantSettings.PublicCdnEnabled
-            PublicCdnAllowedFileTypes                     = $SPOTenantSettings.PublicCdnAllowedFileTypes
-            UseFindPeopleInPeoplePicker                   = $SPOTenantSettings.UseFindPeopleInPeoplePicker
-            NotificationsInSharePointEnabled              = $SPOTenantSettings.NotificationsInSharePointEnabled
-            OwnerAnonymousNotification                    = $SPOTenantSettings.OwnerAnonymousNotification
-            ApplyAppEnforcedRestrictionsToAdHocRecipients = $SPOTenantSettings.ApplyAppEnforcedRestrictionsToAdHocRecipients
-            FilePickerExternalImageSearchEnabled          = $SPOTenantSettings.FilePickerExternalImageSearchEnabled
-            HideDefaultThemes                             = $SPOTenantSettings.HideDefaultThemes
-            MarkNewFilesSensitiveByDefault                = $SPOTenantSettings.MarkNewFilesSensitiveByDefault
-            ConditionalAccessPolicy                       = $SPOTenantSettings.ConditionalAccessPolicy
-            DisabledWebPartIds                            = $SPOTenantSettings.DisabledWebPartIds
-            Credential                                    = $Credential
-            ApplicationId                                 = $ApplicationId
-            TenantId                                      = $TenantId
-            ApplicationSecret                             = $ApplicationSecret
-            CertificatePassword                           = $CertificatePassword
-            CertificatePath                               = $CertificatePath
-            CertificateThumbprint                         = $CertificateThumbprint
-            Managedidentity                               = $ManagedIdentity.IsPresent
-            Ensure                                        = 'Present'
+            IsSingleInstance                                       = 'Yes'
+            ExemptNativeUsersFromTenantLevelRestricedAccessControl = $response.ExemptNativeUsersFromTenantLevelRestricedAccessControl
+            AllowSelectSGsInODBListInTenant                        = $response.AllowSelectSGsInODBListInTenant
+            DenySelectSGsInODBListInTenant                         = $response.DenySelectSGsInODBListInTenant
+            DenySelectSecurityGroupsInSPSitesList                  = $response.DenySelectSecurityGroupsInSPSitesList
+            AllowSelectSecurityGroupsInSPSitesList                 = $response.AllowSelectSecurityGroupsInSPSitesList
+            EnableAzureADB2BIntegration                            = $response.EnableAzureADB2BIntegration
+            OneDriveSharingCapability                              = $response.ODBSharingCapability
+            MinCompatibilityLevel                                  = $MinCompat
+            MaxCompatibilityLevel                                  = $MaxCompat
+            SearchResolveExactEmailOrUPN                           = $SPOTenantSettings.SearchResolveExactEmailOrUPN
+            OfficeClientADALDisabled                               = $SPOTenantSettings.OfficeClientADALDisabled
+            LegacyAuthProtocolsEnabled                             = $SPOTenantSettings.LegacyAuthProtocolsEnabled
+            SignInAccelerationDomain                               = $SPOTenantSettings.SignInAccelerationDomain
+            UsePersistentCookiesForExplorerView                    = $SPOTenantSettings.UsePersistentCookiesForExplorerView
+            PublicCdnEnabled                                       = $SPOTenantSettings.PublicCdnEnabled
+            PublicCdnAllowedFileTypes                              = $SPOTenantSettings.PublicCdnAllowedFileTypes
+            UseFindPeopleInPeoplePicker                            = $SPOTenantSettings.UseFindPeopleInPeoplePicker
+            NotificationsInSharePointEnabled                       = $SPOTenantSettings.NotificationsInSharePointEnabled
+            OwnerAnonymousNotification                             = $SPOTenantSettings.OwnerAnonymousNotification
+            ApplyAppEnforcedRestrictionsToAdHocRecipients          = $SPOTenantSettings.ApplyAppEnforcedRestrictionsToAdHocRecipients
+            FilePickerExternalImageSearchEnabled                   = $SPOTenantSettings.FilePickerExternalImageSearchEnabled
+            HideDefaultThemes                                      = $SPOTenantSettings.HideDefaultThemes
+            HideSyncButtonOnTeamSite                               = $SPOTenantSettings.HideSyncButtonOnTeamSite
+            MarkNewFilesSensitiveByDefault                         = $SPOTenantSettings.MarkNewFilesSensitiveByDefault
+            DisabledWebPartIds                                     = [String[]]$SPOTenantSettings.DisabledWebPartIds
+            SocialBarOnSitePagesDisabled                           = $SPOTenantSettings.SocialBarOnSitePagesDisabled
+            CommentsOnSitePagesDisabled                            = $SPOTenantSettings.CommentsOnSitePagesDisabled
+            EnableAIPIntegration                                   = $SPOTenantSettings.EnableAIPIntegration
+            TenantDefaultTimezone                                  = $SPOTenantGraphSettings.TenantDefaultTimeZone
+            Credential                                             = $Credential
+            ApplicationId                                          = $ApplicationId
+            TenantId                                               = $TenantId
+            ApplicationSecret                                      = $ApplicationSecret
+            CertificatePassword                                    = $CertificatePassword
+            CertificatePath                                        = $CertificatePath
+            CertificateThumbprint                                  = $CertificateThumbprint
+            ManagedIdentity                                        = $ManagedIdentity.IsPresent
+            Ensure                                                 = 'Present'
+            AccessTokens                                           = $AccessTokens
         }
     }
     catch
@@ -229,6 +298,15 @@ function Set-TargetResource
         $IsSingleInstance,
 
         [Parameter()]
+        [System.Boolean]
+        $EnableAzureADB2BIntegration,
+
+        [Parameter()]
+        [ValidateSet('ExternalUserAndGuestSharing', 'Disabled', 'ExternalUserSharingOnly', 'ExistingExternalUserSharingOnly')]
+        [System.String]
+        $OneDriveSharingCapability,
+
+        [Parameter()]
         [System.UInt32]
         $MinCompatibilityLevel,
 
@@ -248,11 +326,6 @@ function Set-TargetResource
         [System.Boolean]
         $LegacyAuthProtocolsEnabled,
 
-        # DEPRECATED
-        [Parameter()]
-        [System.Boolean]
-        $RequireAcceptingAccountMatchInvitedAccount,
-
         [Parameter()]
         [System.String]
         $SignInAccelerationDomain,
@@ -260,10 +333,6 @@ function Set-TargetResource
         [Parameter()]
         [System.Boolean]
         $UsePersistentCookiesForExplorerView,
-
-        [Parameter()]
-        [System.Boolean]
-        $UserVoiceForFeedbackEnabled,
 
         [Parameter()]
         [System.Boolean]
@@ -298,18 +367,53 @@ function Set-TargetResource
         $HideDefaultThemes,
 
         [Parameter()]
+        [System.Boolean]
+        $HideSyncButtonOnTeamSite,
+
+        [Parameter()]
         [ValidateSet('AllowExternalSharing', 'BlockExternalSharing')]
         [System.String]
         $MarkNewFilesSensitiveByDefault,
 
         [Parameter()]
-        [ValidateSet('AllowFullAccess', 'AllowLimitedAccess', 'BlockAccess')]
-        [System.String]
-        $ConditionalAccessPolicy,
-
-        [Parameter()]
         [System.Guid[]]
         $DisabledWebPartIds,
+
+        [Parameter()]
+        [System.Boolean]
+        $SocialBarOnSitePagesDisabled,
+
+        [Parameter()]
+        [System.Boolean]
+        $CommentsOnSitePagesDisabled,
+
+        [Parameter()]
+        [System.Boolean]
+        $EnableAIPIntegration,
+
+        [Parameter()]
+        [System.String]
+        $TenantDefaultTimezone,
+
+        [Parameter()]
+        [System.Boolean]
+        $ExemptNativeUsersFromTenantLevelRestricedAccessControl,
+
+        [Parameter()]
+        [System.String[]]
+        $AllowSelectSGsInODBListInTenant,
+
+        [Parameter()]
+        [System.String[]]
+        $DenySelectSGsInODBListInTenant,
+
+        [Parameter()]
+        [System.String[]]
+        $DenySelectSecurityGroupsInSPSitesList,
+
+        [Parameter()]
+        [System.String[]]
+        $AllowSelectSecurityGroupsInSPSitesList,
 
         [Parameter()]
         [ValidateSet('Present', 'Absent')]
@@ -346,7 +450,11 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message 'Setting configuration for SPO Tenant'
@@ -363,24 +471,23 @@ function Set-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'PNP' -InboundParameters $PSBoundParameters
-
-    if ($PSBoundParameters.ContainsKey('RequireAcceptingAccountMatchInvitedAccount'))
+    if (-not [string]::IsNullOrEmpty($TenantDefaultTimezone))
     {
-        Write-Warning 'RequireAcceptingAccountMatchInvitedAccount is deprecated. Please remove this parameter from your configuration.'
+        $null = New-M365DSCConnection -Workload 'MicrosoftGraph' `
+            -InboundParameters $PSBoundParameters
     }
+    $null = New-M365DSCConnection -Workload 'PNP' -InboundParameters $PSBoundParameters
 
-    $CurrentParameters = $PSBoundParameters
-    $CurrentParameters.Remove('Credential') | Out-Null
+    $CurrentParameters = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
     $CurrentParameters.Remove('IsSingleInstance') | Out-Null
-    $CurrentParameters.Remove('Ensure') | Out-Null
-    $CurrentParameters.Remove('ApplicationId') | Out-Null
-    $CurrentParameters.Remove('TenantId') | Out-Null
-    $CurrentParameters.Remove('CertificatePath') | Out-Null
-    $CurrentParameters.Remove('CertificatePassword') | Out-Null
-    $CurrentParameters.Remove('CertificateThumbprint') | Out-Null
-    $CurrentParameters.Remove('ManagedIdentity') | Out-Null
-    $CurrentParameters.Remove('ApplicationSecret') | Out-Null
+    $CurrentParameters.Remove('ExemptNativeUsersFromTenantLevelRestricedAccessControl') | Out-Null
+    $CurrentParameters.Remove('AllowSelectSGsInODBListInTenant') | Out-Null
+    $CurrentParameters.Remove('DenySelectSGsInODBListInTenant') | Out-Null
+    $CurrentParameters.Remove('DenySelectSecurityGroupsInSPSitesList') | Out-Null
+    $CurrentParameters.Remove('AllowSelectSecurityGroupsInSPSitesList') | Out-Null
+    $CurrentParameters.Remove('EnableAzureADB2BIntegration') | Out-Null
+    $CurrentParameters.Remove('OneDriveSharingCapability') | Out-Null
+    $CurrentParameters.Remove('TenantDefaultTimezone') | Out-Null # this one is updated separately using Graph
 
     if ($PublicCdnEnabled -eq $false)
     {
@@ -388,6 +495,79 @@ function Set-TargetResource
         $CurrentParameters.Remove('PublicCdnAllowedFileTypes') | Out-Null
     }
     $tenant = Set-PnPTenant @CurrentParameters
+
+    if (-not [string]::IsNullOrEmpty($TenantDefaultTimezone))
+    {
+        $tenantGraph = Update-MgAdminSharepointSetting -TenantDefaultTimezone $TenantDefaultTimezone -ErrorAction Stop
+    }
+
+    # Updating via REST
+    try
+    {
+        $paramsToUpdate = @{}
+        $needToUpdate = $false
+
+        if ($null -ne $ExemptNativeUsersFromTenantLevelRestricedAccessControl)
+        {
+            $needToUpdate = $true
+            $paramsToUpdate.Add('ExemptNativeUsersFromTenantLevelRestricedAccessControl', $ExemptNativeUsersFromTenantLevelRestricedAccessControl)
+        }
+
+        if ($null -ne $AllowSelectSGsInODBListInTenant)
+        {
+            $needToUpdate = $true
+            $paramsToUpdate.Add('AllowSelectSGsInODBListInTenant', $AllowSelectSGsInODBListInTenant)
+        }
+
+        if ($null -ne $DenySelectSGsInODBListInTenant)
+        {
+            $needToUpdate = $true
+            $paramsToUpdate.Add('DenySelectSGsInODBListInTenant', $DenySelectSGsInODBListInTenant)
+        }
+
+        if ($null -ne $DenySelectSecurityGroupsInSPSitesList)
+        {
+            $needToUpdate = $true
+            $paramsToUpdate.Add('DenySelectSecurityGroupsInSPSitesList', $DenySelectSecurityGroupsInSPSitesList)
+        }
+
+        if ($null -ne $AllowSelectSecurityGroupsInSPSitesList)
+        {
+            $needToUpdate = $true
+            $paramsToUpdate.Add('AllowSelectSecurityGroupsInSPSitesList', $AllowSelectSecurityGroupsInSPSitesList)
+        }
+
+        if ($null -ne $EnableAzureADB2BIntegration)
+        {
+            $needToUpdate = $true
+            $paramsToUpdate.Add('EnableAzureADB2BIntegration', $EnableAzureADB2BIntegration)
+        }
+
+        if ($null -ne $OneDriveSharingCapability)
+        {
+            $needToUpdate = $true
+            $paramsToUpdate.Add('ODBSharingCapability', $OneDriveSharingCapability)
+        }
+
+        if ($needToUpdate)
+        {
+            Write-Verbose -Message 'Updating properties via REST PATCH call.'
+            Invoke-PnPSPRestMethod -Method PATCH `
+                -Url "$((Get-MSCloudLoginConnectionProfile -Workload PnP).AdminUrl)/_api/SPO.Tenant" `
+                -Content $paramsToUpdate
+        }
+    }
+    catch
+    {
+        if ($_.Exception.Message.Contains('The requested operation is part of an experimental feature that is not supported in the current environment.'))
+        {
+            Write-Verbose -Message 'Updating via REST: The associated feature is not available in the given tenant.'
+        }
+        else
+        {
+            throw $_
+        }
+    }
 }
 
 function Test-TargetResource
@@ -400,6 +580,15 @@ function Test-TargetResource
         [ValidateSet('Yes')]
         [String]
         $IsSingleInstance,
+
+        [Parameter()]
+        [System.Boolean]
+        $EnableAzureADB2BIntegration,
+
+        [Parameter()]
+        [ValidateSet('ExternalUserAndGuestSharing', 'Disabled', 'ExternalUserSharingOnly', 'ExistingExternalUserSharingOnly')]
+        [System.String]
+        $OneDriveSharingCapability,
 
         [Parameter()]
         [System.UInt32]
@@ -422,20 +611,12 @@ function Test-TargetResource
         $LegacyAuthProtocolsEnabled,
 
         [Parameter()]
-        [System.Boolean]
-        $RequireAcceptingAccountMatchInvitedAccount,
-
-        [Parameter()]
         [System.String]
         $SignInAccelerationDomain,
 
         [Parameter()]
         [System.Boolean]
         $UsePersistentCookiesForExplorerView,
-
-        [Parameter()]
-        [System.Boolean]
-        $UserVoiceForFeedbackEnabled,
 
         [Parameter()]
         [System.Boolean]
@@ -470,18 +651,53 @@ function Test-TargetResource
         $HideDefaultThemes,
 
         [Parameter()]
+        [System.Boolean]
+        $HideSyncButtonOnTeamSite,
+
+        [Parameter()]
         [ValidateSet('AllowExternalSharing', 'BlockExternalSharing')]
         [System.String]
         $MarkNewFilesSensitiveByDefault,
 
         [Parameter()]
-        [ValidateSet('AllowFullAccess', 'AllowLimitedAccess', 'BlockAccess')]
-        [System.String]
-        $ConditionalAccessPolicy,
-
-        [Parameter()]
         [System.Guid[]]
         $DisabledWebPartIds,
+
+        [Parameter()]
+        [System.Boolean]
+        $SocialBarOnSitePagesDisabled,
+
+        [Parameter()]
+        [System.Boolean]
+        $CommentsOnSitePagesDisabled,
+
+        [Parameter()]
+        [System.Boolean]
+        $EnableAIPIntegration,
+
+        [Parameter()]
+        [System.String]
+        $TenantDefaultTimezone,
+
+        [Parameter()]
+        [System.Boolean]
+        $ExemptNativeUsersFromTenantLevelRestricedAccessControl,
+
+        [Parameter()]
+        [System.String[]]
+        $AllowSelectSGsInODBListInTenant,
+
+        [Parameter()]
+        [System.String[]]
+        $DenySelectSGsInODBListInTenant,
+
+        [Parameter()]
+        [System.String[]]
+        $DenySelectSecurityGroupsInSPSitesList,
+
+        [Parameter()]
+        [System.String[]]
+        $AllowSelectSecurityGroupsInSPSitesList,
 
         [Parameter()]
         [ValidateSet('Present', 'Absent')]
@@ -518,13 +734,15 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
 
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -532,44 +750,9 @@ function Test-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    if ($PSBoundParameters.ContainsKey('RequireAcceptingAccountMatchInvitedAccount'))
-    {
-        Write-Warning 'RequireAcceptingAccountMatchInvitedAccount is deprecated. Please remove this parameter from your configuration.'
-    }
-
-    Write-Verbose -Message 'Testing configuration for SPO Tenant'
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-
-    Write-Verbose -Message "Current Values: $(Convert-M365DscHashtableToString -Hashtable $CurrentValues)"
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck @('IsSingleInstance', `
-            'MaxCompatibilityLevel', `
-            'SearchResolveExactEmailOrUPN', `
-            'OfficeClientADALDisabled', `
-            'LegacyAuthProtocolsEnabled', `
-            'RequireAcceptingAccountMatchInvitedAccount', `
-            'SignInAccelerationDomain', `
-            'UsePersistentCookiesForExplorerView', `
-            'UserVoiceForFeedbackEnabled', `
-            'PublicCdnEnabled', `
-            'PublicCdnAllowedFileTypes', `
-            'UseFindPeopleInPeoplePicker', `
-            'NotificationsInSharePointEnabled', `
-            'OwnerAnonymousNotification', `
-            'ApplyAppEnforcedRestrictionsToAdHocRecipients', `
-            'FilePickerExternalImageSearchEnabled', `
-            'HideDefaultThemes', `
-            'MarkNewFilesSensitiveByDefault', `
-            'ConditionalAccessPolicy', `
-            'DisabledWebPartIds'
-    )
-
-    Write-Verbose -Message "Test-TargetResource returned $TestResult"
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '')
+    return $result
 }
 
 function Export-TargetResource
@@ -608,11 +791,18 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     try
     {
+        $ConnectionModeGraph = New-M365DSCConnection -Workload 'MicrosoftGraph' `
+            -InboundParameters $PSBoundParameters
+
         $ConnectionMode = New-M365DSCConnection -Workload 'PNP' `
             -InboundParameters $PSBoundParameters
 
@@ -628,6 +818,13 @@ function Export-TargetResource
         Add-M365DSCTelemetryEvent -Data $data
         #endregion
 
+        if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+        {
+            $Global:M365DSCExportResourceInstancesCount++
+        }
+
+        $Script:ExportMode = $true
+
         $Params = @{
             IsSingleInstance      = 'Yes'
             ApplicationId         = $ApplicationId
@@ -636,8 +833,9 @@ function Export-TargetResource
             CertificatePassword   = $CertificatePassword
             CertificatePath       = $CertificatePath
             CertificateThumbprint = $CertificateThumbprint
-            Managedidentity       = $ManagedIdentity.IsPresent
+            ManagedIdentity       = $ManagedIdentity.IsPresent
             Credential            = $Credential
+            AccessTokens          = $AccessTokens
         }
 
         $Results = Get-TargetResource @Params
@@ -649,8 +847,6 @@ function Export-TargetResource
         {
             $Results.Remove('MinCompatibilityLevel') | Out-Null
         }
-        $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-            -Results $Results
         $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
             -ConnectionMode $ConnectionMode `
             -ModulePath $PSScriptRoot `
@@ -659,14 +855,14 @@ function Export-TargetResource
         $dscContent += $currentDSCBlock
         Save-M365DSCPartialExport -Content $currentDSCBlock `
             -FileName $Global:PartialExportFileName
-        Write-Host $Global:M365DSCEmojiGreenCheckmark
+        Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
-        New-M365DSCLogEntry -Message "Error during Export:" `
+        New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `
             -Source $($MyInvocation.MyCommand.Source) `
             -TenantId $TenantId `

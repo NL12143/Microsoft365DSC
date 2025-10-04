@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_SPOSearchManagedProperty'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -118,32 +120,40 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Getting configuration for Managed Property instance $Name"
-    $ConnectionMode = New-M365DSCConnection -Workload 'PnP' `
-        -InboundParameters $PSBoundParameters
-
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
-
-    #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
-    $CommandName = $MyInvocation.MyCommand
-    $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
-        -CommandName $CommandName `
-        -Parameters $PSBoundParameters
-    Add-M365DSCTelemetryEvent -Data $data
-    #endregion
-
-    $nullReturn = $PSBoundParameters
-    $nullReturn.Ensure = 'Absent'
 
     try
     {
-        if ($null -eq $Script:RecentMPExtract)
+        if (-not $Script:exportMode)
         {
+            $null = New-M365DSCConnection -Workload 'PnP' `
+                -InboundParameters $PSBoundParameters `
+                -Url (Get-MSCloudLoginConnectionProfile -Workload PnP).AdminUrl
+
+            #Ensure the proper dependencies are installed in the current environment.
+            Confirm-M365DSCDependencies
+
+            #region Telemetry
+            $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+            $CommandName = $MyInvocation.MyCommand
+            $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
+                -CommandName $CommandName `
+                -Parameters $PSBoundParameters
+            Add-M365DSCTelemetryEvent -Data $data
+            #endregion
+
+            $nullReturn = @{
+                Name   = $Name
+                Type   = $Type
+                Ensure = 'Absent'
+            }
             $Script:RecentMPExtract = [Xml] (Get-PnPSearchConfiguration -Scope Subscription)
         }
         $property = $Script:RecentMPExtract.SearchConfigurationSettings.SearchSchemaConfigurationSettings.ManagedProperties.dictionary.KeyValueOfstringManagedPropertyInfoy6h3NzC8 `
@@ -212,7 +222,6 @@ function Get-TargetResource
             FinerQueryTokenization      = [boolean]::Parse($property.Value.ExpandSegments)
             MappedCrawledProperties     = $mappings
             CompanyNameExtraction       = $CompanyNameExtraction
-            Ensure                      = 'Present'
             Credential                  = $Credential
             ApplicationId               = $ApplicationId
             TenantId                    = $TenantId
@@ -220,7 +229,9 @@ function Get-TargetResource
             CertificatePassword         = $CertificatePassword
             CertificatePath             = $CertificatePath
             CertificateThumbprint       = $CertificateThumbprint
-            Managedidentity             = $ManagedIdentity.IsPresent
+            ManagedIdentity             = $ManagedIdentity.IsPresent
+            Ensure                      = 'Present'
+            AccessTokens                = $AccessTokens
         }
     }
     catch
@@ -354,7 +365,11 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     #Ensure the proper dependencies are installed in the current environment.
@@ -369,9 +384,15 @@ function Set-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'PnP' `
-        -InboundParameters $PSBoundParameters
+    $null = New-M365DSCConnection -Workload 'PnP' `
+        -InboundParameters $PSBoundParameters  -Url (Get-MSCloudLoginConnectionProfile -Workload PnP).AdminUrl
 
+    if ($Ensure -eq 'Absent')
+    {
+        Write-Verbose -Message "Removing SPOSearchManagedProperty {$Name}"
+        Remove-PnPSearchConfiguration -Configuration $Name -Scope Subscription
+        return
+    }
     $SearchConfigTemplatePath = Join-Path -Path $PSScriptRoot `
         -ChildPath '..\..\Dependencies\SearchConfigurationSettings.xml' `
         -Resolve
@@ -644,7 +665,7 @@ function Set-TargetResource
             $node.InnerText = $currentPID
 
             # The order in which we list the properties matters. Pid is to appear right after MappingDisallowed.
-            $namespaceMgr = New-Object System.Xml.XmlNamespaceManager($SearchConfigXML.NameTable);
+            $namespaceMgr = New-Object System.Xml.XmlNamespaceManager($SearchConfigXML.NameTable)
             $namespaceMgr.AddNamespace('d3p1', 'http://schemas.datacontract.org/2004/07/Microsoft.Office.Server.Search.Administration')
             $previousNode = $SearchConfigXML.SelectSingleNode('//d3p1:MappingDisallowed', $namespaceMgr)
             $previousNode.ParentNode.InsertAfter($node, $previousNode) | Out-Null
@@ -812,13 +833,15 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
 
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -826,29 +849,9 @@ function Test-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message "Testing configuration for Managed Property instance $Name"
-
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-
-    Write-Verbose -Message "Current Values: $(Convert-M365DscHashtableToString -Hashtable $CurrentValues)"
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-    $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('Credential') | Out-Null
-    $ValuesToCheck.Remove('ApplicationId') | Out-Null
-    $ValuesToCheck.Remove('ApplicationSecret') | Out-Null
-    $ValuesToCheck.Remove('TenantId') | Out-Null
-    $ValuesToCheck.Remove('CertificateThumbprint') | Out-Null
-    $ValuesToCheck.Remove('ManagedIdentity') | Out-Null
-    $ValuesToCheck.Remove('CertificatePath') | Out-Null
-    $ValuesToCheck.Remove('CertificatePassword') | Out-Null
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck $ValuesToCheck.Keys
-
-    Write-Verbose -Message "Test-TargetResource returned $TestResult"
-
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '')
+    return $result
 }
 
 function Export-TargetResource
@@ -887,13 +890,18 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     try
     {
         $ConnectionMode = New-M365DSCConnection -Workload 'PnP' `
-            -InboundParameters $PSBoundParameters
+            -InboundParameters $PSBoundParameters `
+            -Url (Get-MSCloudLoginConnectionProfile -Workload PnP).AdminUrl
 
         #Ensure the proper dependencies are installed in the current environment.
         Confirm-M365DSCDependencies
@@ -909,21 +917,28 @@ function Export-TargetResource
 
         $SearchConfig = [Xml] (Get-PnPSearchConfiguration -Scope Subscription -ErrorAction Stop)
         [array]$properties = $SearchConfig.SearchConfigurationSettings.SearchSchemaConfigurationSettings.ManagedProperties.dictionary.KeyValueOfstringManagedPropertyInfoy6h3NzC8
+        $Script:RecentMPExtract = $SearchConfig
+        $Script:exportMode = $true
 
         $dscContent = ''
         $i = 1
 
         if ($properties.Length -eq 0)
         {
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         }
         else
         {
-            Write-Host "`r`n" -NoNewline
+            Write-M365DSCHost -Message "`r`n" -DeferWrite
         }
         foreach ($property in $properties)
         {
-            Write-Host "    |---[$i/$($properties.Length)] $($property.Value.Name)" -NoNewline
+            if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+            {
+                $Global:M365DSCExportResourceInstancesCount++
+            }
+
+            Write-M365DSCHost -Message "    |---[$i/$($properties.Length)] $($property.Value.Name)" -DeferWrite
             $Params = @{
                 Credential            = $Credential
                 Name                  = $property.Value.Name
@@ -932,31 +947,40 @@ function Export-TargetResource
                 TenantId              = $TenantId
                 ApplicationSecret     = $ApplicationSecret
                 CertificateThumbprint = $CertificateThumbprint
-                Managedidentity       = $ManagedIdentity.IsPresent
+                ManagedIdentity       = $ManagedIdentity.IsPresent
                 CertificatePath       = $CertificatePath
                 CertificatePassword   = $CertificatePassword
+                AccessTokens          = $AccessTokens
             }
+
             $Results = Get-TargetResource @Params
-            $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                -Results $Results
-            $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
-                -ConnectionMode $ConnectionMode `
-                -ModulePath $PSScriptRoot `
-                -Results $Results `
-                -Credential $Credential
-            $dscContent += $currentDSCBlock
-            Save-M365DSCPartialExport -Content $currentDSCBlock `
-                -FileName $Global:PartialExportFileName
+            if ($Results -is [System.Collections.Hashtable] -and $Results.Count -gt 2)
+            {
+                $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
+                    -ConnectionMode $ConnectionMode `
+                    -ModulePath $PSScriptRoot `
+                    -Results $Results `
+                    -Credential $Credential
+                $dscContent += $currentDSCBlock
+                Save-M365DSCPartialExport -Content $currentDSCBlock `
+                    -FileName $Global:PartialExportFileName
+
+                Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
+            }
+            else
+            {
+                Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
+            }
+
             $i++
-            Write-Host $Global:M365DSCEmojiGreenCheckmark
         }
         return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
-        New-M365DSCLogEntry -Message "Error during Export:" `
+        New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `
             -Source $($MyInvocation.MyCommand.Source) `
             -TenantId $TenantId `

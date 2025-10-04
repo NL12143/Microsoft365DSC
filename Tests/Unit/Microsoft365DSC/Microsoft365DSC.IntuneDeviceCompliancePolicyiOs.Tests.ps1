@@ -20,40 +20,61 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
     InModuleScope -ModuleName $Global:DscHelper.ModuleName -ScriptBlock {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'Pass@word1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString ((New-Guid).ToString()) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
-            }
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
                 return 'Credentials'
             }
 
-            Mock -CommandName Update-MgDeviceManagementDeviceCompliancePolicy -MockWith {
+            Mock -CommandName Update-MgBetaDeviceManagementDeviceCompliancePolicy -MockWith {
             }
 
-            Mock -CommandName New-MgDeviceManagementDeviceCompliancePolicy -MockWith {
+            Mock -CommandName New-MgBetaDeviceManagementDeviceCompliancePolicy -MockWith {
             }
 
-            Mock -CommandName Remove-MgDeviceManagementDeviceCompliancePolicy -MockWith {
+            Mock -CommandName Remove-MgBetaDeviceManagementDeviceCompliancePolicy -MockWith {
             }
 
-            Mock -CommandName Get-MGDeviceManagementDeviceCompliancePolicyAssignment -MockWith {
+            Mock -CommandName Get-MgBetaDeviceManagementDeviceCompliancePolicy -MockWith {
+                return @{
+                    DisplayName          = 'Test iOS Device Compliance Policy'
+                    Description          = 'Test iOS Device Compliance Policy Description'
+                    Id                   = '9c4e2ed7-706e-4874-a826-0c2778352d45'
+                    AdditionalProperties = @{
+                        PasscodeBlockSimple                         = $True
+                        PasscodeExpirationDays                      = 365
+                        PasscodeMinimumLength                       = 6
+                        PasscodeMinutesOfInactivityBeforeLock       = 5
+                        PasscodePreviousPasscodeBlockCount          = 3
+                        PasscodeMinimumCharacterSetCount            = 2
+                        PasscodeRequiredType                        = 'numeric'
+                        PasscodeRequired                            = $True
+                        OsMinimumVersion                            = 10
+                        OsMaximumVersion                            = 12
+                        SecurityBlockJailbrokenDevices              = $True
+                        DeviceThreatProtectionEnabled               = $True
+                        DeviceThreatProtectionRequiredSecurityLevel = 'medium'
+                        ManagedEmailProfileRequired                 = $True
+                        RoleScopeTagIds                             = '0'
+                        '@odata.type'                               = '#microsoft.graph.iosCompliancePolicy'
+                    }
+                }
+            }
 
+            Mock -CommandName Get-MgBetaDeviceManagementDeviceCompliancePolicyAssignment -MockWith {
                 return @()
             }
-
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            Mock -CommandName Update-DeviceConfigurationPolicyAssignment -MockWith {
             }
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -80,7 +101,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Credential                                  = $Credential
                 }
 
-                Mock -CommandName Get-MgDeviceManagementDeviceCompliancePolicy -MockWith {
+                Mock -CommandName Get-MgBetaDeviceManagementDeviceCompliancePolicy -MockWith {
                     return $null
                 }
             }
@@ -95,7 +116,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should create the iOS Device Compliance Policy from the Set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName 'New-MgDeviceManagementDeviceCompliancePolicy' -Exactly 1
+                Should -Invoke -CommandName 'New-MgBetaDeviceManagementDeviceCompliancePolicy' -Exactly 1
             }
         }
 
@@ -112,7 +133,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     PasscodeMinimumCharacterSetCount            = 2
                     PasscodeRequiredType                        = 'numeric'
                     PasscodeRequired                            = $True
-                    OsMinimumVersion                            = 10
+                    OsMinimumVersion                            = 11 # Updated property
                     OsMaximumVersion                            = 12
                     SecurityBlockJailbrokenDevices              = $True
                     DeviceThreatProtectionEnabled               = $True
@@ -120,32 +141,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     ManagedEmailProfileRequired                 = $True
                     Ensure                                      = 'Present'
                     Credential                                  = $Credential
-                }
-
-                Mock -CommandName Get-MgDeviceManagementDeviceCompliancePolicy -MockWith {
-                    return @{
-                        DisplayName          = 'Test iOS Device Compliance Policy'
-                        Description          = 'Different Value'
-                        Id                   = '9c4e2ed7-706e-4874-a826-0c2778352d45'
-                        AdditionalProperties = @{
-                            PasscodeBlockSimple                         = $True
-                            PasscodeExpirationDays                      = 365
-                            PasscodeMinimumLength                       = 6
-                            PasscodeMinutesOfInactivityBeforeLock       = 5
-                            PasscodePreviousPasscodeBlockCount          = 3
-                            PasscodeMinimumCharacterSetCount            = 2
-                            PasscodeRequiredType                        = 'numeric'
-                            PasscodeRequired                            = $True
-                            OsMinimumVersion                            = 10
-                            OsMaximumVersion                            = 12
-                            SecurityBlockJailbrokenDevices              = $True
-                            DeviceThreatProtectionEnabled               = $True
-                            DeviceThreatProtectionRequiredSecurityLevel = 'medium'
-                            ManagedEmailProfileRequired                 = $True
-                            RoleScopeTagIds                             = '0'
-                            '@odata.type'                               = '#microsoft.graph.iosCompliancePolicy'
-                        }
-                    }
                 }
             }
 
@@ -159,7 +154,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should update the iOS Device Compliance Policy from the Set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName Update-MgDeviceManagementDeviceCompliancePolicy -Exactly 1
+                Should -Invoke -CommandName Update-MgBetaDeviceManagementDeviceCompliancePolicy -Exactly 1
             }
         }
 
@@ -184,32 +179,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     ManagedEmailProfileRequired                 = $True
                     Ensure                                      = 'Present'
                     Credential                                  = $Credential
-                }
-
-                Mock -CommandName Get-MgDeviceManagementDeviceCompliancePolicy -MockWith {
-                    return @{
-                        DisplayName          = 'Test iOS Device Compliance Policy'
-                        Description          = 'Test iOS Device Compliance Policy Description'
-                        Id                   = '9c4e2ed7-706e-4874-a826-0c2778352d45'
-                        AdditionalProperties = @{
-                            PasscodeBlockSimple                         = $True
-                            PasscodeExpirationDays                      = 365
-                            PasscodeMinimumLength                       = 6
-                            PasscodeMinutesOfInactivityBeforeLock       = 5
-                            PasscodePreviousPasscodeBlockCount          = 3
-                            PasscodeMinimumCharacterSetCount            = 2
-                            PasscodeRequiredType                        = 'numeric'
-                            PasscodeRequired                            = $True
-                            OsMinimumVersion                            = 10
-                            OsMaximumVersion                            = 12
-                            SecurityBlockJailbrokenDevices              = $True
-                            DeviceThreatProtectionEnabled               = $True
-                            DeviceThreatProtectionRequiredSecurityLevel = 'medium'
-                            ManagedEmailProfileRequired                 = $True
-                            RoleScopeTagIds                             = '0'
-                            '@odata.type'                               = '#microsoft.graph.iosCompliancePolicy'
-                        }
-                    }
                 }
             }
 
@@ -240,32 +209,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Ensure                                      = 'Absent'
                     Credential                                  = $Credential
                 }
-
-                Mock -CommandName Get-MgDeviceManagementDeviceCompliancePolicy -MockWith {
-                    return @{
-                        DisplayName          = 'Test iOS Device Compliance Policy'
-                        Description          = 'Test iOS Device Compliance Policy Description'
-                        Id                   = '9c4e2ed7-706e-4874-a826-0c2778352d45'
-                        AdditionalProperties = @{
-                            PasscodeBlockSimple                         = $True
-                            PasscodeExpirationDays                      = 365
-                            PasscodeMinimumLength                       = 6
-                            PasscodeMinutesOfInactivityBeforeLock       = 5
-                            PasscodePreviousPasscodeBlockCount          = 3
-                            PasscodeMinimumCharacterSetCount            = 2
-                            PasscodeRequiredType                        = 'numeric'
-                            PasscodeRequired                            = $True
-                            OsMinimumVersion                            = 10
-                            OsMaximumVersion                            = 12
-                            SecurityBlockJailbrokenDevices              = $True
-                            DeviceThreatProtectionEnabled               = $True
-                            DeviceThreatProtectionRequiredSecurityLevel = 'medium'
-                            ManagedEmailProfileRequired                 = $True
-                            RoleScopeTagIds                             = '0'
-                            '@odata.type'                               = '#microsoft.graph.iosCompliancePolicy'
-                        }
-                    }
-                }
             }
 
             It 'Should return Present from the Get method' {
@@ -278,46 +221,22 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should remove the iOS Device Compliance Policy from the Set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName Remove-MgDeviceManagementDeviceCompliancePolicy -Exactly 1
+                Should -Invoke -CommandName Remove-MgBetaDeviceManagementDeviceCompliancePolicy -Exactly 1
             }
         }
 
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
-                }
-
-                Mock -CommandName Get-MgDeviceManagementDeviceCompliancePolicy -MockWith {
-                    return @{
-                        DisplayName          = 'Test iOS Device Compliance Policy'
-                        Description          = 'Test iOS Device Compliance Policy Description'
-                        Id                   = '9c4e2ed7-706e-4874-a826-0c2778352d45'
-                        AdditionalProperties = @{
-                            PasscodeBlockSimple                         = $True
-                            PasscodeExpirationDays                      = 365
-                            PasscodeMinimumLength                       = 6
-                            PasscodeMinutesOfInactivityBeforeLock       = 5
-                            PasscodePreviousPasscodeBlockCount          = 3
-                            PasscodeMinimumCharacterSetCount            = 2
-                            PasscodeRequiredType                        = 'numeric'
-                            PasscodeRequired                            = $True
-                            OsMinimumVersion                            = 10
-                            OsMaximumVersion                            = 12
-                            SecurityBlockJailbrokenDevices              = $True
-                            DeviceThreatProtectionEnabled               = $True
-                            DeviceThreatProtectionRequiredSecurityLevel = 'medium'
-                            ManagedEmailProfileRequired                 = $True
-                            RoleScopeTagIds                             = '0'
-                            '@odata.type'                               = '#microsoft.graph.iosCompliancePolicy'
-                        }
-                    }
                 }
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

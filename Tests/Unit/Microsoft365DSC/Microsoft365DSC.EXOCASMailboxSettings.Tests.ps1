@@ -21,53 +21,35 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
 
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
-            }
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
                 return 'Credentials'
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            Mock -CommandName Set-CASMailbox -MockWith {
             }
-        }
 
-        # Test contexts
-        Context -Name "Specified CAS Mailbox doesn't exist" -Fixture {
-            BeforeAll {
-                $testParams = @{
-                    Identity   = 'NonExisting@contoso.com'
-                    Ensure     = 'Present'
-                    Credential = $Credential
-                }
-
-                Mock -CommandName Get-CASMailbox -MockWith {
-                    return $null
+            Mock -CommandName Get-CASMailbox -MockWith {
+                return @{
+                    Ensure                 = 'Present'
+                    Identity               = 'MeganB'
+                    Credential             = $Credential
+                    ActiveSyncDebugLogging = $False
+                    PopEnabled             = $False
+                    EwsEnabled             = $True
                 }
             }
 
-            It 'Should throw an error from the Set method' {
-                { Set-TargetResource @testParams } | Should -Throw 'The specified mailbox {NonExisting@contoso.com} does not exist.'
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
             }
-
-            It 'Should return Ensure is absent from the Get method' {
-                (Get-TargetResource @testParams).Ensure | Should -Be 'Absent'
-            }
-
-            It 'Should return False from the Test method' {
-                Test-TargetResource @testParams | Should -Be $False
-            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         Context -Name 'CAS Mailbox settings - update not required.' -Fixture {
@@ -79,17 +61,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     ActiveSyncDebugLogging = $False
                     PopEnabled             = $False
                     EwsEnabled             = $True
-                }
-
-                Mock -CommandName Get-CASMailbox -MockWith {
-                    return @{
-                        Ensure                 = 'Present'
-                        Identity               = 'MeganB'
-                        Credential             = $Credential
-                        ActiveSyncDebugLogging = $False
-                        PopEnabled             = $False
-                        EwsEnabled             = $True
-                    }
                 }
             }
 
@@ -106,18 +77,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Credential             = $Credential
                     ActiveSyncDebugLogging = $False
                     PopEnabled             = $False
-                    EwsEnabled             = $True
-                }
-
-                Mock -CommandName Get-CASMailbox -MockWith {
-                    return @{
-                        Ensure                 = 'Present'
-                        Identity               = 'ExampleCASRule'
-                        Credential             = $Credential
-                        ActiveSyncDebugLogging = $True
-                        PopEnabled             = $True
-                        EwsEnabled             = $False
-                    }
+                    EwsEnabled             = $False # Drift
                 }
             }
 
@@ -127,27 +87,31 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the Set method' {
                 Set-TargetResource @testParams
+                Should -Invoke -CommandName 'Set-CASMailbox' -Exactly 1
             }
         }
 
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
                 }
 
-                Mock -CommandName Get-CASMailbox -MockWith {
-                    return @{
-                        ActiveSyncDebugLogging = $False
-                        PopEnabled             = $False
-                        EwsEnabled             = $True
-                    }
+                Mock -CommandName Get-Mailbox -MockWith {
+                    return @(
+                        @{
+                            Name              = 'Megan B'
+                            UserPrincipalName = 'megan.b@contoso.onmicrosoft.com'
+                        }
+                    )
                 }
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

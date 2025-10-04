@@ -4,17 +4,23 @@
 
 | Parameter | Attribute | DataType | Description | Allowed Values |
 | --- | --- | --- | --- | --- |
-| **Name** | Key | String | The Name parameter specifies the unique name of the compliance case. ||
-| **Description** | Write | String | The description of the case. ||
-| **Ensure** | Write | String | Specify if this case should exist or not. |Present, Absent|
-| **Status** | Write | String | Status for the case. Can either be 'Active' or 'Closed' |Active, Closed|
-| **Credential** | Required | PSCredential | Credentials of the Global Admin Account ||
+| **Name** | Key | String | The Name parameter specifies the unique name of the compliance case. | |
+| **Description** | Write | String | The description of the case. | |
+| **Ensure** | Write | String | Specify if this case should exist or not. | `Present`, `Absent` |
+| **Status** | Write | String | Status for the case. Can either be 'Active' or 'Closed' | `Active`, `Closed` |
+| **Credential** | Write | PSCredential | Credentials of the Global Admin Account | |
+| **ApplicationId** | Write | String | Id of the Azure Active Directory application to authenticate with. | |
+| **TenantId** | Write | String | Id of the Azure Active Directory tenant used for authentication. | |
+| **CertificateThumbprint** | Write | String | Thumbprint of the Azure Active Directory application's authentication certificate to use for authentication. | |
+| **CertificatePassword** | Write | PSCredential | Username can be made up to anything but password will be used for CertificatePassword | |
+| **CertificatePath** | Write | String | Path to certificate used in service principal usually a PFX file. | |
+| **AccessTokens** | Write | StringArray[] | Access token used for authentication. | |
 
-# SCComplianceCase
+## Description
 
-### Description
+This resource configures an eDiscovery Case in Purview.
 
-This resource configures an eDiscovery Case in Security and Compliance.
+## Permissions
 
 ## Examples
 
@@ -29,7 +35,7 @@ Configuration Example
     param(
         [Parameter(Mandatory = $true)]
         [PSCredential]
-        $credsGlobalAdmin
+        $Credscredential
     )
     Import-DscResource -ModuleName Microsoft365DSC
 
@@ -41,7 +47,7 @@ Configuration Example
             Description        = "MyPolicy"
             Status             = "Active"
             Ensure             = "Present"
-            Credential         = $credsGlobalAdmin
+            Credential         = $Credscredential
         }
     }
 }

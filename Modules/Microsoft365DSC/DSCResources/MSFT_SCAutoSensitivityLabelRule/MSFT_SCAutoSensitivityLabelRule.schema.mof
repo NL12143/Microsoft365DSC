@@ -1,5 +1,11 @@
 [ClassVersion("1.0.0")]
-Class MSFT_SCDLPSensitiveInformation
+class MSFT_SCHeaderPattern
+{
+    [Required, Description("Name of the header pattern")] String Name;
+    [Required, Description("Regular expressions for the pattern")] String Values[];
+};
+[ClassVersion("1.0.0")]
+class MSFT_SCDLPSensitiveInformation
 {
     [Required, Description("Name of the Sensitive Information Content")] String name;
     [Write, Description("Id of the Sensitive Information Content")] String id;
@@ -10,14 +16,14 @@ Class MSFT_SCDLPSensitiveInformation
     [Write, Description("Maximum Count value for the Sensitive Information")] String maxcount;
 };
 [ClassVersion("1.0.0")]
-Class MSFT_SCDLPLabel
+class MSFT_SCDLPLabel
 {
     [Required, Description("Name of the Sensitive Label")] String name;
     [Write, Description("Id of the Sensitive Information label")] String id;
     [Write, Description("Type of the Sensitive Information label")] String type;
 };
 [ClassVersion("1.0.0")]
-Class MSFT_SCDLPContainsSensitiveInformationGroup
+class MSFT_SCDLPContainsSensitiveInformationGroup
 {
     [Write, Description("Sensitive Information Content Types"),EmbeddedInstance("MSFT_SCDLPSensitiveInformation")] String SensitiveInformation[];
     [Write, Description("Sensitive Information Labels"),EmbeddedInstance("MSFT_SCDLPLabel")] String Labels[];
@@ -25,7 +31,7 @@ Class MSFT_SCDLPContainsSensitiveInformationGroup
     [Required, Description("Operator"),ValueMap{"And","Or"}, Values{"And","Or"}] String Operator;
 };
 [ClassVersion("1.0.0")]
-Class MSFT_SCDLPContainsSensitiveInformation
+class MSFT_SCDLPContainsSensitiveInformation
 {
     [Write, Description("Sensitive Information Content Types"),EmbeddedInstance("MSFT_SCDLPSensitiveInformation")] String SensitiveInformation[];
     [Write, Description("Groups of sensitive information types."),EmbeddedInstance("MSFT_SCDLPContainsSensitiveInformationGroup")] String Groups[];
@@ -66,7 +72,7 @@ class MSFT_SCAutoSensitivityLabelRule : OMI_BaseResource
     [Write, Description("The ExceptIfSubjectMatchesPatterns parameter specifies an exception for the auto-labeling policy rule that looks for text patterns in the Subject field of messages by using regular expressions.")] String ExceptIfSubjectMatchesPatterns;
     [Write, Description("The FromAddressContainsWords parameter specifies a condition for the auto-labeling policy rule that looks for words or phrases in the sender's email address. You can specify multiple words or phrases separated by commas.")] String FromAddressContainsWords;
     [Write, Description("The FromAddressMatchesPatterns parameter specifies a condition for the auto-labeling policy rule that looks for text patterns in the sender's email address by using regular expressions.")] String FromAddressMatchesPatterns;
-    [Write, Description("The HeaderMatchesPatterns parameter specifies a condition for the auto-labeling policy rule that looks for text patterns in a header field by using regular expressions.")] String HeaderMatchesPatterns[];
+    [Write, Description("The HeaderMatchesPatterns parameter specifies a condition for the auto-labeling policy rule that looks for text patterns in a header field by using regular expressions."), EmbeddedInstance("MSFT_SCHeaderPattern")] String HeaderMatchesPatterns;
     [Write, Description("The ProcessingLimitExceeded parameter specifies a condition for the auto-labeling policy rule that looks for files where scanning couldn't complete. You can use this condition to create rules that work together to identify and process messages where the content couldn't be fully scanned.")] Boolean ProcessingLimitExceeded;
     [Write, Description("The RecipientDomainIs parameter specifies a condition for the auto-labeling policy rule that looks for recipients with email address in the specified domains. You can specify multiple domains separated by commas.")] String RecipientDomainIs[];
     [Write, Description("The ReportSeverityLevel parameter specifies the severity level of the incident report for content detections based on the rule. Valid values are: None, Low, Medium, High"), ValueMap{"None","Low", "Medium", "High"}, Values{"None","Low", "Medium", "High"}] String ReportSeverityLevel;
@@ -76,7 +82,13 @@ class MSFT_SCAutoSensitivityLabelRule : OMI_BaseResource
     [Write, Description("The SentTo parameter specifies a condition for the auto-sensitivity policy rule that looks for recipients in messages. You can use any value that uniquely identifies the recipient.")] String SentTo[];
     [Write, Description("The SentToMemberOf parameter specifies a condition for the auto-labeling policy rule that looks for messages sent to members of distribution groups, dynamic distribution groups, or mail-enabled security groups. You identify the groups by email address.")] String SentToMemberOf[];
     [Write, Description("The SubjectMatchesPatterns parameter specifies a condition for the auto-labeling policy rule that looks for text patterns in the Subject field of messages by using regular expressions.")] String SubjectMatchesPatterns;
-    [Key, Description("Workload the rule is associated with. Value can be: Exchange, SharePoint, OneDriveForBusiness"), ValueMap{"Exchange","SharePoint", "OneDriveForBusiness"}, Values{"Exchange","SharePoint", "OneDriveForBusiness"}] String Workload;
+    [Key, Description("Workload the rule is associated with. Value can be: Exchange, SharePoint, OneDriveForBusiness, Applications, Azure, AWS and PowerBI"), ValueMap{"Exchange","SharePoint", "OneDriveForBusiness", "Applications", "Azure", "AWS", "PowerBI"}, Values{"Exchange","SharePoint", "OneDriveForBusiness", "Applications", "Azure", "AWS", "PowerBI"}] String Workload;
     [Write, Description("Specify if this rule should exist or not."), ValueMap{"Present","Absent"}, Values{"Present","Absent"}] String Ensure;
-    [Required, Description("Credentials of the Exchange Global Admin"), EmbeddedInstance("MSFT_Credential")] string Credential;
+    [Write, Description("Credentials of the Exchange Global Admin"), EmbeddedInstance("MSFT_Credential")] string Credential;
+    [Write, Description("Id of the Azure Active Directory application to authenticate with.")] String ApplicationId;
+    [Write, Description("Id of the Azure Active Directory tenant used for authentication.")] String TenantId;
+    [Write, Description("Thumbprint of the Azure Active Directory application's authentication certificate to use for authentication.")] String CertificateThumbprint;
+    [Write, Description("Username can be made up to anything but password will be used for CertificatePassword"), EmbeddedInstance("MSFT_Credential")] String CertificatePassword;
+    [Write, Description("Path to certificate used in service principal usually a PFX file.")] String CertificatePath;
+    [Write, Description("Access token used for authentication.")] String AccessTokens[];
 };

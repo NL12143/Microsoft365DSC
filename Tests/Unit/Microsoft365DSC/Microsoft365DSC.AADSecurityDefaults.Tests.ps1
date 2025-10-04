@@ -20,13 +20,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
     InModuleScope -ModuleName $Global:DscHelper.ModuleName -ScriptBlock {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName Get-PSSession -MockWith {
@@ -35,20 +32,30 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             Mock -CommandName Remove-PSSession -MockWith {
             }
 
-            Mock -CommandName Update-MgPolicyIdentitySecurityDefaultEnforcementPolicy -MockWith {
+            Mock -CommandName Update-MgBetaPolicyIdentitySecurityDefaultEnforcementPolicy -MockWith {
+            }
+
+            Mock -CommandName Get-MgBetaPolicyIdentitySecurityDefaultEnforcementPolicy -MockWith {
+                return @{
+                    DisplayName = 'Security Defaults'
+                    Id          = '000000000000'
+                    Description = 'Security Defaults description'
+                    IsEnabled   = $true
+                }
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
                 return 'Credentials'
             }
 
-
             Mock -CommandName Invoke-MgGraphRequest -MockWith {
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
             }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -58,30 +65,21 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     IsSingleInstance = 'Yes'
                     DisplayName      = 'Security Defaults'
                     Description      = 'Security Defaults description'
-                    IsEnabled        = $True
-                    Credential       = $credsGlobalAdmin
-                }
-
-                Mock -CommandName Get-MgPolicyIdentitySecurityDefaultEnforcementPolicy -MockWith {
-                    return @{
-                        DisplayName = 'Security Defaults'
-                        Id          = '000000000000'
-                        Description = 'Security Defaults description'
-                        IsEnabled   = $false
-                    }
+                    IsEnabled        = $false # Drift
+                    Credential       = $Credscredential
                 }
             }
 
             It 'Should return values from the get method' {
                 Get-TargetResource @testParams
-                Should -Invoke -CommandName 'Get-MgPolicyIdentitySecurityDefaultEnforcementPolicy' -Exactly 1
+                Should -Invoke -CommandName 'Get-MgBetaPolicyIdentitySecurityDefaultEnforcementPolicy' -Exactly 1
             }
             It 'Should return false from the test method' {
                 Test-TargetResource @testParams | Should -Be $false
             }
             It 'Should create the Enable from the set method' {
                 Set-TargetResource @testParams |
-                Should -Invoke -CommandName 'Update-MgPolicyIdentitySecurityDefaultEnforcementPolicy' -Exactly 1
+                Should -Invoke -CommandName 'Update-MgBetaPolicyIdentitySecurityDefaultEnforcementPolicy' -Exactly 1
             }
         }
         Context -Name 'The Security Defaults are already in the desired State' -Fixture {
@@ -91,22 +89,13 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     DisplayName      = 'Security Defaults'
                     Description      = 'Security Defaults description'
                     IsEnabled        = $True
-                    Credential       = $credsGlobalAdmin
-                }
-
-                Mock -CommandName Get-MgPolicyIdentitySecurityDefaultEnforcementPolicy -MockWith {
-                    return @{
-                        DisplayName = 'Security Defaults'
-                        Id          = '000000000000'
-                        Description = 'Security Defaults description'
-                        IsEnabled   = $true
-                    }
+                    Credential       = $Credscredential
                 }
             }
 
             It 'Should return values from the get method' {
                 Get-TargetResource @testParams
-                Should -Invoke -CommandName 'Get-MgPolicyIdentitySecurityDefaultEnforcementPolicy' -Exactly 1
+                Should -Invoke -CommandName 'Get-MgBetaPolicyIdentitySecurityDefaultEnforcementPolicy' -Exactly 1
             }
 
             It 'Should return false from the test method' {

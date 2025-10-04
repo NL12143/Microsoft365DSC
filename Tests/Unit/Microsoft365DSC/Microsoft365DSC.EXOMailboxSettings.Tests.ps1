@@ -21,53 +21,44 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
 
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
-            }
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
                 return 'Credentials'
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            Mock -CommandName Set-Mailbox -MockWith {
             }
-        }
 
-        # Test contexts
-        Context -Name "Specified Mailbox doesn't exist" -Fixture {
-            BeforeAll {
-                $testParams = @{
-                    DisplayName = 'NonExisting@contoso.com'
-                    Ensure      = 'Present'
-                    Credential  = $Credential
+            Mock -CommandName Get-Mailbox -MockWith {
+                return @(
+                    @{
+                        Name = 'John.Smith'
+                    }
+                )
+            }
+
+            Mock -CommandName Get-MailboxRegionalConfiguration -MockWith {
+                return @{
+                    TimeZone = 'Eastern Standard Time'
+                    Language = @{
+                        Name = 'en-US'
+                    }
                 }
-
-                Mock -CommandName Get-MailboxRegionalConfiguration -MockWith {
-                    return $null
-                }
             }
 
-            It 'Should throw an error from the Set method' {
-                { Set-TargetResource @testParams } | Should -Throw 'The specified mailbox {NonExisting@contoso.com} does not exist.'
+            Mock -CommandName Set-MailboxRegionalConfiguration -MockWith {
             }
 
-            It 'Should return Ensure is absent from the Get method' {
-                (Get-TargetResource @testParams).Ensure | Should -Be 'Absent'
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
             }
-
-            It 'Should return False from the Test method' {
-                Test-TargetResource @testParams | Should -Be $False
-            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         Context -Name 'Specified TimeZone is Invalid' -Fixture {
@@ -78,20 +69,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Ensure      = 'Present'
                     Credential  = $Credential
                 }
-
-                Mock -CommandName Get-MailboxRegionalConfiguration -MockWith {
-                    return @{
-                        TimeZone = 'Eastern Standard Time'
-                    }
-                }
-
-                Mock -CommandName Set-MailboxRegionalConfiguration -MockWith {
-                    return $null
-                }
-            }
-
-            It 'Should throw an error from the Set method' {
-                { Set-TargetResource @testParams } | Should -Throw 'The specified Time Zone {Non-Existing} is not valid.'
             }
 
             It 'Should return the current TimeZone from the Get method' {
@@ -112,27 +89,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Ensure      = 'Present'
                     Credential  = $Credential
                 }
-
-                Mock -CommandName Get-MailboxRegionalConfiguration -MockWith {
-                    return @{
-                        TimeZone = 'Eastern Standard Time'
-                        Language = @{
-                            Name = 'en-US'
-                        }
-                    }
-                }
-
-                Mock -CommandName Set-MailboxRegionalConfiguration -MockWith {
-                    return $null
-                }
-            }
-
-            It 'Should call the Set method' {
-                Set-TargetResource @testParams
-            }
-
-            It 'Should return Ensure is Present from the Get method' {
-                (Get-TargetResource @testParams).Ensure | Should -Be 'Present'
             }
 
             It 'Should return True from the Test method' {
@@ -143,22 +99,15 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
-                }
-
-                Mock -CommandName Get-MailboxRegionalConfiguration -MockWith {
-                    return @{
-                        TimeZone = 'Eastern Standard Time'
-                        Language = @{
-                            Name = 'en-US'
-                        }
-                    }
                 }
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

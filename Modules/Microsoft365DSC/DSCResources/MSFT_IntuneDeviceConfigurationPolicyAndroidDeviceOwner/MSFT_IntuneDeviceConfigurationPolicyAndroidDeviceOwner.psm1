@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_IntuneDeviceConfigurationPolicyAndroidDeviceOwner'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -9,37 +11,17 @@ function Get-TargetResource
         [System.String]
         $Id,
 
+        [Parameter(Mandatory = $true)]
+        [System.String]
+        $DisplayName,
+
         [Parameter()]
         [System.String]
         $Description,
 
         [Parameter()]
-        [Microsoft.Management.Infrastructure.CimInstance]
-        $DeviceManagementApplicabilityRuleDeviceMode,
-
-        [Parameter()]
-        [Microsoft.Management.Infrastructure.CimInstance]
-        $DeviceManagementApplicabilityRuleOsEdition,
-
-        [Parameter()]
-        [Microsoft.Management.Infrastructure.CimInstance]
-        $DeviceManagementApplicabilityRuleOsVersion,
-
-        [Parameter()]
-        [System.String]
-        $DisplayName,
-
-        [Parameter()]
         [System.String[]]
         $RoleScopeTagIds,
-
-        [Parameter()]
-        [System.Boolean]
-        $SupportsScopeTags,
-
-        [Parameter()]
-        [System.Int32]
-        $Version,
 
         [Parameter()]
         [System.Boolean]
@@ -50,11 +32,13 @@ function Get-TargetResource
         $AppsAllowInstallFromUnknownSources,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'userChoice', 'never', 'wiFiOnly', 'always')]
+        [System.String]
         $AppsAutoUpdatePolicy,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('deviceDefault', 'prompt', 'autoGrant', 'autoDeny')]
+        [System.String]
         $AppsDefaultPermissionPolicy,
 
         [Parameter()]
@@ -62,7 +46,7 @@ function Get-TargetResource
         $AppsRecommendSkippingFirstUseHints,
 
         [Parameter()]
-        [System.String[]]
+        [Microsoft.Management.Infrastructure.CimInstance[]]
         $AzureAdSharedDeviceDataClearApps,
 
         [Parameter()]
@@ -90,7 +74,8 @@ function Get-TargetResource
         $CrossProfilePoliciesAllowCopyPaste,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'crossProfileDataSharingBlocked', 'dataSharingFromWorkToPersonalBlocked', 'crossProfileDataSharingAllowed', 'unkownFutureValue')]
+        [System.String]
         $CrossProfilePoliciesAllowDataSharing,
 
         [Parameter()]
@@ -106,7 +91,16 @@ function Get-TargetResource
         $DateTimeConfigurationBlocked,
 
         [Parameter()]
-        [System.String[]]
+        [Microsoft.Management.Infrastructure.CimInstance]
+        $DetailedHelpText,
+
+        [Parameter()]
+        [Microsoft.Management.Infrastructure.CimInstance]
+        $DeviceOwnerLockScreenMessage,
+
+        [Parameter()]
+        [ValidateSet('notConfigured', 'dedicatedDevice', 'fullyManaged')]
+        [System.String]
         $EnrollmentProfile,
 
         [Parameter()]
@@ -118,7 +112,7 @@ function Get-TargetResource
         $FactoryResetDeviceAdministratorEmails,
 
         [Parameter()]
-        [System.String[]]
+        [Microsoft.Management.Infrastructure.CimInstance]
         $GlobalProxy,
 
         [Parameter()]
@@ -134,7 +128,8 @@ function Get-TargetResource
         $KioskCustomizationPowerButtonActionsBlocked,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'notificationsAndSystemInfoEnabled', 'systemInfoOnly')]
+        [System.String]
         $KioskCustomizationStatusBar,
 
         [Parameter()]
@@ -142,7 +137,8 @@ function Get-TargetResource
         $KioskCustomizationSystemErrorWarnings,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'navigationEnabled', 'homeButtonOnly')]
+        [System.String]
         $KioskCustomizationSystemNavigation,
 
         [Parameter()]
@@ -150,11 +146,11 @@ function Get-TargetResource
         $KioskModeAppOrderEnabled,
 
         [Parameter()]
-        [System.String[]]
+        [Microsoft.Management.Infrastructure.CimInstance[]]
         $KioskModeAppPositions,
 
         [Parameter()]
-        [System.String[]]
+        [Microsoft.Management.Infrastructure.CimInstance[]]
         $KioskModeApps,
 
         [Parameter()]
@@ -178,7 +174,8 @@ function Get-TargetResource
         $KioskModeFlashlightConfigurationEnabled,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'darkSquare', 'darkCircle', 'lightSquare', 'lightCircle')]
+        [System.String]
         $KioskModeFolderIcon,
 
         [Parameter()]
@@ -190,7 +187,8 @@ function Get-TargetResource
         $KioskModeGridWidth,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'smallest', 'small', 'regular', 'large', 'largest')]
+        [System.String]
         $KioskModeIconSize,
 
         [Parameter()]
@@ -198,7 +196,7 @@ function Get-TargetResource
         $KioskModeLockHomeScreen,
 
         [Parameter()]
-        [System.String[]]
+        [Microsoft.Management.Infrastructure.CimInstance[]]
         $KioskModeManagedFolders,
 
         [Parameter()]
@@ -214,7 +212,8 @@ function Get-TargetResource
         $KioskModeManagedHomeScreenInactiveSignOutNoticeInSeconds,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'simple', 'complex')]
+        [System.String]
         $KioskModeManagedHomeScreenPinComplexity,
 
         [Parameter()]
@@ -246,7 +245,8 @@ function Get-TargetResource
         $KioskModeMediaVolumeConfigurationEnabled,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'portrait', 'landscape', 'autoRotate')]
+        [System.String]
         $KioskModeScreenOrientation,
 
         [Parameter()]
@@ -278,11 +278,17 @@ function Get-TargetResource
         $KioskModeShowDeviceInfo,
 
         [Parameter()]
+        [ValidateSet('notConfigured', 'singleAppMode', 'multiAppMode')]
+        [System.String]
+        $KioskModeUseManagedHomeScreenApp,
+
+        [Parameter()]
         [System.Boolean]
         $KioskModeVirtualHomeButtonEnabled,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'swipeUp', 'floating')]
+        [System.String]
         $KioskModeVirtualHomeButtonType,
 
         [Parameter()]
@@ -322,7 +328,8 @@ function Get-TargetResource
         $MicrosoftLauncherDockPresenceAllowUserModification,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'show', 'hide', 'disabled')]
+        [System.String]
         $MicrosoftLauncherDockPresenceConfiguration,
 
         [Parameter()]
@@ -334,7 +341,8 @@ function Get-TargetResource
         $MicrosoftLauncherFeedEnabled,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'top', 'bottom', 'hide')]
+        [System.String]
         $MicrosoftLauncherSearchBarPlacementConfiguration,
 
         [Parameter()]
@@ -350,6 +358,7 @@ function Get-TargetResource
         $PasswordBlockKeyguard,
 
         [Parameter()]
+        [ValidateSet('notConfigured', 'camera', 'notifications', 'unredactedNotifications', 'trustAgents', 'fingerprint', 'remoteInput', 'allFeatures', 'face', 'iris', 'biometrics')]
         [System.String[]]
         $PasswordBlockKeyguardFeatures,
 
@@ -394,8 +403,14 @@ function Get-TargetResource
         $PasswordPreviousPasswordCountToBlock,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('deviceDefault', 'required', 'numeric', 'numericComplex', 'alphabetic', 'alphanumeric', 'alphanumericWithSymbols', 'lowSecurityBiometric', 'customPassword')]
+        [System.String]
         $PasswordRequiredType,
+
+        [Parameter()]
+        [ValidateSet('deviceDefault', 'daily', 'unkownFutureValue')]
+        [System.String]
+        $PasswordRequireUnlock,
 
         [Parameter()]
         [System.Int32]
@@ -410,11 +425,12 @@ function Get-TargetResource
         $PersonalProfileCameraBlocked,
 
         [Parameter()]
-        [System.String[]]
+        [Microsoft.Management.Infrastructure.CimInstance[]]
         $PersonalProfilePersonalApplications,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'blockedApps', 'allowedApps')]
+        [System.String]
         $PersonalProfilePlayStoreMode,
 
         [Parameter()]
@@ -422,12 +438,17 @@ function Get-TargetResource
         $PersonalProfileScreenCaptureBlocked,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'allowList', 'blockList')]
+        [System.String]
         $PlayStoreMode,
 
         [Parameter()]
         [System.Boolean]
         $ScreenCaptureBlocked,
+
+        [Parameter()]
+        [System.Boolean]
+        $SecurityCommonCriteriaModeEnabled,
 
         [Parameter()]
         [System.Boolean]
@@ -438,10 +459,15 @@ function Get-TargetResource
         $SecurityRequireVerifyApps,
 
         [Parameter()]
+        [Microsoft.Management.Infrastructure.CimInstance]
+        $ShortHelpText,
+
+        [Parameter()]
         [System.Boolean]
         $StatusBarBlocked,
 
         [Parameter()]
+        [ValidateSet('notConfigured', 'ac', 'usb', 'wireless')]
         [System.String[]]
         $StayOnModes,
 
@@ -458,11 +484,12 @@ function Get-TargetResource
         $StorageBlockUsbFileTransfer,
 
         [Parameter()]
-        [System.String[]]
+        [Microsoft.Management.Infrastructure.CimInstance[]]
         $SystemUpdateFreezePeriods,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('deviceDefault', 'postpone', 'windowed', 'automatic')]
+        [System.String]
         $SystemUpdateInstallType,
 
         [Parameter()]
@@ -542,8 +569,14 @@ function Get-TargetResource
         $WorkProfilePasswordPreviousPasswordCountToBlock,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('deviceDefault', 'required', 'numeric', 'numericComplex', 'alphabetic', 'alphanumeric', 'alphanumericWithSymbols', 'lowSecurityBiometric', 'customPassword')]
+        [System.String]
         $WorkProfilePasswordRequiredType,
+
+        [Parameter()]
+        [ValidateSet('deviceDefault', 'daily', 'unkownFutureValue')]
+        [System.String]
+        $WorkProfilePasswordRequireUnlock,
 
         [Parameter()]
         [System.Int32]
@@ -552,39 +585,12 @@ function Get-TargetResource
         [Parameter()]
         [Microsoft.Management.Infrastructure.CimInstance[]]
         $Assignments,
-
-        [Parameter()]
-        [Microsoft.Management.Infrastructure.CimInstance[]]
-        $DeviceSettingStateSummaries,
-
-        [Parameter()]
-        [Microsoft.Management.Infrastructure.CimInstance[]]
-        $DeviceStatuses,
-
-        [Parameter()]
-        [Microsoft.Management.Infrastructure.CimInstance]
-        $DeviceStatusOverview,
-
-        [Parameter()]
-        [Microsoft.Management.Infrastructure.CimInstance[]]
-        $GroupAssignments,
-
-        [Parameter()]
-        [Microsoft.Management.Infrastructure.CimInstance[]]
-        $UserStatuses,
-
-        [Parameter()]
-        [Microsoft.Management.Infrastructure.CimInstance]
-        $UserStatusOverview,
-
-
         #endregion
 
-
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [System.String]
         [ValidateSet('Absent', 'Present')]
-        $Ensure = $true,
+        $Ensure = 'Present',
 
         [Parameter()]
         [System.Management.Automation.PSCredential]
@@ -608,80 +614,236 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
+    Write-Verbose -Message "Getting configuration of the Intune Device Configuration Policy Android Device Owner with Id {$Id} and DisplayName {$DisplayName}"
+
     try
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftGraph' `
-            -InboundParameters $PSBoundParameters `
-            -ProfileName 'beta'
-    }
-    catch
-    {
-        Write-Verbose -Message 'Reloading1'
-    }
-
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
-
-    #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
-    $CommandName = $MyInvocation.MyCommand
-    $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
-        -CommandName $CommandName `
-        -Parameters $PSBoundParameters
-    Add-M365DSCTelemetryEvent -Data $data
-    #endregion
-
-    $nullResult = $PSBoundParameters
-    $nullResult.Ensure = 'Absent'
-    try
-    {
-
-        #region resource generator code
-        $getValue = Get-MgDeviceManagementDeviceConfiguration `
-            -ErrorAction Stop | Where-Object `
-            -FilterScript {
-            $_.AdditionalProperties.'@odata.type' -eq '#microsoft.graph.androidDeviceOwnerGeneralDeviceConfiguration' -and $_.displayName -eq $($DisplayName)
-        }
-
-        if (-not $getValue)
+        if (-not $Script:exportedInstance -or $Script:exportedInstance.DisplayName -ne $DisplayName)
         {
-            [array]$getValue = Get-MgDeviceManagementDeviceConfiguration `
-                -ErrorAction Stop | Where-Object `
-                -FilterScript {
-                $_.displayName -eq $DisplayName
+            $null = New-M365DSCConnection -Workload 'MicrosoftGraph' `
+                -InboundParameters $PSBoundParameters
+
+            #Ensure the proper dependencies are installed in the current environment.
+            Confirm-M365DSCDependencies
+
+            #region Telemetry
+            $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
+            $CommandName = $MyInvocation.MyCommand
+            $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
+                -CommandName $CommandName `
+                -Parameters $PSBoundParameters
+
+            Add-M365DSCTelemetryEvent -Data $data
+            #endregion
+
+            $nullResult = $PSBoundParameters
+            $nullResult.Ensure = 'Absent'
+
+            $getValue = $null
+            #region resource generator code
+            if (-not [string]::IsNullOrEmpty($Id))
+            {
+                $getValue = Get-MgBetaDeviceManagementDeviceConfiguration -All -Filter "Id eq '$Id'" -ErrorAction SilentlyContinue
+            }
+
+            if (-not $getValue)
+            {
+                $getValue = Get-MgBetaDeviceManagementDeviceConfiguration -All -Filter "DisplayName eq '$($Displayname -replace "'", "''")'" -ErrorAction SilentlyContinue | Where-Object `
+                    -FilterScript { `
+                        $_.AdditionalProperties.'@odata.type' -eq '#microsoft.graph.androidDeviceOwnerGeneralDeviceConfiguration' `
+                }
+            }
+            #endregion
+
+            if ($null -eq $getValue)
+            {
+                Write-Verbose -Message "Nothing with id {$id} was found"
+                return $nullResult
             }
         }
-        #endregion
-
-
-        if ($null -eq $getValue)
+        else
         {
-            Write-Verbose -Message "Nothing with displayName {$DisplayName} was found"
-            return $nullResult
+            $getValue = $Script:exportedInstance
         }
 
-        Write-Verbose -Message "Found something with displayName {$DisplayName}"
-        $results = @{
+        Write-Verbose -Message "Found something with id {$id}"
 
+        $complexAzureAdSharedDeviceDataClearApps = @()
+        $currentValueArray = $getValue.AdditionalProperties.azureAdSharedDeviceDataClearApps
+        if ($null -ne $currentValueArray -and $currentValueArray.count -gt 0)
+        {
+            foreach ($currentValue in $currentValueArray)
+            {
+                $currentHash = @{
+                    appId       = $currentValue.appId
+                    publisher   = $currentValue.publisher
+                    appStoreUrl = $currentValue.appStoreUrl
+                    name        = $currentValue.name
+                    odataType   = $currentValue.'@odata.type'
+                }
+                $complexAzureAdSharedDeviceDataClearApps += $currentHash
+            }
+        }
+
+        $complexDetailedHelpText = [ordered]@{}
+        $currentValue = $getValue.AdditionalProperties.detailedHelpText
+        if ($null -ne $currentValue)
+        {
+            $complexDetailedHelpText.Add('DefaultMessage', $currentValue.defaultMessage)
+            $complexLocalizedMessages = @()
+            $currentValueArray = $currentValue.localizedMessages
+            if ($null -ne $currentValueArray -and $currentValueArray.count -gt 0)
+            {
+                foreach ($currentChildValue in $currentValueArray)
+                {
+                    $currentHash = @{
+                        Name  = $currentChildValue.name
+                        Value = $currentChildValue.value
+                    }
+                    $complexLocalizedMessages += $currentHash
+                }
+            }
+            $complexDetailedHelpText.Add('LocalizedMessages', $complexLocalizedMessages)
+        }
+        if ($complexDetailedHelpText.Values.Where({ $null -ne $_ }).Count -eq 0)
+        {
+            $complexDetailedHelpText = $null
+        }
+
+        $complexDeviceOwnerLockScreenMessage = [ordered]@{}
+        $currentValue = $getValue.AdditionalProperties.deviceOwnerLockScreenMessage
+        if ($null -ne $currentValue)
+        {
+            $complexDeviceOwnerLockScreenMessage.Add('DefaultMessage', $currentValue.defaultMessage)
+            $complexLocalizedMessages = @()
+            $currentValueArray = $currentValue.localizedMessages
+            if ($null -ne $currentValueArray -and $currentValueArray.count -gt 0)
+            {
+                foreach ($currentChildValue in $currentValueArray)
+                {
+                    $currentHash = @{
+                        Name  = $currentChildValue.name
+                        Value = $currentChildValue.value
+                    }
+                    $complexLocalizedMessages += $currentHash
+                }
+            }
+            $complexDeviceOwnerLockScreenMessage.Add('LocalizedMessages', $complexLocalizedMessages)
+        }
+        if ($complexDeviceOwnerLockScreenMessage.Values.Where({ $null -ne $_ }).Count -eq 0)
+        {
+            $complexDeviceOwnerLockScreenMessage = $null
+        }
+
+        $complexGlobalProxy = [ordered]@{}
+        $currentValue = $getValue.AdditionalProperties.globalProxy
+        if ($null -ne $currentValue)
+        {
+            $complexGlobalProxy.Add('ProxyAutoConfigURL', $currentValue.proxyAutoConfigURL)
+            $complexGlobalProxy.Add('ExcludedHosts', $currentValue.excludedHosts)
+            $complexGlobalProxy.Add('Host', $currentValue.host)
+            $complexGlobalProxy.Add('Port', $currentValue.port)
+            $complexGlobalProxy.Add('oDataType', $currentValue.'@odata.type')
+        }
+        if ($complexGlobalProxy.Values.Where({ $null -ne $_ }).Count -eq 0)
+        {
+            $complexGlobalProxy = $null
+        }
+
+        $complexKioskModeApps = @()
+        $currentValueArray = $getValue.AdditionalProperties.kioskModeApps
+        if ($null -ne $currentValueArray -and $currentValueArray.count -gt 0)
+        {
+            foreach ($currentValue in $currentValueArray)
+            {
+                $currentHash = [ordered]@{}
+                $currentHash.Add('AppId', $currentValue.appid)
+                $currentHash.Add('Publisher', $currentValue.publisher)
+                $currentHash.Add('AppStoreUrl', $currentValue.appStoreUrl)
+                $currentHash.Add('Name', $currentValue.name)
+                $currentHash.Add('oDataType', $currentValue.'@odata.type')
+                $complexKioskModeApps += $currentHash
+            }
+        }
+
+        $complexPersonalProfilePersonalApplications = @()
+        $currentValueArray = $getValue.AdditionalProperties.personalProfilePersonalApplications
+        if ($null -ne $currentValueArray -and $currentValueArray.count -gt 0)
+        {
+            foreach ($currentValue in $currentValueArray)
+            {
+                $currentHash = [ordered]@{}
+                $currentHash.Add('AppId', $currentValue.appid)
+                $currentHash.Add('Publisher', $currentValue.publisher)
+                $currentHash.Add('AppStoreUrl', $currentValue.appStoreUrl)
+                $currentHash.Add('Name', $currentValue.name)
+                $currentHash.Add('oDataType', $currentValue.'@odata.type')
+                $complexPersonalProfilePersonalApplications += $currentHash
+            }
+        }
+
+        $complexShortHelpText = [ordered]@{}
+        $currentValue = $getValue.AdditionalProperties.shortHelpText
+        if ($null -ne $currentValue)
+        {
+            $complexShortHelpText.Add('DefaultMessage', $currentValue.defaultMessage)
+            $complexLocalizedMessages = @()
+            $currentValueArray = $currentValue.localizedMessages
+            if ($null -ne $currentValueArray -and $currentValueArray.count -gt 0)
+            {
+                foreach ($currentChildValue in $currentValueArray)
+                {
+                    $currentHash = @{
+                        Name  = $currentChildValue.name
+                        Value = $currentChildValue.value
+                    }
+                    $complexLocalizedMessages += $currentHash
+                }
+            }
+            $complexShortHelpText.Add('LocalizedMessages', $complexLocalizedMessages)
+        }
+        if ($complexShortHelpText.Values.Where({ $null -ne $_ }).Count -eq 0)
+        {
+            $complexShortHelpText = $null
+        }
+
+        $complexSystemUpdateFreezePeriods = @()
+        $currentValueArray = $getValue.AdditionalProperties.systemUpdateFreezePeriods
+        if ($null -ne $currentValueArray -and $currentValueArray.count -gt 0)
+        {
+            foreach ($currentValue in $currentValueArray)
+            {
+                $currentHash = @{}
+                $currentHash.Add('StartDay', $currentValue.startDay)
+                $currentHash.Add('EndDay', $currentValue.endDay)
+                $currentHash.Add('StartMonth', $currentValue.startMonth)
+                $currentHash.Add('EndMonth', $currentValue.endMonth)
+                $complexSystemUpdateFreezePeriods += $currentHash
+            }
+        }
+
+        $results = @{
             #region resource generator code
             Id                                                       = $getValue.Id
             Description                                              = $getValue.Description
-            DeviceManagementApplicabilityRuleDeviceMode              = $getValue.DeviceManagementApplicabilityRuleDeviceMode
-            DeviceManagementApplicabilityRuleOsEdition               = $getValue.DeviceManagementApplicabilityRuleOsEdition
-            DeviceManagementApplicabilityRuleOsVersion               = $getValue.DeviceManagementApplicabilityRuleOsVersion
+            #DeviceManagementApplicabilityRuleDeviceMode              = $getValue.DeviceManagementApplicabilityRuleDeviceMode
+            #DeviceManagementApplicabilityRuleOsEdition               = $getValue.DeviceManagementApplicabilityRuleOsEdition
+            #DeviceManagementApplicabilityRuleOsVersion               = $getValue.DeviceManagementApplicabilityRuleOsVersion
             DisplayName                                              = $getValue.DisplayName
             RoleScopeTagIds                                          = $getValue.RoleScopeTagIds
-            SupportsScopeTags                                        = $getValue.SupportsScopeTags
-            Version                                                  = $getValue.Version
             AccountsBlockModification                                = $getValue.AdditionalProperties.accountsBlockModification
             AppsAllowInstallFromUnknownSources                       = $getValue.AdditionalProperties.appsAllowInstallFromUnknownSources
             AppsAutoUpdatePolicy                                     = $getValue.AdditionalProperties.appsAutoUpdatePolicy
             AppsDefaultPermissionPolicy                              = $getValue.AdditionalProperties.appsDefaultPermissionPolicy
             AppsRecommendSkippingFirstUseHints                       = $getValue.AdditionalProperties.appsRecommendSkippingFirstUseHints
-            AzureAdSharedDeviceDataClearApps                         = $getValue.AdditionalProperties.azureAdSharedDeviceDataClearApps
+            AzureAdSharedDeviceDataClearApps                         = $complexAzureAdSharedDeviceDataClearApps
             BluetoothBlockConfiguration                              = $getValue.AdditionalProperties.bluetoothBlockConfiguration
             BluetoothBlockContactSharing                             = $getValue.AdditionalProperties.bluetoothBlockContactSharing
             CameraBlocked                                            = $getValue.AdditionalProperties.cameraBlocked
@@ -692,10 +854,12 @@ function Get-TargetResource
             CrossProfilePoliciesShowWorkContactsInPersonalProfile    = $getValue.AdditionalProperties.crossProfilePoliciesShowWorkContactsInPersonalProfile
             DataRoamingBlocked                                       = $getValue.AdditionalProperties.dataRoamingBlocked
             DateTimeConfigurationBlocked                             = $getValue.AdditionalProperties.dateTimeConfigurationBlocked
+            DetailedHelpText                                         = $complexDetailedHelpText
+            DeviceOwnerLockScreenMessage                             = $complexDeviceOwnerLockScreenMessage
             EnrollmentProfile                                        = $getValue.AdditionalProperties.enrollmentProfile
             FactoryResetBlocked                                      = $getValue.AdditionalProperties.factoryResetBlocked
             FactoryResetDeviceAdministratorEmails                    = $getValue.AdditionalProperties.factoryResetDeviceAdministratorEmails
-            GlobalProxy                                              = $getValue.AdditionalProperties.globalProxy
+            GlobalProxy                                              = $complexGlobalProxy
             GoogleAccountsBlocked                                    = $getValue.AdditionalProperties.googleAccountsBlocked
             KioskCustomizationDeviceSettingsBlocked                  = $getValue.AdditionalProperties.kioskCustomizationDeviceSettingsBlocked
             KioskCustomizationPowerButtonActionsBlocked              = $getValue.AdditionalProperties.kioskCustomizationPowerButtonActionsBlocked
@@ -704,7 +868,7 @@ function Get-TargetResource
             KioskCustomizationSystemNavigation                       = $getValue.AdditionalProperties.kioskCustomizationSystemNavigation
             KioskModeAppOrderEnabled                                 = $getValue.AdditionalProperties.kioskModeAppOrderEnabled
             KioskModeAppPositions                                    = $getValue.AdditionalProperties.kioskModeAppPositions
-            KioskModeApps                                            = $getValue.AdditionalProperties.kioskModeApps
+            KioskModeApps                                            = $complexKioskModeApps
             KioskModeAppsInFolderOrderedByName                       = $getValue.AdditionalProperties.kioskModeAppsInFolderOrderedByName
             KioskModeBluetoothConfigurationEnabled                   = $getValue.AdditionalProperties.kioskModeBluetoothConfigurationEnabled
             KioskModeDebugMenuEasyAccessEnabled                      = $getValue.AdditionalProperties.kioskModeDebugMenuEasyAccessEnabled
@@ -735,6 +899,7 @@ function Get-TargetResource
             KioskModeScreenSaverStartDelayInSeconds                  = $getValue.AdditionalProperties.kioskModeScreenSaverStartDelayInSeconds
             KioskModeShowAppNotificationBadge                        = $getValue.AdditionalProperties.kioskModeShowAppNotificationBadge
             KioskModeShowDeviceInfo                                  = $getValue.AdditionalProperties.kioskModeShowDeviceInfo
+            KioskModeUseManagedHomeScreenApp                         = $getValue.AdditionalProperties.kioskModeUseManagedHomeScreenApp
             KioskModeVirtualHomeButtonEnabled                        = $getValue.AdditionalProperties.kioskModeVirtualHomeButtonEnabled
             KioskModeVirtualHomeButtonType                           = $getValue.AdditionalProperties.kioskModeVirtualHomeButtonType
             KioskModeWallpaperUrl                                    = $getValue.AdditionalProperties.kioskModeWallpaperUrl
@@ -765,22 +930,25 @@ function Get-TargetResource
             PasswordMinutesOfInactivityBeforeScreenTimeout           = $getValue.AdditionalProperties.passwordMinutesOfInactivityBeforeScreenTimeout
             PasswordPreviousPasswordCountToBlock                     = $getValue.AdditionalProperties.passwordPreviousPasswordCountToBlock
             PasswordRequiredType                                     = $getValue.AdditionalProperties.passwordRequiredType
+            PasswordRequireUnlock                                    = $getValue.AdditionalProperties.passwordRequireUnlock
             PasswordSignInFailureCountBeforeFactoryReset             = $getValue.AdditionalProperties.passwordSignInFailureCountBeforeFactoryReset
             PersonalProfileAppsAllowInstallFromUnknownSources        = $getValue.AdditionalProperties.personalProfileAppsAllowInstallFromUnknownSources
             PersonalProfileCameraBlocked                             = $getValue.AdditionalProperties.personalProfileCameraBlocked
-            PersonalProfilePersonalApplications                      = $getValue.AdditionalProperties.personalProfilePersonalApplications
+            PersonalProfilePersonalApplications                      = $complexPersonalProfilePersonalApplications
             PersonalProfilePlayStoreMode                             = $getValue.AdditionalProperties.personalProfilePlayStoreMode
             PersonalProfileScreenCaptureBlocked                      = $getValue.AdditionalProperties.personalProfileScreenCaptureBlocked
             PlayStoreMode                                            = $getValue.AdditionalProperties.playStoreMode
             ScreenCaptureBlocked                                     = $getValue.AdditionalProperties.screenCaptureBlocked
+            SecurityCommonCriteriaModeEnabled                        = $getValue.AdditionalProperties.securityCommonCriteriaModeEnabled
             SecurityDeveloperSettingsEnabled                         = $getValue.AdditionalProperties.securityDeveloperSettingsEnabled
             SecurityRequireVerifyApps                                = $getValue.AdditionalProperties.securityRequireVerifyApps
+            ShortHelpText                                            = $complexShortHelpText
             StatusBarBlocked                                         = $getValue.AdditionalProperties.statusBarBlocked
             StayOnModes                                              = $getValue.AdditionalProperties.stayOnModes
             StorageAllowUsb                                          = $getValue.AdditionalProperties.storageAllowUsb
             StorageBlockExternalMedia                                = $getValue.AdditionalProperties.storageBlockExternalMedia
             StorageBlockUsbFileTransfer                              = $getValue.AdditionalProperties.storageBlockUsbFileTransfer
-            SystemUpdateFreezePeriods                                = $getValue.AdditionalProperties.systemUpdateFreezePeriods
+            SystemUpdateFreezePeriods                                = $complexSystemUpdateFreezePeriods
             SystemUpdateInstallType                                  = $getValue.AdditionalProperties.systemUpdateInstallType
             SystemUpdateWindowEndMinutesAfterMidnight                = $getValue.AdditionalProperties.systemUpdateWindowEndMinutesAfterMidnight
             SystemUpdateWindowStartMinutesAfterMidnight              = $getValue.AdditionalProperties.systemUpdateWindowStartMinutesAfterMidnight
@@ -802,29 +970,33 @@ function Get-TargetResource
             WorkProfilePasswordMinimumUpperCaseCharacters            = $getValue.AdditionalProperties.workProfilePasswordMinimumUpperCaseCharacters
             WorkProfilePasswordPreviousPasswordCountToBlock          = $getValue.AdditionalProperties.workProfilePasswordPreviousPasswordCountToBlock
             WorkProfilePasswordRequiredType                          = $getValue.AdditionalProperties.workProfilePasswordRequiredType
+            WorkProfilePasswordRequireUnlock                         = $getValue.AdditionalProperties.workProfilePasswordRequireUnlock
             WorkProfilePasswordSignInFailureCountBeforeFactoryReset  = $getValue.AdditionalProperties.workProfilePasswordSignInFailureCountBeforeFactoryReset
-            Assignments                                              = $getValue.AdditionalProperties.assignments
-            DeviceSettingStateSummaries                              = $getValue.AdditionalProperties.deviceSettingStateSummaries
-            DeviceStatuses                                           = $getValue.AdditionalProperties.deviceStatuses
-            DeviceStatusOverview                                     = $getValue.AdditionalProperties.deviceStatusOverview
-            GroupAssignments                                         = $getValue.AdditionalProperties.groupAssignments
-            UserStatuses                                             = $getValue.AdditionalProperties.userStatuses
-            UserStatusOverview                                       = $getValue.AdditionalProperties.userStatusOverview
-
-
             Ensure                                                   = 'Present'
             Credential                                               = $Credential
             ApplicationId                                            = $ApplicationId
             TenantId                                                 = $TenantId
             ApplicationSecret                                        = $ApplicationSecret
             CertificateThumbprint                                    = $CertificateThumbprint
-            Managedidentity                                          = $ManagedIdentity.IsPresent
+            ManagedIdentity                                          = $ManagedIdentity.IsPresent
+            AccessTokens                                             = $AccessTokens
         }
 
-        return [System.Collections.Hashtable] $results
+        $assignmentsValues = Get-MgBetaDeviceManagementDeviceConfigurationAssignment -DeviceConfigurationId $getValue.Id
+        $assignmentResult = @()
+        if ($assignmentsValues.Count -gt 0)
+        {
+            $assignmentResult += ConvertFrom-IntunePolicyAssignment `
+                -IncludeDeviceFilter:$true `
+                -Assignments ($assignmentsValues)
+        }
+        $results.Add('Assignments', $assignmentResult)
+
+        return $results
     }
     catch
     {
+        Write-Verbose $_
         New-M365DSCLogEntry -Message 'Error retrieving data:' `
             -Exception $_ `
             -Source $($MyInvocation.MyCommand.Source) `
@@ -840,43 +1012,22 @@ function Set-TargetResource
     [CmdletBinding()]
     param
     (
-
         #region resource generator code
         [Parameter()]
         [System.String]
         $Id,
+
+        [Parameter(Mandatory = $true)]
+        [System.String]
+        $DisplayName,
 
         [Parameter()]
         [System.String]
         $Description,
 
         [Parameter()]
-        [Microsoft.Management.Infrastructure.CimInstance]
-        $DeviceManagementApplicabilityRuleDeviceMode,
-
-        [Parameter()]
-        [Microsoft.Management.Infrastructure.CimInstance]
-        $DeviceManagementApplicabilityRuleOsEdition,
-
-        [Parameter()]
-        [Microsoft.Management.Infrastructure.CimInstance]
-        $DeviceManagementApplicabilityRuleOsVersion,
-
-        [Parameter()]
-        [System.String]
-        $DisplayName,
-
-        [Parameter()]
         [System.String[]]
         $RoleScopeTagIds,
-
-        [Parameter()]
-        [System.Boolean]
-        $SupportsScopeTags,
-
-        [Parameter()]
-        [System.Int32]
-        $Version,
 
         [Parameter()]
         [System.Boolean]
@@ -887,11 +1038,13 @@ function Set-TargetResource
         $AppsAllowInstallFromUnknownSources,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'userChoice', 'never', 'wiFiOnly', 'always')]
+        [System.String]
         $AppsAutoUpdatePolicy,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('deviceDefault', 'prompt', 'autoGrant', 'autoDeny')]
+        [System.String]
         $AppsDefaultPermissionPolicy,
 
         [Parameter()]
@@ -899,7 +1052,7 @@ function Set-TargetResource
         $AppsRecommendSkippingFirstUseHints,
 
         [Parameter()]
-        [System.String[]]
+        [Microsoft.Management.Infrastructure.CimInstance[]]
         $AzureAdSharedDeviceDataClearApps,
 
         [Parameter()]
@@ -927,7 +1080,8 @@ function Set-TargetResource
         $CrossProfilePoliciesAllowCopyPaste,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'crossProfileDataSharingBlocked', 'dataSharingFromWorkToPersonalBlocked', 'crossProfileDataSharingAllowed', 'unkownFutureValue')]
+        [System.String]
         $CrossProfilePoliciesAllowDataSharing,
 
         [Parameter()]
@@ -943,7 +1097,16 @@ function Set-TargetResource
         $DateTimeConfigurationBlocked,
 
         [Parameter()]
-        [System.String[]]
+        [Microsoft.Management.Infrastructure.CimInstance]
+        $DetailedHelpText,
+
+        [Parameter()]
+        [Microsoft.Management.Infrastructure.CimInstance]
+        $DeviceOwnerLockScreenMessage,
+
+        [Parameter()]
+        [ValidateSet('notConfigured', 'dedicatedDevice', 'fullyManaged')]
+        [System.String]
         $EnrollmentProfile,
 
         [Parameter()]
@@ -955,7 +1118,7 @@ function Set-TargetResource
         $FactoryResetDeviceAdministratorEmails,
 
         [Parameter()]
-        [System.String[]]
+        [Microsoft.Management.Infrastructure.CimInstance]
         $GlobalProxy,
 
         [Parameter()]
@@ -971,7 +1134,8 @@ function Set-TargetResource
         $KioskCustomizationPowerButtonActionsBlocked,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'notificationsAndSystemInfoEnabled', 'systemInfoOnly')]
+        [System.String]
         $KioskCustomizationStatusBar,
 
         [Parameter()]
@@ -979,7 +1143,8 @@ function Set-TargetResource
         $KioskCustomizationSystemErrorWarnings,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'navigationEnabled', 'homeButtonOnly')]
+        [System.String]
         $KioskCustomizationSystemNavigation,
 
         [Parameter()]
@@ -987,11 +1152,11 @@ function Set-TargetResource
         $KioskModeAppOrderEnabled,
 
         [Parameter()]
-        [System.String[]]
+        [Microsoft.Management.Infrastructure.CimInstance[]]
         $KioskModeAppPositions,
 
         [Parameter()]
-        [System.String[]]
+        [Microsoft.Management.Infrastructure.CimInstance[]]
         $KioskModeApps,
 
         [Parameter()]
@@ -1015,7 +1180,8 @@ function Set-TargetResource
         $KioskModeFlashlightConfigurationEnabled,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'darkSquare', 'darkCircle', 'lightSquare', 'lightCircle')]
+        [System.String]
         $KioskModeFolderIcon,
 
         [Parameter()]
@@ -1027,7 +1193,8 @@ function Set-TargetResource
         $KioskModeGridWidth,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'smallest', 'small', 'regular', 'large', 'largest')]
+        [System.String]
         $KioskModeIconSize,
 
         [Parameter()]
@@ -1035,7 +1202,7 @@ function Set-TargetResource
         $KioskModeLockHomeScreen,
 
         [Parameter()]
-        [System.String[]]
+        [Microsoft.Management.Infrastructure.CimInstance[]]
         $KioskModeManagedFolders,
 
         [Parameter()]
@@ -1051,7 +1218,8 @@ function Set-TargetResource
         $KioskModeManagedHomeScreenInactiveSignOutNoticeInSeconds,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'simple', 'complex')]
+        [System.String]
         $KioskModeManagedHomeScreenPinComplexity,
 
         [Parameter()]
@@ -1083,7 +1251,8 @@ function Set-TargetResource
         $KioskModeMediaVolumeConfigurationEnabled,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'portrait', 'landscape', 'autoRotate')]
+        [System.String]
         $KioskModeScreenOrientation,
 
         [Parameter()]
@@ -1115,11 +1284,17 @@ function Set-TargetResource
         $KioskModeShowDeviceInfo,
 
         [Parameter()]
+        [ValidateSet('notConfigured', 'singleAppMode', 'multiAppMode')]
+        [System.String]
+        $KioskModeUseManagedHomeScreenApp,
+
+        [Parameter()]
         [System.Boolean]
         $KioskModeVirtualHomeButtonEnabled,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'swipeUp', 'floating')]
+        [System.String]
         $KioskModeVirtualHomeButtonType,
 
         [Parameter()]
@@ -1159,7 +1334,8 @@ function Set-TargetResource
         $MicrosoftLauncherDockPresenceAllowUserModification,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'show', 'hide', 'disabled')]
+        [System.String]
         $MicrosoftLauncherDockPresenceConfiguration,
 
         [Parameter()]
@@ -1171,7 +1347,8 @@ function Set-TargetResource
         $MicrosoftLauncherFeedEnabled,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'top', 'bottom', 'hide')]
+        [System.String]
         $MicrosoftLauncherSearchBarPlacementConfiguration,
 
         [Parameter()]
@@ -1187,6 +1364,7 @@ function Set-TargetResource
         $PasswordBlockKeyguard,
 
         [Parameter()]
+        [ValidateSet('notConfigured', 'camera', 'notifications', 'unredactedNotifications', 'trustAgents', 'fingerprint', 'remoteInput', 'allFeatures', 'face', 'iris', 'biometrics')]
         [System.String[]]
         $PasswordBlockKeyguardFeatures,
 
@@ -1231,8 +1409,14 @@ function Set-TargetResource
         $PasswordPreviousPasswordCountToBlock,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('deviceDefault', 'required', 'numeric', 'numericComplex', 'alphabetic', 'alphanumeric', 'alphanumericWithSymbols', 'lowSecurityBiometric', 'customPassword')]
+        [System.String]
         $PasswordRequiredType,
+
+        [Parameter()]
+        [ValidateSet('deviceDefault', 'daily', 'unkownFutureValue')]
+        [System.String]
+        $PasswordRequireUnlock,
 
         [Parameter()]
         [System.Int32]
@@ -1247,11 +1431,12 @@ function Set-TargetResource
         $PersonalProfileCameraBlocked,
 
         [Parameter()]
-        [System.String[]]
+        [Microsoft.Management.Infrastructure.CimInstance[]]
         $PersonalProfilePersonalApplications,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'blockedApps', 'allowedApps')]
+        [System.String]
         $PersonalProfilePlayStoreMode,
 
         [Parameter()]
@@ -1259,12 +1444,17 @@ function Set-TargetResource
         $PersonalProfileScreenCaptureBlocked,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'allowList', 'blockList')]
+        [System.String]
         $PlayStoreMode,
 
         [Parameter()]
         [System.Boolean]
         $ScreenCaptureBlocked,
+
+        [Parameter()]
+        [System.Boolean]
+        $SecurityCommonCriteriaModeEnabled,
 
         [Parameter()]
         [System.Boolean]
@@ -1275,10 +1465,15 @@ function Set-TargetResource
         $SecurityRequireVerifyApps,
 
         [Parameter()]
+        [Microsoft.Management.Infrastructure.CimInstance]
+        $ShortHelpText,
+
+        [Parameter()]
         [System.Boolean]
         $StatusBarBlocked,
 
         [Parameter()]
+        [ValidateSet('notConfigured', 'ac', 'usb', 'wireless')]
         [System.String[]]
         $StayOnModes,
 
@@ -1292,15 +1487,16 @@ function Set-TargetResource
 
         [Parameter()]
         [System.Boolean]
-        $StorageBlockUsbFileTransfer,
+        $storageBlockUsbFileTransfer,
 
         [Parameter()]
-        [System.String[]]
+        [Microsoft.Management.Infrastructure.CimInstance[]]
         $SystemUpdateFreezePeriods,
 
         [Parameter()]
-        [System.String[]]
-        $SystemUpdateInstallType,
+        [ValidateSet('deviceDefault', 'postpone', 'windowed', 'automatic')]
+        [System.String]
+        $systemUpdateInstallType,
 
         [Parameter()]
         [System.Int32]
@@ -1379,8 +1575,14 @@ function Set-TargetResource
         $WorkProfilePasswordPreviousPasswordCountToBlock,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('deviceDefault', 'required', 'numeric', 'numericComplex', 'alphabetic', 'alphanumeric', 'alphanumericWithSymbols', 'lowSecurityBiometric', 'customPassword')]
+        [System.String]
         $WorkProfilePasswordRequiredType,
+
+        [Parameter()]
+        [ValidateSet('deviceDefault', 'daily', 'unkownFutureValue')]
+        [System.String]
+        $WorkProfilePasswordRequireUnlock,
 
         [Parameter()]
         [System.Int32]
@@ -1389,38 +1591,12 @@ function Set-TargetResource
         [Parameter()]
         [Microsoft.Management.Infrastructure.CimInstance[]]
         $Assignments,
-
-        [Parameter()]
-        [Microsoft.Management.Infrastructure.CimInstance[]]
-        $DeviceSettingStateSummaries,
-
-        [Parameter()]
-        [Microsoft.Management.Infrastructure.CimInstance[]]
-        $DeviceStatuses,
-
-        [Parameter()]
-        [Microsoft.Management.Infrastructure.CimInstance]
-        $DeviceStatusOverview,
-
-        [Parameter()]
-        [Microsoft.Management.Infrastructure.CimInstance[]]
-        $GroupAssignments,
-
-        [Parameter()]
-        [Microsoft.Management.Infrastructure.CimInstance[]]
-        $UserStatuses,
-
-        [Parameter()]
-        [Microsoft.Management.Infrastructure.CimInstance]
-        $UserStatusOverview,
-
-
         #endregion
 
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [System.String]
         [ValidateSet('Absent', 'Present')]
-        $Ensure = $true,
+        $Ensure = 'Present',
 
         [Parameter()]
         [System.Management.Automation.PSCredential]
@@ -1444,21 +1620,14 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
-    try
-    {
-        $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftGraph' `
-            -InboundParameters $PSBoundParameters `
-            -ProfileName 'beta'
-        Write-Verbose -Message "2 - There are currently {$((Get-ChildItem function: | Measure-Object).Count) functions}"
-        Write-Verbose -Message 'Here2'
-    }
-    catch
-    {
-        Write-Verbose -Message 'Reloading2'
-    }
+    Write-Verbose -Message "Setting configuration of the Intune Device Configuration Policy Android Device Owner with Id {$Id} and DisplayName {$DisplayName}"
 
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
@@ -1474,87 +1643,116 @@ function Set-TargetResource
 
     $currentInstance = Get-TargetResource @PSBoundParameters
 
-    $PSBoundParameters.Remove('Ensure') | Out-Null
-    $PSBoundParameters.Remove('Credential') | Out-Null
-    $PSBoundParameters.Remove('ApplicationId') | Out-Null
-    $PSBoundParameters.Remove('ApplicationSecret') | Out-Null
-    $PSBoundParameters.Remove('TenantId') | Out-Null
-
     if ($Ensure -eq 'Present' -and $currentInstance.Ensure -eq 'Absent')
     {
         Write-Verbose -Message "Creating {$DisplayName}"
-        $AdditionalProperties = Get-M365DSCAdditionalProperties -Properties ([System.Collections.Hashtable]$PSBoundParameters)
-        $CreateParameters = @{
-            DisplayName          = $DisplayName
-            Description          = $Description
-            AdditionalProperties = $AdditionalProperties
-        }
+        $PSBoundParameters.Remove('Assignments') | Out-Null
 
+        $CreateParameters = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
+        $CreateParameters = Rename-M365DSCCimInstanceParameter -Properties $CreateParameters
+
+        $CreateParameters.Remove('Id') | Out-Null
+        $CreateParameters.Remove('Verbose') | Out-Null
+
+        foreach ($key in ($CreateParameters.Clone()).Keys)
+        {
+            if ($key -eq 'DetailedHelpText' -or $key -eq 'DeviceOwnerLockScreenMessage' -or $key -eq 'ShortHelpText')
+            {
+                if ($null -ne $CreateParameters.$key.DefaultMessage -or $null -ne $CreateParameters.$key.LocalizedMessages)
+                {
+                    $CreateParameters.$key.Add('@odata.type', '#microsoft.graph.androidDeviceOwnerUserFacingMessage')
+                }
+
+                if ($null -eq $CreateParameters.$key.LocalizedMessages)
+                {
+                    $CreateParameters.$key.Add('localizedMessages', @())
+                }
+            }
+
+            if ($CreateParameters[$key].GetType().Fullname -like '*CimInstance*')
+            {
+                $CreateParameters[$key] = Convert-M365DSCDRGComplexTypeToHashtable -ComplexObject $CreateParameters[$key]
+            }
+
+            if ($key -ne '@odata.type')
+            {
+                $keyName = $key.Substring(0, 1).ToLower() + $key.Substring(1, $key.length - 1)
+                $keyValue = $CreateParameters.$key
+                $CreateParameters.Remove($key) | Out-Null
+                $CreateParameters.Add($keyName, $keyValue) | Out-Null
+            }
+        }
+        $CreateParameters.Add('@odata.type', '#microsoft.graph.androidDeviceOwnerGeneralDeviceConfiguration')
 
         #region resource generator code
-        New-MgDeviceManagementDeviceConfiguration @CreateParameters
-        #endregion
+        $policy = New-MgBetaDeviceManagementDeviceConfiguration -BodyParameter $CreateParameters
+        $assignmentsHash = ConvertTo-IntunePolicyAssignment -IncludeDeviceFilter:$true -Assignments $Assignments
 
+        if ($policy.id)
+        {
+            Update-DeviceConfigurationPolicyAssignment -DeviceConfigurationPolicyId $policy.id `
+                -Targets $assignmentsHash `
+                -Repository 'deviceManagement/deviceConfigurations'
+        }
+        #endregion
     }
     elseif ($Ensure -eq 'Present' -and $currentInstance.Ensure -eq 'Present')
     {
         Write-Verbose -Message "Updating {$DisplayName}"
-        [System.Collections.Hashtable]$UpdateParameters = $PSBoundParameters
-        $UpdateParameters.Remove('Id') | Out-Null
-        $AdditionalProperties = Get-M365DSCAdditionalProperties -Properties ([System.Collections.Hashtable]$PSBoundParameters)
+        $PSBoundParameters.Remove('Assignments') | Out-Null
 
-        $ConvertedParameters = @()
-        foreach ($key in $UpdateParameters.Keys)
+        $UpdateParameters = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
+        $UpdateParameters = Rename-M365DSCCimInstanceParameter -Properties $UpdateParameters
+
+        $UpdateParameters.Remove('Id') | Out-Null
+        $UpdateParameters.Remove('Verbose') | Out-Null
+
+        foreach ($key in (($UpdateParameters.Clone()).Keys | Sort-Object))
         {
-            if (($UpdateParameters[$key]).GetType().Name -eq 'CimInstance')
+            if ($key -eq 'DetailedHelpText' -or $key -eq 'DeviceOwnerLockScreenMessage' -or $key -eq 'ShortHelpText')
             {
-                Write-Verbose -Message "Converting complex property {$key} to Hashtable"
-                $hashtableValue = Get-M365DSCDRGComplexTypeToHashtable -ComplexObject $UpdateParameters[$key]
-                $currentParameter = @{
-                    Name  = $key
-                    Value = $hashtableValue
+                if ($null -ne $UpdateParameters.$key.DefaultMessage -or $null -ne $UpdateParameters.$key.LocalizedMessages)
+                {
+                    $UpdateParameters.$key.Add('@odata.type', '#microsoft.graph.androidDeviceOwnerUserFacingMessage')
                 }
-                $ConvertedParameters += $currentParameter
+
+                if ($null -eq $UpdateParameters.$key.LocalizedMessages)
+                {
+                    $UpdateParameters.$key.Add('localizedMessages', @())
+                }
+            }
+
+            if ($UpdateParameters.$key.GetType().Fullname -like '*CimInstance*')
+            {
+                $UpdateParameters.$key = Convert-M365DSCDRGComplexTypeToHashtable -ComplexObject $UpdateParameters.$key
+            }
+
+            if ($key -ne '@odata.type')
+            {
+                $keyName = $key.Substring(0, 1).ToLower() + $key.Substring(1, $key.length - 1)
+                $keyValue = $UpdateParameters.$key
+                $UpdateParameters.Remove($key)
+                $UpdateParameters.Add($keyName, $keyValue)
             }
         }
+        $UpdateParameters.Add('@odata.type', '#microsoft.graph.androidDeviceOwnerGeneralDeviceConfiguration')
 
-        foreach ($convertedParameter in $ConvertedParameters)
-        {
-            $UpdateParameters[$convertedParameter.Name] = $convertedParameter.Value
-        }
-        <#
-        if ($AdditionalProperties)
-        {
-            $UpdateParameters.Add("AdditionalProperties", $AdditionalProperties)
-        }#>
-
-        #region resource generator code
-        Write-Verbose -Message ($UpdateParameters | Out-String)
-        $AdditionalProperties = Get-M365DSCAdditionalProperties -Properties ([System.Collections.Hashtable]$PSBoundParameters)
-        $UpdateParameters = @{
-            DeviceConfigurationId = $currentInstance.Id
-            DisplayName           = $DisplayName
-            Description           = $Description
-            AdditionalProperties  = $AdditionalProperties
-        }
-        Update-MgDeviceManagementDeviceConfiguration @UpdateParameters
+        Update-MgBetaDeviceManagementDeviceConfiguration -BodyParameter $UpdateParameters `
+            -DeviceConfigurationId $currentInstance.Id
+        $assignmentsHash = ConvertTo-IntunePolicyAssignment -IncludeDeviceFilter:$true -Assignments $Assignments
+        Update-DeviceConfigurationPolicyAssignment `
+            -DeviceConfigurationPolicyId $currentInstance.id `
+            -Targets $assignmentsHash `
+            -Repository 'deviceManagement/deviceConfigurations'
         #endregion
-
     }
     elseif ($Ensure -eq 'Absent' -and $currentInstance.Ensure -eq 'Present')
     {
         Write-Verbose -Message "Removing {$DisplayName}"
 
-
         #region resource generator code
+        Remove-MgBetaDeviceManagementDeviceConfiguration -DeviceConfigurationId $currentInstance.Id
         #endregion
-
-
-
-        #region resource generator code
-        Remove-MgDeviceManagementDeviceConfiguration -DeviceConfigurationId $currentInstance.Id
-        #endregion
-
     }
 }
 
@@ -1564,43 +1762,22 @@ function Test-TargetResource
     [OutputType([System.Boolean])]
     param
     (
-
         #region resource generator code
         [Parameter()]
         [System.String]
         $Id,
+
+        [Parameter(Mandatory = $true)]
+        [System.String]
+        $DisplayName,
 
         [Parameter()]
         [System.String]
         $Description,
 
         [Parameter()]
-        [Microsoft.Management.Infrastructure.CimInstance]
-        $DeviceManagementApplicabilityRuleDeviceMode,
-
-        [Parameter()]
-        [Microsoft.Management.Infrastructure.CimInstance]
-        $DeviceManagementApplicabilityRuleOsEdition,
-
-        [Parameter()]
-        [Microsoft.Management.Infrastructure.CimInstance]
-        $DeviceManagementApplicabilityRuleOsVersion,
-
-        [Parameter()]
-        [System.String]
-        $DisplayName,
-
-        [Parameter()]
         [System.String[]]
         $RoleScopeTagIds,
-
-        [Parameter()]
-        [System.Boolean]
-        $SupportsScopeTags,
-
-        [Parameter()]
-        [System.Int32]
-        $Version,
 
         [Parameter()]
         [System.Boolean]
@@ -1611,11 +1788,13 @@ function Test-TargetResource
         $AppsAllowInstallFromUnknownSources,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'userChoice', 'never', 'wiFiOnly', 'always')]
+        [System.String]
         $AppsAutoUpdatePolicy,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('deviceDefault', 'prompt', 'autoGrant', 'autoDeny')]
+        [System.String]
         $AppsDefaultPermissionPolicy,
 
         [Parameter()]
@@ -1623,7 +1802,7 @@ function Test-TargetResource
         $AppsRecommendSkippingFirstUseHints,
 
         [Parameter()]
-        [System.String[]]
+        [Microsoft.Management.Infrastructure.CimInstance[]]
         $AzureAdSharedDeviceDataClearApps,
 
         [Parameter()]
@@ -1651,7 +1830,8 @@ function Test-TargetResource
         $CrossProfilePoliciesAllowCopyPaste,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'crossProfileDataSharingBlocked', 'dataSharingFromWorkToPersonalBlocked', 'crossProfileDataSharingAllowed', 'unkownFutureValue')]
+        [System.String]
         $CrossProfilePoliciesAllowDataSharing,
 
         [Parameter()]
@@ -1667,7 +1847,16 @@ function Test-TargetResource
         $DateTimeConfigurationBlocked,
 
         [Parameter()]
-        [System.String[]]
+        [Microsoft.Management.Infrastructure.CimInstance]
+        $DetailedHelpText,
+
+        [Parameter()]
+        [Microsoft.Management.Infrastructure.CimInstance]
+        $DeviceOwnerLockScreenMessage,
+
+        [Parameter()]
+        [ValidateSet('notConfigured', 'dedicatedDevice', 'fullyManaged')]
+        [System.String]
         $EnrollmentProfile,
 
         [Parameter()]
@@ -1679,7 +1868,7 @@ function Test-TargetResource
         $FactoryResetDeviceAdministratorEmails,
 
         [Parameter()]
-        [System.String[]]
+        [Microsoft.Management.Infrastructure.CimInstance]
         $GlobalProxy,
 
         [Parameter()]
@@ -1695,7 +1884,8 @@ function Test-TargetResource
         $KioskCustomizationPowerButtonActionsBlocked,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'notificationsAndSystemInfoEnabled', 'systemInfoOnly')]
+        [System.String]
         $KioskCustomizationStatusBar,
 
         [Parameter()]
@@ -1703,7 +1893,8 @@ function Test-TargetResource
         $KioskCustomizationSystemErrorWarnings,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'navigationEnabled', 'homeButtonOnly')]
+        [System.String]
         $KioskCustomizationSystemNavigation,
 
         [Parameter()]
@@ -1711,11 +1902,11 @@ function Test-TargetResource
         $KioskModeAppOrderEnabled,
 
         [Parameter()]
-        [System.String[]]
+        [Microsoft.Management.Infrastructure.CimInstance[]]
         $KioskModeAppPositions,
 
         [Parameter()]
-        [System.String[]]
+        [Microsoft.Management.Infrastructure.CimInstance[]]
         $KioskModeApps,
 
         [Parameter()]
@@ -1739,7 +1930,8 @@ function Test-TargetResource
         $KioskModeFlashlightConfigurationEnabled,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'darkSquare', 'darkCircle', 'lightSquare', 'lightCircle')]
+        [System.String]
         $KioskModeFolderIcon,
 
         [Parameter()]
@@ -1751,7 +1943,8 @@ function Test-TargetResource
         $KioskModeGridWidth,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'smallest', 'small', 'regular', 'large', 'largest')]
+        [System.String]
         $KioskModeIconSize,
 
         [Parameter()]
@@ -1759,7 +1952,7 @@ function Test-TargetResource
         $KioskModeLockHomeScreen,
 
         [Parameter()]
-        [System.String[]]
+        [Microsoft.Management.Infrastructure.CimInstance[]]
         $KioskModeManagedFolders,
 
         [Parameter()]
@@ -1775,7 +1968,8 @@ function Test-TargetResource
         $KioskModeManagedHomeScreenInactiveSignOutNoticeInSeconds,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'simple', 'complex')]
+        [System.String]
         $KioskModeManagedHomeScreenPinComplexity,
 
         [Parameter()]
@@ -1807,7 +2001,8 @@ function Test-TargetResource
         $KioskModeMediaVolumeConfigurationEnabled,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'portrait', 'landscape', 'autoRotate')]
+        [System.String]
         $KioskModeScreenOrientation,
 
         [Parameter()]
@@ -1839,11 +2034,17 @@ function Test-TargetResource
         $KioskModeShowDeviceInfo,
 
         [Parameter()]
+        [ValidateSet('notConfigured', 'singleAppMode', 'multiAppMode')]
+        [System.String]
+        $KioskModeUseManagedHomeScreenApp,
+
+        [Parameter()]
         [System.Boolean]
         $KioskModeVirtualHomeButtonEnabled,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'swipeUp', 'floating')]
+        [System.String]
         $KioskModeVirtualHomeButtonType,
 
         [Parameter()]
@@ -1883,7 +2084,8 @@ function Test-TargetResource
         $MicrosoftLauncherDockPresenceAllowUserModification,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'show', 'hide', 'disabled')]
+        [System.String]
         $MicrosoftLauncherDockPresenceConfiguration,
 
         [Parameter()]
@@ -1895,7 +2097,8 @@ function Test-TargetResource
         $MicrosoftLauncherFeedEnabled,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'top', 'bottom', 'hide')]
+        [System.String]
         $MicrosoftLauncherSearchBarPlacementConfiguration,
 
         [Parameter()]
@@ -1911,6 +2114,7 @@ function Test-TargetResource
         $PasswordBlockKeyguard,
 
         [Parameter()]
+        [ValidateSet('notConfigured', 'camera', 'notifications', 'unredactedNotifications', 'trustAgents', 'fingerprint', 'remoteInput', 'allFeatures', 'face', 'iris', 'biometrics')]
         [System.String[]]
         $PasswordBlockKeyguardFeatures,
 
@@ -1955,8 +2159,14 @@ function Test-TargetResource
         $PasswordPreviousPasswordCountToBlock,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('deviceDefault', 'required', 'numeric', 'numericComplex', 'alphabetic', 'alphanumeric', 'alphanumericWithSymbols', 'lowSecurityBiometric', 'customPassword')]
+        [System.String]
         $PasswordRequiredType,
+
+        [Parameter()]
+        [ValidateSet('deviceDefault', 'daily', 'unkownFutureValue')]
+        [System.String]
+        $PasswordRequireUnlock,
 
         [Parameter()]
         [System.Int32]
@@ -1971,11 +2181,12 @@ function Test-TargetResource
         $PersonalProfileCameraBlocked,
 
         [Parameter()]
-        [System.String[]]
+        [Microsoft.Management.Infrastructure.CimInstance[]]
         $PersonalProfilePersonalApplications,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'blockedApps', 'allowedApps')]
+        [System.String]
         $PersonalProfilePlayStoreMode,
 
         [Parameter()]
@@ -1983,12 +2194,17 @@ function Test-TargetResource
         $PersonalProfileScreenCaptureBlocked,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('notConfigured', 'allowList', 'blockList')]
+        [System.String]
         $PlayStoreMode,
 
         [Parameter()]
         [System.Boolean]
         $ScreenCaptureBlocked,
+
+        [Parameter()]
+        [System.Boolean]
+        $SecurityCommonCriteriaModeEnabled,
 
         [Parameter()]
         [System.Boolean]
@@ -1999,10 +2215,15 @@ function Test-TargetResource
         $SecurityRequireVerifyApps,
 
         [Parameter()]
+        [Microsoft.Management.Infrastructure.CimInstance]
+        $ShortHelpText,
+
+        [Parameter()]
         [System.Boolean]
         $StatusBarBlocked,
 
         [Parameter()]
+        [ValidateSet('notConfigured', 'ac', 'usb', 'wireless')]
         [System.String[]]
         $StayOnModes,
 
@@ -2019,11 +2240,12 @@ function Test-TargetResource
         $StorageBlockUsbFileTransfer,
 
         [Parameter()]
-        [System.String[]]
+        [Microsoft.Management.Infrastructure.CimInstance[]]
         $SystemUpdateFreezePeriods,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('deviceDefault', 'postpone', 'windowed', 'automatic')]
+        [System.String]
         $SystemUpdateInstallType,
 
         [Parameter()]
@@ -2103,8 +2325,14 @@ function Test-TargetResource
         $WorkProfilePasswordPreviousPasswordCountToBlock,
 
         [Parameter()]
-        [System.String[]]
+        [ValidateSet('deviceDefault', 'required', 'numeric', 'numericComplex', 'alphabetic', 'alphanumeric', 'alphanumericWithSymbols', 'lowSecurityBiometric', 'customPassword')]
+        [System.String]
         $WorkProfilePasswordRequiredType,
+
+        [Parameter()]
+        [ValidateSet('deviceDefault', 'daily', 'unkownFutureValue')]
+        [System.String]
+        $WorkProfilePasswordRequireUnlock,
 
         [Parameter()]
         [System.Int32]
@@ -2113,38 +2341,12 @@ function Test-TargetResource
         [Parameter()]
         [Microsoft.Management.Infrastructure.CimInstance[]]
         $Assignments,
-
-        [Parameter()]
-        [Microsoft.Management.Infrastructure.CimInstance[]]
-        $DeviceSettingStateSummaries,
-
-        [Parameter()]
-        [Microsoft.Management.Infrastructure.CimInstance[]]
-        $DeviceStatuses,
-
-        [Parameter()]
-        [Microsoft.Management.Infrastructure.CimInstance]
-        $DeviceStatusOverview,
-
-        [Parameter()]
-        [Microsoft.Management.Infrastructure.CimInstance[]]
-        $GroupAssignments,
-
-        [Parameter()]
-        [Microsoft.Management.Infrastructure.CimInstance[]]
-        $UserStatuses,
-
-        [Parameter()]
-        [Microsoft.Management.Infrastructure.CimInstance]
-        $UserStatusOverview,
-
-
         #endregion
 
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [System.String]
         [ValidateSet('Absent', 'Present')]
-        $Ensure = $true,
+        $Ensure = 'Present',
 
         [Parameter()]
         [System.Management.Automation.PSCredential]
@@ -2168,11 +2370,12 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
-    )
+        $ManagedIdentity,
 
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
+    )
 
     #region Telemetry
     $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
@@ -2183,27 +2386,9 @@ function Test-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message "Testing configuration of {$DisplayName}"
-
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-
-    Write-Verbose -Message "Current Values: $(Convert-M365DscHashtableToString -Hashtable $CurrentValues)"
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('Credential') | Out-Null
-    $ValuesToCheck.Remove('ApplicationId') | Out-Null
-    $ValuesToCheck.Remove('TenantId') | Out-Null
-    $ValuesToCheck.Remove('ApplicationSecret') | Out-Null
-
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck $ValuesToCheck.Keys
-
-    Write-Verbose -Message "Test-TargetResource returned $TestResult"
-
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '')
+    return $result
 }
 
 function Export-TargetResource
@@ -2238,12 +2423,15 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftGraph' `
-        -InboundParameters $PSBoundParameters `
-        -ProfileName 'beta'
+        -InboundParameters $PSBoundParameters
 
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
@@ -2259,9 +2447,10 @@ function Export-TargetResource
 
     try
     {
+
         #region resource generator code
-        [array]$getValue = Get-MgDeviceManagementDeviceConfiguration `
-            -ErrorAction Stop -All:$true -Filter $Filter | Where-Object `
+        [array]$getValue = Get-MgBetaDeviceManagementDeviceConfiguration -Filter $Filter -All `
+            -ErrorAction Stop | Where-Object `
             -FilterScript {
             $_.AdditionalProperties.'@odata.type' -eq '#microsoft.graph.androidDeviceOwnerGeneralDeviceConfiguration'
         }
@@ -2272,16 +2461,22 @@ function Export-TargetResource
         $dscContent = ''
         if ($getValue.Length -eq 0)
         {
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         }
         else
         {
-            Write-Host "`r`n" -NoNewline
+            Write-M365DSCHost -Message "`r`n" -DeferWrite
         }
         foreach ($config in $getValue)
         {
-            Write-Host "    |---[$i/$($getValue.Count)] $($config.displayName)" -NoNewline
+            if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+            {
+                $Global:M365DSCExportResourceInstancesCount++
+            }
+
+            Write-M365DSCHost -Message "    |---[$i/$($getValue.Count)] $($config.displayName)" -DeferWrite
             $params = @{
+                Id                    = $config.id
                 DisplayName           = $config.DisplayName
                 Ensure                = 'Present'
                 Credential            = $Credential
@@ -2289,127 +2484,267 @@ function Export-TargetResource
                 TenantId              = $TenantId
                 ApplicationSecret     = $ApplicationSecret
                 CertificateThumbprint = $CertificateThumbprint
-                Managedidentity       = $ManagedIdentity.IsPresent
+                ManagedIdentity       = $ManagedIdentity.IsPresent
+                AccessTokens          = $AccessTokens
             }
+
+            $Script:exportedInstance = $config
             $Results = Get-TargetResource @Params
-            $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                -Results $Results
+
+            if ($Results.AzureAdSharedDeviceDataClearApps)
+            {
+                $complexTypeStringResult = Get-M365DSCDRGComplexTypeToString -ComplexObject $Results.AzureAdSharedDeviceDataClearApps -CIMInstanceName MicrosoftGraphapplistitem
+                if ($complexTypeStringResult)
+                {
+                    $Results.AzureAdSharedDeviceDataClearApps = $complexTypeStringResult
+                }
+                else
+                {
+                    $Results.Remove('AzureAdSharedDeviceDataClearApps') | Out-Null
+                }
+            }
+
+            if ($Results.DetailedHelpText)
+            {
+                $complexTypeMapping = @(
+                    @{
+                        Name            = 'DetailedHelpText'
+                        CimInstanceName = 'MicrosoftGraphandroiddeviceowneruserfacingmessage'
+                    }
+                    @{
+                        Name            = 'localizedMessages'
+                        CimInstanceName = 'MicrosoftGraphkeyvaluepair'
+                    }
+                )
+
+                $complexTypeStringResult = Get-M365DSCDRGComplexTypeToString `
+                    -ComplexObject $Results.DetailedHelpText `
+                    -CIMInstanceName MicrosoftGraphandroiddeviceowneruserfacingmessage `
+                    -ComplexTypeMapping $complexTypeMapping
+
+                if ($complexTypeStringResult)
+                {
+                    $Results.DetailedHelpText = $complexTypeStringResult
+                }
+                else
+                {
+                    $Results.Remove('DetailedHelpText') | Out-Null
+                }
+            }
+
+            if ($Results.DeviceOwnerLockScreenMessage)
+            {
+                $complexTypeMapping = @(
+                    @{
+                        Name            = 'DeviceOwnerLockScreenMessage'
+                        CimInstanceName = 'MicrosoftGraphandroiddeviceowneruserfacingmessage'
+                    }
+                    @{
+                        Name            = 'localizedMessages'
+                        CimInstanceName = 'MicrosoftGraphkeyvaluepair'
+                        isRequired      = $true
+                    }
+                )
+
+                $complexTypeStringResult = Get-M365DSCDRGComplexTypeToString `
+                    -ComplexObject $Results.DeviceOwnerLockScreenMessage `
+                    -CIMInstanceName MicrosoftGraphandroiddeviceowneruserfacingmessage `
+                    -ComplexTypeMapping $complexTypeMapping
+                if ($complexTypeStringResult)
+                {
+                    $Results.DeviceOwnerLockScreenMessage = $complexTypeStringResult
+                }
+                else
+                {
+                    $Results.Remove('DeviceOwnerLockScreenMessage') | Out-Null
+                }
+            }
+
+            if ($Results.GlobalProxy)
+            {
+                $complexTypeStringResult = Get-M365DSCDRGComplexTypeToString -ComplexObject $Results.GlobalProxy -CIMInstanceName MicrosoftGraphandroiddeviceownerglobalproxy
+                if ($complexTypeStringResult)
+                {
+                    $Results.GlobalProxy = $complexTypeStringResult
+                }
+                else
+                {
+                    $Results.Remove('GlobalProxy') | Out-Null
+                }
+            }
+
+            if ($Results.KioskModeAppPositions)
+            {
+                $complexTypeMapping = @(
+                    @{
+                        Name            = 'kioskModeAppPositions'
+                        CimInstanceName = 'MicrosoftGraphandroiddeviceownerkioskmodeapppositionitem'
+                    }
+                    @{
+                        Name            = 'item'
+                        CimInstanceName = 'MicrosoftGraphandroiddeviceownerkioskmodefolderitem'
+                        isRequired      = $true
+                    }
+                )
+                $complexTypeStringResult = Get-M365DSCDRGComplexTypeToString `
+                    -ComplexObject $Results.KioskModeAppPositions `
+                    -CIMInstanceName MicrosoftGraphandroiddeviceownerkioskmodeapppositionitem `
+                    -ComplexTypeMapping $complexTypeMapping
+                if ($complexTypeStringResult)
+                {
+                    $Results.KioskModeAppPositions = $complexTypeStringResult
+                }
+                else
+                {
+                    $Results.Remove('KioskModeAppPositions') | Out-Null
+                }
+            }
+
+            if ($Results.KioskModeApps)
+            {
+                $complexTypeStringResult = Get-M365DSCDRGComplexTypeToString -ComplexObject $Results.KioskModeApps -CIMInstanceName MicrosoftGraphapplistitem
+                if ($complexTypeStringResult)
+                {
+                    $Results.KioskModeApps = $complexTypeStringResult
+                }
+                else
+                {
+                    $Results.Remove('KioskModeApps') | Out-Null
+                }
+            }
+
+
+            if ($Results.KioskModeManagedFolders)
+            {
+                $complexTypeMapping = @(
+                    @{
+                        Name            = 'kioskModeManagedFolders'
+                        CimInstanceName = 'MicrosoftGraphandroiddeviceownerkioskmodemanagedfolder'
+                    }
+                    @{
+                        Name            = 'items'
+                        CimInstanceName = 'MicrosoftGraphandroiddeviceownerkioskmodefolderitem'
+                    }
+                )
+                $complexTypeStringResult = Get-M365DSCDRGComplexTypeToString `
+                    -ComplexObject $Results.KioskModeManagedFolders `
+                    -CIMInstanceName MicrosoftGraphandroiddeviceownerkioskmodemanagedfolder `
+                    -ComplexTypeMapping $complexTypeMapping
+
+                if ($complexTypeStringResult)
+                {
+                    $Results.KioskModeManagedFolders = $complexTypeStringResult
+                }
+                else
+                {
+                    $Results.Remove('KioskModeManagedFolders') | Out-Null
+                }
+            }
+
+            if ($Results.PersonalProfilePersonalApplications)
+            {
+                $complexTypeStringResult = Get-M365DSCDRGComplexTypeToString -ComplexObject $Results.PersonalProfilePersonalApplications -CIMInstanceName MicrosoftGraphapplistitem
+                if ($complexTypeStringResult)
+                {
+                    $Results.PersonalProfilePersonalApplications = $complexTypeStringResult
+                }
+                else
+                {
+                    $Results.Remove('PersonalProfilePersonalApplications') | Out-Null
+                }
+            }
+
+            if ($Results.ShortHelpText)
+            {
+                $complexTypeMapping = @(
+                    @{
+                        Name            = 'ShortHelpText'
+                        CimInstanceName = 'MicrosoftGraphandroiddeviceowneruserfacingmessage'
+                    }
+                    @{
+                        Name            = 'localizedMessages'
+                        CimInstanceName = 'MicrosoftGraphkeyvaluepair'
+                        isRequired      = $true
+                        isArray         = $true
+                    }
+                )
+
+                $complexTypeStringResult = Get-M365DSCDRGComplexTypeToString -ComplexObject $Results.ShortHelpText `
+                    -CIMInstanceName MicrosoftGraphandroiddeviceowneruserfacingmessage `
+                    -ComplexTypeMapping $complexTypeMapping
+                if ($complexTypeStringResult)
+                {
+                    $Results.ShortHelpText = $complexTypeStringResult
+                }
+                else
+                {
+                    $Results.Remove('ShortHelpText') | Out-Null
+                }
+            }
+
+            if ($Results.SystemUpdateFreezePeriods)
+            {
+                $complexTypeStringResult = Get-M365DSCDRGComplexTypeToString -ComplexObject $Results.SystemUpdateFreezePeriods -CIMInstanceName MicrosoftGraphandroiddeviceownersystemupdatefreezeperiod
+                if ($complexTypeStringResult)
+                {
+                    $Results.SystemUpdateFreezePeriods = $complexTypeStringResult
+                }
+                else
+                {
+                    $Results.Remove('SystemUpdateFreezePeriods') | Out-Null
+                }
+            }
+
+            if ($Results.Assignments)
+            {
+                $complexTypeStringResult = Get-M365DSCDRGComplexTypeToString -ComplexObject $Results.Assignments -CIMInstanceName DeviceManagementConfigurationPolicyAssignments
+                if ($complexTypeStringResult)
+                {
+                    $Results.Assignments = $complexTypeStringResult
+                }
+                else
+                {
+                    $Results.Remove('Assignments') | Out-Null
+                }
+            }
 
             $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                 -ConnectionMode $ConnectionMode `
                 -ModulePath $PSScriptRoot `
                 -Results $Results `
-                -Credential $Credential
+                -Credential $Credential `
+                -NoEscape @('AzureAdSharedDeviceDataClearApps', 'DetailedHelpText', 'DeviceOwnerLockScreenMessage', 'GlobalProxy',
+                    'KioskModeAppPositions', 'KioskModeApps', 'KioskModeManagedFolders', 'PersonalProfilePersonalApplications',
+                    'ShortHelpText', 'SystemUpdateFreezePeriods', 'Assignments')
 
             $dscContent += $currentDSCBlock
             Save-M365DSCPartialExport -Content $currentDSCBlock `
                 -FileName $Global:PartialExportFileName
             $i++
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         }
         return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        if ($_.Exception -like '*401*' -or $_.ErrorDetails.Message -like "*`"ErrorCode`":`"Forbidden`"*" -or `
+                $_.Exception -like '*Request not applicable to target tenant*')
+        {
+            Write-M365DSCHost -Message "`r`n    $($Global:M365DSCEmojiYellowCircle) The current tenant is not registered for Intune."
+        }
+        else
+        {
+            Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
-        New-M365DSCLogEntry -Message 'Error during Export:' `
-            -Exception $_ `
-            -Source $($MyInvocation.MyCommand.Source) `
-            -TenantId $TenantId `
-            -Credential $Credential
+            New-M365DSCLogEntry -Message 'Error during Export:' `
+                -Exception $_ `
+                -Source $($MyInvocation.MyCommand.Source) `
+                -TenantId $TenantId `
+                -Credential $Credential
+        }
 
         return ''
     }
-}
-
-function Get-M365DSCDRGComplexTypeToHashtable
-{
-    [CmdletBinding()]
-    [OutputType([System.Collections.Hashtable])]
-    param
-    (
-        [Parameter(Mandatory = 'true')]
-        [System.Object]
-        $ComplexObject
-    )
-
-    $keys = $ComplexObject | Get-Member | Where-Object -FilterScript { $_.MemberType -eq 'Property' -and $_.Name -ne 'AdditionalProperties' }
-    $results = @{}
-    foreach ($key in $keys)
-    {
-        $results.Add($key.Name, $ComplexObject.$($key.Name))
-    }
-    return $results
-}
-
-function Get-M365DSCDRGComplexTypeToString
-{
-    [CmdletBinding()]
-    [OutputType([System.String])]
-    param
-    (
-        [Parameter(Mandatory = $true)]
-        [System.Collections.Hashtable]
-        $ComplexObject,
-
-        [Parameter(Mandatory = $true)]
-        [System.String]
-        $CIMInstanceName
-    )
-    if ($null -eq $ComplexObject)
-    {
-        return $null
-    }
-    $currentProperty = "MSFT_$CIMInstanceName{`r`n"
-    $keyNotNull = 0
-    foreach ($key in $ComplexObject.Keys)
-    {
-        if ($ComplexObject[$key])
-        {
-            $keyNotNull++
-
-            if ($ComplexObject[$key].GetType().Name -eq 'Boolean')
-            {
-                $currentProperty += '                ' + $key + " = `$" + $ComplexObject[$key].ToString() + "`r`n"
-            }
-            else
-            {
-                $currentProperty += '                ' + $key + " = '" + $ComplexObject[$key] + "'`r`n"
-            }
-        }
-    }
-    $currentProperty += '            }'
-
-    if ($keyNotNull -eq 0)
-    {
-        $currentProperty = $null
-    }
-    return $currentProperty
-}
-
-function Get-M365DSCAdditionalProperties
-{
-    [CmdletBinding()]
-    [OutputType([System.Collections.Hashtable])]
-    param
-    (
-        [Parameter(Mandatory = 'true')]
-        [System.Collections.Hashtable]
-        $Properties
-    )
-
-    $results = @{'@odata.type' = '#microsoft.graph.androidDeviceOwnerGeneralDeviceConfiguration' }
-    foreach ($property in $properties.Keys)
-    {
-        if ($property -ne 'Verbose')
-        {
-            $propertyName = $property[0].ToString().ToLower() + $property.Substring(1, $property.Length - 1)
-            $propertyValue = $properties.$property
-            $results.Add($propertyName, $propertyValue)
-        }
-    }
-    return $results
 }
 
 Export-ModuleMember -Function *-TargetResource

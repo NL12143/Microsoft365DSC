@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_EXOSafeLinksPolicy'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -24,19 +26,9 @@ function Get-TargetResource
         [Boolean]
         $DeliverMessageAfterScan = $false,
 
-        #DEPRECATED
-        [Parameter()]
-        [Boolean]
-        $DoNotAllowClickThrough = $true,
-
         [Parameter()]
         [System.String[]]
         $DoNotRewriteUrls = @(),
-
-        #DEPRECATED
-        [Parameter()]
-        [Boolean]
-        $DoNotTrackUserClicks = $true,
 
         [Parameter()]
         [Boolean]
@@ -61,11 +53,6 @@ function Get-TargetResource
         [Parameter()]
         [Boolean]
         $DisableUrlRewrite = $false,
-
-        #DEPRECATED
-        [Parameter()]
-        [Boolean]
-        $IsEnabled,
 
         [Parameter()]
         [Boolean]
@@ -110,20 +97,24 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Getting configuration of SafeLinksPolicy for $Identity"
 
     if ($Global:CurrentModeIsExport)
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+        $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
             -InboundParameters $PSBoundParameters `
             -SkipModuleReload $true
     }
     else
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+        $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
             -InboundParameters $PSBoundParameters
     }
     #Ensure the proper dependencies are installed in the current environment.
@@ -142,12 +133,9 @@ function Get-TargetResource
     $nullReturn.Ensure = 'Absent'
     try
     {
-        Write-Verbose -Message 'Global ExchangeOnlineSession status:'
-        Write-Verbose -Message "$( Get-PSSession -ErrorAction SilentlyContinue | Where-Object -FilterScript { $_.Name -eq 'ExchangeOnline' } | Out-String)"
-
         try
         {
-            $SafeLinksPolicies = Get-SafeLinksPolicy -ErrorAction Stop
+            $SafeLinksPolicy = Get-SafeLinksPolicy -Identity $Identity -ErrorAction Stop
         }
         catch
         {
@@ -156,8 +144,6 @@ function Get-TargetResource
                 -Exception $_ `
                 -Source $MyInvocation.MyCommand.ModuleName
         }
-
-        $SafeLinksPolicy = $SafeLinksPolicies | Where-Object -FilterScript { $_.Identity -eq $Identity }
         if (-not $SafeLinksPolicy)
         {
             Write-Verbose -Message "SafeLinksPolicy $($Identity) does not exist."
@@ -166,35 +152,31 @@ function Get-TargetResource
         else
         {
             $result = @{
-                Identity                      = $SafeLinksPolicy.Identity
-                AdminDisplayName              = $SafeLinksPolicy.AdminDisplayName
-                AllowClickThrough             = $SafeLinksPolicy.AllowClickThrough
-                CustomNotificationText        = $SafeLinksPolicy.CustomNotificationText
-                DeliverMessageAfterScan       = $SafeLinksPolicy.DeliverMessageAfterScan
-                #Deprecated
-                #DoNotAllowClickThrough        = $SafeLinksPolicy.DoNotAllowClickThrough
-                DoNotRewriteUrls              = $SafeLinksPolicy.DoNotRewriteUrls
-                #Deprecated
-                #DoNotTrackUserClicks          = $SafeLinksPolicy.DoNotTrackUserClicks
-                EnableForInternalSenders      = $SafeLinksPolicy.EnableForInternalSenders
-                EnableOrganizationBranding    = $SafeLinksPolicy.EnableOrganizationBranding
-                EnableSafeLinksForTeams       = $SafeLinksPolicy.EnableSafeLinksForTeams
-                EnableSafeLinksForEmail       = $SafeLinksPolicy.EnableSafeLinksForEmail
-                EnableSafeLinksForOffice      = $SafeLinksPolicy.EnableSafeLinksForOffice
-                DisableUrlRewrite             = $SafeLinksPolicy.DisableUrlRewrite
-                #Deprecated
-                #IsEnabled                     = $SafeLinksPolicy.IsEnabled
-                ScanUrls                      = $SafeLinksPolicy.ScanUrls
-                TrackClicks                   = $SafeLinksPolicy.TrackClicks
-                UseTranslatedNotificationText = $SafeLinksPolicy.UseTranslatedNotificationText
-                Ensure                        = 'Present'
-                Credential                    = $Credential
-                ApplicationId                 = $ApplicationId
-                CertificateThumbprint         = $CertificateThumbprint
-                CertificatePath               = $CertificatePath
-                CertificatePassword           = $CertificatePassword
-                Managedidentity               = $ManagedIdentity.IsPresent
-                TenantId                      = $TenantId
+                Identity                   = $SafeLinksPolicy.Identity
+                AdminDisplayName           = $SafeLinksPolicy.AdminDisplayName
+                AllowClickThrough          = $SafeLinksPolicy.AllowClickThrough
+                CustomNotificationText     = $SafeLinksPolicy.CustomNotificationText
+                DeliverMessageAfterScan    = $SafeLinksPolicy.DeliverMessageAfterScan
+                DoNotRewriteUrls           = $SafeLinksPolicy.DoNotRewriteUrls
+                EnableForInternalSenders   = $SafeLinksPolicy.EnableForInternalSenders
+                EnableOrganizationBranding = $SafeLinksPolicy.EnableOrganizationBranding
+                EnableSafeLinksForTeams    = $SafeLinksPolicy.EnableSafeLinksForTeams
+                EnableSafeLinksForEmail    = $SafeLinksPolicy.EnableSafeLinksForEmail
+                EnableSafeLinksForOffice   = $SafeLinksPolicy.EnableSafeLinksForOffice
+                DisableUrlRewrite          = $SafeLinksPolicy.DisableUrlRewrite
+                ScanUrls                   = $SafeLinksPolicy.ScanUrls
+                TrackClicks                = $SafeLinksPolicy.TrackClicks
+                # The Get-SafeLinksPolicy no longer returns this property
+                # UseTranslatedNotificationText = $SafeLinksPolicy.UseTranslatedNotificationText
+                Ensure                     = 'Present'
+                Credential                 = $Credential
+                ApplicationId              = $ApplicationId
+                CertificateThumbprint      = $CertificateThumbprint
+                CertificatePath            = $CertificatePath
+                CertificatePassword        = $CertificatePassword
+                ManagedIdentity            = $ManagedIdentity.IsPresent
+                TenantId                   = $TenantId
+                AccessTokens               = $AccessTokens
             }
 
             Write-Verbose -Message "Found SafeLinksPolicy $($Identity)"
@@ -239,19 +221,9 @@ function Set-TargetResource
         [Boolean]
         $DeliverMessageAfterScan = $false,
 
-        #DEPRECATED
-        [Parameter()]
-        [Boolean]
-        $DoNotAllowClickThrough = $true,
-
         [Parameter()]
         [System.String[]]
         $DoNotRewriteUrls = @(),
-
-        #DEPRECATED
-        [Parameter()]
-        [Boolean]
-        $DoNotTrackUserClicks = $true,
 
         [Parameter()]
         [Boolean]
@@ -276,11 +248,6 @@ function Set-TargetResource
         [Parameter()]
         [Boolean]
         $DisableUrlRewrite = $false,
-
-        #DEPRECATED
-        [Parameter()]
-        [Boolean]
-        $IsEnabled,
 
         [Parameter()]
         [Boolean]
@@ -325,7 +292,11 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Setting configuration of SafeLinksPolicy for $Identity"
@@ -341,21 +312,13 @@ function Set-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+    $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
         -InboundParameters $PSBoundParameters
 
     $SafeLinksPolicies = Get-SafeLinksPolicy
 
     $SafeLinksPolicy = $SafeLinksPolicies | Where-Object -FilterScript { $_.Identity -eq $Identity }
-    $SafeLinksPolicyParams = [System.Collections.Hashtable]($PSBoundParameters)
-    $SafeLinksPolicyParams.Remove('Ensure') | Out-Null
-    $SafeLinksPolicyParams.Remove('Credential') | Out-Null
-    $SafeLinksPolicyParams.Remove('ApplicationId') | Out-Null
-    $SafeLinksPolicyParams.Remove('TenantId') | Out-Null
-    $SafeLinksPolicyParams.Remove('CertificateThumbprint') | Out-Null
-    $SafeLinksPolicyParams.Remove('CertificatePath') | Out-Null
-    $SafeLinksPolicyParams.Remove('CertificatePassword') | Out-Null
-    $SafeLinksPolicyParams.Remove('ManagedIdentity') | Out-Null
+    $SafeLinksPolicyParams = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
 
     if (('Present' -eq $Ensure ) -and ($null -eq $SafeLinksPolicy))
     {
@@ -365,29 +328,11 @@ function Set-TargetResource
         $SafeLinksPolicyParams.Remove('Identity') | Out-Null
         Write-Verbose -Message "Creating SafeLinksPolicy $($Identity)"
 
-        Write-Verbose -Message 'Property DoNotTrackUserClicks is deprecated and will be ignored.'
-        $SafeLinksPolicyParams.Remove('DoNotTrackUserClicks') | Out-Null
-
-        Write-Verbose -Message 'Property DoNotAllowClickThrough is deprecated and will be ignored.'
-        $SafeLinksPolicyParams.Remove('DoNotAllowClickThrough') | Out-Null
-
-        Write-Verbose -Message 'Property IsEnabled is deprecated and will be ignored.'
-        $SafeLinksPolicyParams.Remove('IsEnabled') | Out-Null
-
         New-SafeLinksPolicy @SafeLinksPolicyParams
     }
     elseif (('Present' -eq $Ensure ) -and ($null -ne $SafeLinksPolicy))
     {
         Write-Verbose -Message "Setting SafeLinksPolicy $($Identity) with values: $(Convert-M365DscHashtableToString -Hashtable $SafeLinksPolicyParams)"
-
-        Write-Verbose -Message 'Property DoNotTrackUserClicks is deprecated and will be ignored.'
-        $SafeLinksPolicyParams.Remove('DoNotTrackUserClicks') | Out-Null
-
-        Write-Verbose -Message 'Property DoNotAllowClickThrough is deprecated and will be ignored.'
-        $SafeLinksPolicyParams.Remove('DoNotAllowClickThrough') | Out-Null
-
-        Write-Verbose -Message 'Property IsEnabled is deprecated and will be ignored.'
-        $SafeLinksPolicyParams.Remove('IsEnabled') | Out-Null
 
         Set-SafeLinksPolicy @SafeLinksPolicyParams -Confirm:$false
     }
@@ -424,19 +369,9 @@ function Test-TargetResource
         [Boolean]
         $DeliverMessageAfterScan = $false,
 
-        #DEPRECATED
-        [Parameter()]
-        [Boolean]
-        $DoNotAllowClickThrough = $true,
-
         [Parameter()]
         [System.String[]]
         $DoNotRewriteUrls = @(),
-
-        #DEPRECATED
-        [Parameter()]
-        [Boolean]
-        $DoNotTrackUserClicks = $true,
 
         [Parameter()]
         [Boolean]
@@ -461,11 +396,6 @@ function Test-TargetResource
         [Parameter()]
         [Boolean]
         $DisableUrlRewrite = $false,
-
-        #DEPRECATED
-        [Parameter()]
-        [Boolean]
-        $IsEnabled,
 
         [Parameter()]
         [Boolean]
@@ -510,7 +440,11 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
@@ -532,20 +466,8 @@ function Test-TargetResource
     Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
 
     $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('Credential') | Out-Null
     $ValuesToCheck.Remove('IsSingleInstance') | Out-Null
-    $ValuesToCheck.Remove('Verbose') | Out-Null
-    $ValuesToCheck.Remove('ApplicationId') | Out-Null
-    $ValuesToCheck.Remove('TenantId') | Out-Null
-    $ValuesToCheck.Remove('CertificateThumbprint') | Out-Null
-    $ValuesToCheck.Remove('CertificatePath') | Out-Null
-    $ValuesToCheck.Remove('CertificatePassword') | Out-Null
-    $ValuesToCheck.Remove('ManagedIdentity') | Out-Null
-
-    #DEPRECATED
-    $ValuesToCheck.Remove('DoNotAllowClickThrough') | Out-Null
-    $ValuesToCheck.Remove('DoNotTrackUserClicks') | Out-Null
-    $ValuesToCheck.Remove('IsEnabled') | Out-Null
+    $ValuesToCheck.Remove('UseTranslatedNotificationText') | Out-Null
 
     $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
         -Source $($MyInvocation.MyCommand.Source) `
@@ -589,8 +511,13 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
         -InboundParameters $PSBoundParameters `
         -SkipModuleReload $true
@@ -617,16 +544,21 @@ function Export-TargetResource
 
             if ($SafeLinksPolicies.Length -eq 0)
             {
-                Write-Host $Global:M365DSCEmojiGreenCheckMark
+                Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
             }
             else
             {
-                Write-Host "`r`n" -NoNewline
+                Write-M365DSCHost -Message "`r`n" -DeferWrite
             }
             $i = 1
             foreach ($SafeLinksPolicy in $SafeLinksPolicies)
             {
-                Write-Host "    |---[$i/$($SafeLinksPolicies.Length)] $($SafeLinksPolicy.Name)" -NoNewline
+                if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+                {
+                    $Global:M365DSCExportResourceInstancesCount++
+                }
+
+                Write-M365DSCHost -Message "    |---[$i/$($SafeLinksPolicies.Length)] $($SafeLinksPolicy.Name)" -DeferWrite
                 $Params = @{
                     Credential            = $Credential
                     Identity              = $SafeLinksPolicy.Identity
@@ -634,12 +566,11 @@ function Export-TargetResource
                     TenantId              = $TenantId
                     CertificateThumbprint = $CertificateThumbprint
                     CertificatePassword   = $CertificatePassword
-                    Managedidentity       = $ManagedIdentity.IsPresent
+                    ManagedIdentity       = $ManagedIdentity.IsPresent
                     CertificatePath       = $CertificatePath
+                    AccessTokens          = $AccessTokens
                 }
                 $Results = Get-TargetResource @Params
-                $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                    -Results $Results
                 $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                     -ConnectionMode $ConnectionMode `
                     -ModulePath $PSScriptRoot `
@@ -648,19 +579,19 @@ function Export-TargetResource
                 $dscContent += $currentDSCBlock
                 Save-M365DSCPartialExport -Content $currentDSCBlock `
                     -FileName $Global:PartialExportFileName
-                Write-Host $Global:M365DSCEmojiGreenCheckMark
+                Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
                 $i++
             }
         }
         else
         {
-            Write-Host "`r`n    $($Global:M365DSCEmojiYellowCircle)The current tenant is not registered to allow for Safe Attachment Rules."
+            Write-M365DSCHost -Message "`r`n    $($Global:M365DSCEmojiYellowCircle)The current tenant is not registered to allow for Safe Attachment Rules."
         }
         return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `

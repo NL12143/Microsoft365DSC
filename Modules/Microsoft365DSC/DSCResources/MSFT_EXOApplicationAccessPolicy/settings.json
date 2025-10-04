@@ -1,23 +1,42 @@
-﻿{
-    "resourceName": "EXOApplicationAccessPolicy",
-    "description": "",
-    "permissions": {
-        "graph": {
-            "delegated": {
-                "read": [],
-                "update": []
-            },
-            "application": {
-                "read": [],
-                "update": []
-            }
-        },
-        "exchange": {
-            "requiredroles": [
-                "View-Only Configuration",
-                "Organization Configuration"
-            ],
-            "requiredrolegroups": "Organization Management"
-        }
+{
+  "resourceName": "EXOApplicationAccessPolicy",
+  "description": "",
+  "roles": {
+    "read": [
+      "Global Reader"
+    ],
+    "update": [
+      "Exchange Administrator"
+    ]
+  },
+  "permissions": {
+    "Office 365 Exchange Online": {
+      "application": {
+        "read": [
+          {
+            "name": "Exchange.ManageAsApp"
+          }
+        ],
+        "update": [
+          {
+            "name": "Exchange.ManageAsApp"
+          }
+        ]
+      }
+    },
+    "exchange": {
+      "requiredroles": [
+        "View-Only Configuration",
+        "Organization Configuration"
+      ],
+      "requiredrolegroups": [
+        "Organization Management"
+      ]
     }
+  },
+  "requiredModules": [],
+  "supportedEnvironments": [
+    "Global"
+  ],
+  "mode": "Configuration"
 }

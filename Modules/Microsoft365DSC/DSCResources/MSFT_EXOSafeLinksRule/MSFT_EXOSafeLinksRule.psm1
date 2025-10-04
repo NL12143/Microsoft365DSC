@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_EXOSafeLinksRule'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -79,18 +81,24 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     Write-Verbose -Message "Setting configuration of SafeLinksRule for $Identity"
+
     if ($Global:CurrentModeIsExport)
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+        $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
             -InboundParameters $PSBoundParameters `
             -SkipModuleReload $true
     }
     else
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+        $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
             -InboundParameters $PSBoundParameters
     }
 
@@ -139,8 +147,9 @@ function Get-TargetResource
                 CertificateThumbprint     = $CertificateThumbprint
                 CertificatePath           = $CertificatePath
                 CertificatePassword       = $CertificatePassword
-                Managedidentity           = $ManagedIdentity.IsPresent
+                ManagedIdentity           = $ManagedIdentity.IsPresent
                 TenantId                  = $TenantId
+                AccessTokens              = $AccessTokens
             }
 
             if ('Enabled' -eq $SafeLinksRule.State)
@@ -250,7 +259,11 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Setting configuration of SafeLinksRule for $Identity"
@@ -266,25 +279,20 @@ function Set-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+    $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
         -InboundParameters $PSBoundParameters
 
     $SafeLinksRules = Get-SafeLinksRule
     $SafeLinksRule = $SafeLinksRules | Where-Object -FilterScript { $_.Identity -eq $Identity }
-    $SafeLinksRuleParams = [System.Collections.Hashtable]($PSBoundParameters)
-    $SafeLinksRuleParams.Remove('Ensure') | Out-Null
-    $SafeLinksRuleParams.Remove('Credential') | Out-Null
-    $SafeLinksRuleParams.Remove('ApplicationId') | Out-Null
-    $SafeLinksRuleParams.Remove('TenantId') | Out-Null
-    $SafeLinksRuleParams.Remove('CertificateThumbprint') | Out-Null
-    $SafeLinksRuleParams.Remove('CertificatePath') | Out-Null
-    $SafeLinksRuleParams.Remove('CertificatePassword') | Out-Null
-    $SafeLinksRuleParams.Remove('ManagedIdentity') | Out-Null
-
+    $SafeLinksRuleParams = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
 
     if (('Present' -eq $Ensure ) -and (-not $SafeLinksRule))
     {
-        New-EXOSafeLinksRule -SafeLinksRuleParams $PSBoundParameters
+        $SafeLinksRuleParams.Add('Name', $SafeLinksRuleParams.Identity)
+        $SafeLinksRuleParams.Remove('Identity') | Out-Null
+        $SafeLinksRuleParams.Remove('MakeDefault') | Out-Null
+        Write-Verbose -Message "Creating New SafeLinksRule $($SafeLinksRuleParams.Name)"
+        New-SafeLinksRule @SafeLinksRuleParams -Confirm:$false
     }
 
     if (('Present' -eq $Ensure ) -and ($SafeLinksRule))
@@ -295,19 +303,20 @@ function Set-TargetResource
             # There doesn't appear to be any way to change the Enabled state of a rule once created.
             Write-Verbose -Message "Removing SafeLinksRule $($Identity) in order to change Enabled state."
             Remove-SafeLinksRule -Identity $Identity -Confirm:$false
-            New-EXOSafeLinksRule -SafeLinksRuleParams $PSBoundParameters
+            $SafeLinksRuleParams.Add('Name', $SafeLinksRuleParams.Identity)
+            $SafeLinksRuleParams.Remove('Identity') | Out-Null
+            $SafeLinksRuleParams.Remove('MakeDefault') | Out-Null
+            New-SafeLinksRule @SafeLinksRuleParams -Confirm:$false
         }
         else
         {
-            if ($SafeLinksRuleParams.SafeLinksPolicy -ne $SafeLinksRule.SafeLinksPolicy)
-            {
-                Set-EXOSafeLinksRule -SafeLinksRuleParams $SafeLinksRuleParams
-            }
-            else
+            $SafeLinksRuleParams.Remove('Enabled') | Out-Null
+            if ($SafeLinksRuleParams.SafeLinksPolicy -eq $SafeLinksRule.SafeLinksPolicy)
             {
                 $SafeLinksRuleParams.Remove('SafeLinksPolicy')
-                Set-EXOSafeLinksRule -SafeLinksRuleParams $SafeLinksRuleParams
             }
+            Write-Verbose -Message "Setting SafeLinksRule $($Identity)"
+            Set-SafeLinksRule @SafeLinksRuleParams -Confirm:$false
         }
     }
 
@@ -399,7 +408,11 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
@@ -421,13 +434,6 @@ function Test-TargetResource
     Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
 
     $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('Credential') | Out-Null
-    $ValuesToCheck.Remove('ApplicationId') | Out-Null
-    $ValuesToCheck.Remove('TenantId') | Out-Null
-    $ValuesToCheck.Remove('CertificateThumbprint') | Out-Null
-    $ValuesToCheck.Remove('CertificatePath') | Out-Null
-    $ValuesToCheck.Remove('CertificatePassword') | Out-Null
-    $ValuesToCheck.Remove('ManagedIdentity') | Out-Null
 
     $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
         -Source $($MyInvocation.MyCommand.Source) `
@@ -471,8 +477,13 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
         -InboundParameters $PSBoundParameters `
         -SkipModuleReload $true
@@ -499,16 +510,21 @@ function Export-TargetResource
 
             if ($SafeLinksRules.Length -eq 0)
             {
-                Write-Host $Global:M365DSCEmojiGreenCheckMark
+                Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
             }
             else
             {
-                Write-Host "`r`n" -NoNewline
+                Write-M365DSCHost -Message "`r`n" -DeferWrite
             }
             $i = 1
             foreach ($SafeLinksRule in $SafeLinksRules)
             {
-                Write-Host "    |---[$i/$($SafeLinksRules.Length)] $($SafeLinksRule.Identity)" -NoNewline
+                if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+                {
+                    $Global:M365DSCExportResourceInstancesCount++
+                }
+
+                Write-M365DSCHost -Message "    |---[$i/$($SafeLinksRules.Length)] $($SafeLinksRule.Identity)" -DeferWrite
                 $Params = @{
                     Identity              = $SafeLinksRule.Identity
                     SafeLinksPolicy       = $SafeLinksRule.SafeLinksPolicy
@@ -517,12 +533,11 @@ function Export-TargetResource
                     TenantId              = $TenantId
                     CertificateThumbprint = $CertificateThumbprint
                     CertificatePassword   = $CertificatePassword
-                    Managedidentity       = $ManagedIdentity.IsPresent
+                    ManagedIdentity       = $ManagedIdentity.IsPresent
                     CertificatePath       = $CertificatePath
+                    AccessTokens          = $AccessTokens
                 }
                 $Results = Get-TargetResource @Params
-                $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                    -Results $Results
                 $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                     -ConnectionMode $ConnectionMode `
                     -ModulePath $PSScriptRoot `
@@ -531,19 +546,19 @@ function Export-TargetResource
                 $dscContent += $currentDSCBlock
                 Save-M365DSCPartialExport -Content $currentDSCBlock `
                     -FileName $Global:PartialExportFileName
-                Write-Host $Global:M365DSCEmojiGreenCheckMark
+                Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
                 $i++
             }
         }
         else
         {
-            Write-Host "`r`n    $($Global:M365DSCEmojiYellowCircle) The current tenant is not registered to allow for Safe Links Rules."
+            Write-M365DSCHost -Message "`r`n    $($Global:M365DSCEmojiYellowCircle) The current tenant is not registered to allow for Safe Links Rules."
         }
         return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `

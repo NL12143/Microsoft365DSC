@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_PlannerBucket'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -45,6 +47,7 @@ function Get-TargetResource
         [Switch]
         $ManagedIdentity
     )
+
     Write-Verbose -Message "Getting configuration of Planner Bucket {$Name}"
 
     #Ensure the proper dependencies are installed in the current environment.
@@ -59,7 +62,7 @@ function Get-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftGraph' `
+    $null = New-M365DSCConnection -Workload 'MicrosoftGraph' `
         -InboundParameters $PSBoundParameters
 
     $nullReturn = $PSBoundParameters
@@ -159,6 +162,7 @@ function Set-TargetResource
         [Switch]
         $ManagedIdentity
     )
+
     Write-Verbose -Message "Setting configuration of Planner Bucket {$Name}"
 
     #Ensure the proper dependencies are installed in the current environment.
@@ -173,18 +177,8 @@ function Set-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftGraph' `
-        -InboundParameters $PSBoundParameters
-
-    $SetParams = $PSBoundParameters
     $currentValues = Get-TargetResource @PSBoundParameters
-    $SetParams.Remove('Credential') | Out-Null
-    $SetParams.Remove('ApplicationId') | Out-Null
-    $SetParams.Remove('TenantId') | Out-Null
-    $SetParams.Remove('CertificateThumbprint') | Out-Null
-    $SetParams.Remove('ApplicationSecret') | Out-Null
-    $SetParams.Remove('ManagedIdentity') | Out-Null
-    $SetParams.Remove('Ensure') | Out-Null
+    $SetParams = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
 
     if ($Ensure -eq 'Present' -and $currentValues.Ensure -eq 'Absent')
     {
@@ -251,11 +245,9 @@ function Test-TargetResource
         [Switch]
         $ManagedIdentity
     )
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
 
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -263,20 +255,9 @@ function Test-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message "Testing configuration of Planner Bucket {$Name}"
-
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $ValuesToCheck = $PSBoundParameters
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck $ValuesToCheck.Keys
-
-    Write-Verbose -Message "Test-TargetResource returned $TestResult"
-
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '')
+    return $result
 }
 
 function Export-TargetResource
@@ -285,6 +266,10 @@ function Export-TargetResource
     [OutputType([System.String])]
     param
     (
+        [Parameter()]
+        [System.String]
+        $Filter,
+
         [Parameter()]
         [System.Management.Automation.PSCredential]
         $Credential,
@@ -326,14 +311,14 @@ function Export-TargetResource
 
     try
     {
-        [array]$groups = Get-MgGroup -All:$true -ErrorAction Stop
+        [array]$groups = Get-MgGroup -All:$true -ErrorAction Stop -Filter $filter
 
         $i = 1
         $dscContent = ''
-        Write-Host "`r`n" -NoNewline
+        Write-M365DSCHost -Message "`r`n" -DeferWrite
         foreach ($group in $groups)
         {
-            Write-Host "    [$i/$($groups.Length)] $($group.DisplayName) - {$($group.Id)}"
+            Write-M365DSCHost -Message "    [$i/$($groups.Length)] $($group.DisplayName) - {$($group.Id)}"
             try
             {
                 [Array]$plans = Get-MgGroupPlannerPlan -GroupId $group.Id -ErrorAction 'SilentlyContinue'
@@ -341,12 +326,17 @@ function Export-TargetResource
                 $j = 1
                 foreach ($plan in $plans)
                 {
-                    Write-Host "        |---[$j/$($plans.Length)] $($plan.Title)"
+                    Write-M365DSCHost -Message "        |---[$j/$($plans.Length)] $($plan.Title)"
                     $buckets = Get-MgPlannerPlanBucket -PlannerPlanId $plan.Id
                     $k = 1
                     foreach ($bucket in $buckets)
                     {
-                        Write-Host "            |---[$k/$($buckets.Length)] $($bucket.Name)" -NoNewline
+                        if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+                        {
+                            $Global:M365DSCExportResourceInstancesCount++
+                        }
+
+                        Write-M365DSCHost -Message "            |---[$k/$($buckets.Length)] $($bucket.Name)" -DeferWrite
                         $params = @{
                             Name                  = $bucket.Name
                             PlanId                = $plan.Id
@@ -359,8 +349,6 @@ function Export-TargetResource
                             ManagedIdentity       = $ManagedIdentity.IsPresent
                         }
                         $results = Get-TargetResource @params
-                        $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                            -Results $Results
                         $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                             -ConnectionMode $ConnectionMode `
                             -ModulePath $PSScriptRoot `
@@ -370,7 +358,7 @@ function Export-TargetResource
 
                         Save-M365DSCPartialExport -Content $currentDSCBlock `
                             -FileName $Global:PartialExportFileName
-                        Write-Host $Global:M365DSCEmojiGreenCheckMark
+                        Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
                         $k++
                     }
                     $j++
@@ -379,7 +367,7 @@ function Export-TargetResource
             }
             catch
             {
-                Write-Host $Global:M365DSCEmojiRedX
+                Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
                 New-M365DSCLogEntry -Message 'Error during Export:' `
                     -Exception $_ `
@@ -392,7 +380,7 @@ function Export-TargetResource
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `

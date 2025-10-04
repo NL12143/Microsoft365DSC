@@ -1,16 +1,18 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_AADConditionalAccessPolicy'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
     [OutputType([System.Collections.Hashtable])]
     param
     (
-        [Parameter(Mandatory = $true)]
-        [System.String]
-        $DisplayName,
-
         [Parameter()]
         [System.String]
         $Id,
+
+        [Parameter(Mandatory = $true)]
+        [System.String]
+        $DisplayName,
 
         [Parameter()]
         [System.String]
@@ -25,6 +27,15 @@ function Get-TargetResource
         [Parameter()]
         [System.String[]]
         $ExcludeApplications,
+
+        [Parameter()]
+        [System.String]
+        $ApplicationsFilter,
+
+        [Parameter()]
+        [ValidateSet('include', 'exclude')]
+        [System.String]
+        $ApplicationsFilterMode,
 
         [Parameter()]
         [System.String[]]
@@ -55,6 +66,51 @@ function Get-TargetResource
         [System.String[]]
         $ExcludeRoles,
 
+        [Parameter()]
+        [System.String[]]
+        [validateSet('none', 'internalGuest', 'b2bCollaborationGuest', 'b2bCollaborationMember', 'b2bDirectConnectUser', 'otherExternalUser', 'serviceProvider', 'unknownFutureValue')]
+        $IncludeGuestOrExternalUserTypes,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet('', 'all', 'enumerated', 'unknownFutureValue')]
+        $IncludeExternalTenantsMembershipKind,
+
+        [Parameter()]
+        [System.String[]]
+        $IncludeExternalTenantsMembers,
+
+        [Parameter()]
+        [System.String[]]
+        [validateSet('none', 'internalGuest', 'b2bCollaborationGuest', 'b2bCollaborationMember', 'b2bDirectConnectUser', 'otherExternalUser', 'serviceProvider', 'unknownFutureValue')]
+        $ExcludeGuestOrExternalUserTypes,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet('', 'all', 'enumerated', 'unknownFutureValue')]
+        $ExcludeExternalTenantsMembershipKind,
+
+        [Parameter()]
+        [System.String[]]
+        $ExcludeExternalTenantsMembers,
+
+        [Parameter()]
+        [System.String[]]
+        $IncludeServicePrincipals,
+
+        [Parameter()]
+        [System.String[]]
+        $ExcludeServicePrincipals,
+
+        [Parameter()]
+        [ValidateSet('include', 'exclude')]
+        [System.String]
+        $ServicePrincipalFilterMode,
+
+        [Parameter()]
+        [System.String]
+        $ServicePrincipalFilterRule,
+
         #ConditionalAccessPlatformCondition
         [Parameter()]
         [System.String[]]
@@ -72,17 +128,6 @@ function Get-TargetResource
         [Parameter()]
         [System.String[]]
         $ExcludeLocations,
-
-        #ConditionalAccessDevicesCondition
-        #DEPRECATED
-        [Parameter()]
-        [System.String[]]
-        $IncludeDevices,
-
-        #DEPRECATED
-        [Parameter()]
-        [System.String[]]
-        $ExcludeDevices,
 
         [Parameter()]
         [ValidateSet('include', 'exclude')]
@@ -143,6 +188,11 @@ function Get-TargetResource
         $SignInFrequencyIsEnabled,
 
         [Parameter()]
+        [ValidateSet('timeBased', 'everyTime', 'unknownFutureValue')]
+        [System.String]
+        $SignInFrequencyInterval,
+
+        [Parameter()]
         [ValidateSet('Always', 'Never', '')]
         [System.String]
         $PersistentBrowserMode,
@@ -152,12 +202,42 @@ function Get-TargetResource
         $PersistentBrowserIsEnabled,
 
         [Parameter()]
+        [System.Boolean]
+        $DisableResilienceDefaultsIsEnabled,
+
+        [Parameter()]
         [System.String]
         $TermsOfUse,
 
         [Parameter()]
         [System.String[]]
         $CustomAuthenticationFactors,
+
+        [Parameter()]
+        [System.String]
+        $AuthenticationStrength,
+
+        [Parameter()]
+        [System.String[]]
+        $AuthenticationContexts,
+
+        [Parameter()]
+        [System.String]
+        $TransferMethods,
+
+        [Parameter()]
+        [ValidateSet('minor', 'moderate', 'elevated', 'unknownFutureValue')]
+        [System.String[]]
+        $InsiderRiskLevels,
+
+        [Parameter()]
+        [ValidateSet('low', 'medium', 'high', 'none', 'unknownFutureValue')]
+        [System.String[]]
+        $ServicePrincipalRiskLevels,
+
+        [Parameter()]
+        [System.String[]]
+        $ProtocolFlows,
 
         #generic
         [Parameter()]
@@ -187,414 +267,521 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
-    Write-Verbose -Message 'Getting configuration of AzureAD Conditional Access Policy'
-    $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftGraph' `
-        -InboundParameters $PSBoundParameters `
-        -ProfileName 'beta'
+    Write-Verbose -Message "Getting configuration of AzureAD Conditional Access Policy for {$DisplayName}"
 
-    Select-MgProfile -Name 'beta'
-
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
-
-    #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
-    $CommandName = $MyInvocation.MyCommand
-    $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
-        -CommandName $CommandName `
-        -Parameters $PSBoundParameters
-    Add-M365DSCTelemetryEvent -Data $data
-    #endregion
-
-    if ($PSBoundParameters.ContainsKey('Id'))
+    if (-not $Script:exportedInstance -or $Script:exportedInstance.DisplayName -ne $DisplayName)
     {
-        Write-Verbose -Message 'PolicyID was specified'
-        try
+        $null = New-M365DSCConnection -Workload 'MicrosoftGraph' `
+            -InboundParameters $PSBoundParameters
+
+        #Ensure the proper dependencies are installed in the current environment.
+        Confirm-M365DSCDependencies
+
+        #region Telemetry
+        $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+        $CommandName = $MyInvocation.MyCommand
+        $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
+            -CommandName $CommandName `
+            -Parameters $PSBoundParameters
+        Add-M365DSCTelemetryEvent -Data $data
+        #endregion
+
+        if ($PSBoundParameters.ContainsKey('Id'))
         {
-            $Policy = Get-MgIdentityConditionalAccessPolicy -ConditionalAccessPolicyId $Id -ErrorAction Stop
+            Write-Verbose -Message 'PolicyID was specified'
+            try
+            {
+                $Policy = Get-MgBetaIdentityConditionalAccessPolicy -ConditionalAccessPolicyId $Id -ErrorAction Stop
+                $jsonPolicy = ConvertTo-Json $Policy -Depth 10 -ErrorAction SilentlyContinue
+                Write-Verbose -Message "Retrieved policy:`r`n$($jsonPolicy)"
+            }
+            catch
+            {
+                Write-Verbose -Message "Couldn't find existing policy by ID {$Id}"
+                $Policy = Get-MgBetaIdentityConditionalAccessPolicy -Filter "DisplayName eq '$($DisplayName -replace "'", "''")'"
+                $jsonPolicy = ConvertTo-Json -Depth 10 $Policy -ErrorAction SilentlyContinue
+                Write-Verbose -Message "Retrieved policy:`r`n$($jsonPolicy)"
+
+                if ($Policy.Length -gt 1)
+                {
+                    throw "Duplicate CA Policies named $DisplayName exist in tenant"
+                }
+            }
         }
-        catch
+        else
         {
-            Write-Verbose -Message "Couldn't find existing policy by ID {$Id}"
-            $Policy = Get-MgIdentityConditionalAccessPolicy -Filter "DisplayName eq '$DisplayName'"
+            Write-Verbose -Message 'Id was NOT specified'
+            ## Can retreive multiple CA Policies since displayname is not unique
+            $Policy = Get-MgBetaIdentityConditionalAccessPolicy -Filter "DisplayName eq '$($DisplayName -replace "'", "''")'"
+            $jsonPolicy = ConvertTo-Json -Depth 10 $Policy -ErrorAction SilentlyContinue
+            Write-Verbose -Message "Retrieved policy:`r`n$($jsonPolicy)"
+
             if ($Policy.Length -gt 1)
             {
                 throw "Duplicate CA Policies named $DisplayName exist in tenant"
             }
         }
+
+        if ([String]::IsNullOrEmpty($Policy.id))
+        {
+            Write-Verbose -Message "No existing Policy with name {$DisplayName} were found"
+            $currentValues = $PSBoundParameters
+            $currentValues.Ensure = 'Absent'
+            return $currentValues
+        }
     }
     else
     {
-        Write-Verbose -Message 'Id was NOT specified'
-        ## Can retreive multiple CA Policies since displayname is not unique
-        $Policy = Get-MgIdentityConditionalAccessPolicy -Filter "DisplayName eq '$DisplayName'"
-        if ($Policy.Length -gt 1)
-        {
-            throw "Duplicate CA Policies named $DisplayName exist in tenant"
-        }
+        Write-Verbose -Message "Using cached policy {$($Script:exportedInstance.DisplayName)}"
+        $Policy = $Script:exportedInstance
     }
 
-    if ($null -eq $Policy)
+    Write-Verbose -Message 'Get-TargetResource: Found existing Conditional Access policy'
+    $PolicyDisplayName = $Policy.DisplayName
+
+    Write-Verbose -Message 'Get-TargetResource: Process IncludeUsers'
+    #translate IncludeUser GUIDs to UPN, except id value is GuestsOrExternalUsers, None or All
+    $IncludeUsers = @()
+    if ($Policy.Conditions.Users.IncludeUsers)
     {
-        Write-Verbose -Message "No existing Policy with name {$DisplayName} were found"
-        $currentValues = $PSBoundParameters
-        $currentValues.Ensure = 'Absent'
-        return $currentValues
-    }
-    else
-    {
-        Write-Verbose -Message 'Get-TargetResource: Found existing Conditional Access policy'
-        $PolicyDisplayName = $Policy.DisplayName
-
-        Write-Verbose -Message 'Get-TargetResource: Process IncludeUsers'
-        #translate IncludeUser GUIDs to UPN, except id value is GuestsOrExternalUsers, None or All
-        $IncludeUsers = @()
-        if ($Policy.Conditions.Users.IncludeUsers)
+        foreach ($IncludeUserGUID in $Policy.Conditions.Users.IncludeUsers)
         {
-            foreach ($IncludeUserGUID in $Policy.Conditions.Users.IncludeUsers)
+            if ($IncludeUserGUID -notin 'GuestsOrExternalUsers', 'All', 'None')
             {
-                if ($IncludeUserGUID -notin 'GuestsOrExternalUsers', 'All', 'None')
-                {
-                    $IncludeUser = $null
-                    try
-                    {
-                        $IncludeUser = (Get-MgUser -UserId $IncludeUserGUID -ErrorAction Stop).userprincipalname
-                    }
-                    catch
-                    {
-                        New-M365DSCLogEntry -Message 'Error retrieving data:' `
-                            -Exception $_ `
-                            -Source $($MyInvocation.MyCommand.Source) `
-                            -TenantId $TenantId `
-                            -Credential $Credential
-                    }
-                    if ($IncludeUser)
-                    {
-                        $IncludeUsers += $IncludeUser
-                    }
-                }
-                else
-                {
-                    $IncludeUsers += $IncludeUserGUID
-                }
-            }
-        }
-
-        Write-Verbose -Message 'Get-TargetResource: Process ExcludeUsers'
-        #translate ExcludeUser GUIDs to UPN, except id value is GuestsOrExternalUsers, None or All
-        $ExcludeUsers = @()
-        if ($Policy.Conditions.Users.ExcludeUsers)
-        {
-            foreach ($ExcludeUserGUID in $Policy.Conditions.Users.ExcludeUsers)
-            {
-                if ($ExcludeUserGUID -notin 'GuestsOrExternalUsers', 'All', 'None')
-                {
-                    $ExcludeUser = $null
-                    try
-                    {
-                        $ExcludeUser = (Get-MgUser -UserId $ExcludeUserGUID -ErrorAction Stop).userprincipalname
-                    }
-                    catch
-                    {
-                        $message = "Couldn't find user $ExcludeUserGUID , that is defined in policy $PolicyDisplayName"
-                        New-M365DSCLogEntry -Message $message `
-                            -Source $($MyInvocation.MyCommand.Source) `
-                            -TenantId $TenantId `
-                            -Credential $Credential
-                    }
-                    if ($ExcludeUser)
-                    {
-                        $ExcludeUsers += $ExcludeUser
-                    }
-                }
-                else
-                {
-                    $ExcludeUsers += $ExcludeUserGUID
-                }
-            }
-        }
-
-        Write-Verbose -Message 'Get-TargetResource: Process IncludeGroups'
-        #translate IncludeGroup GUIDs to DisplayName
-        $IncludeGroups = @()
-        if ($Policy.Conditions.Users.IncludeGroups)
-        {
-            foreach ($IncludeGroupGUID in $Policy.Conditions.Users.IncludeGroups)
-            {
-                $IncludeGroup = $null
+                $IncludeUser = $null
                 try
                 {
-                    $IncludeGroup = (Get-MgGroup -GroupId $IncludeGroupGUID).displayname
+                    $IncludeUser = (Get-MgUser -UserId $IncludeUserGUID -ErrorAction Stop).userprincipalname
                 }
                 catch
                 {
-                    $message = "Couldn't find Group $IncludeGroupGUID , that is defined in policy $PolicyDisplayName"
+                    $message = "Couldn't find IncludedUser '$IncludeUserGUID', that is defined in policy '$PolicyDisplayName'. Skipping user."
+                    New-M365DSCLogEntry -Message $message `
+                        -Exception $_ `
+                        -Source $($MyInvocation.MyCommand.Source) `
+                        -TenantId $TenantId `
+                        -Credential $Credential
+                    continue
+                }
+                if ($IncludeUser)
+                {
+                    $IncludeUsers += $IncludeUser
+                }
+            }
+            else
+            {
+                $IncludeUsers += $IncludeUserGUID
+            }
+        }
+    }
+
+    Write-Verbose -Message 'Get-TargetResource: Process ExcludeUsers'
+    #translate ExcludeUser GUIDs to UPN, except id value is GuestsOrExternalUsers, None or All
+    $ExcludeUsers = @()
+    if ($Policy.Conditions.Users.ExcludeUsers)
+    {
+        foreach ($ExcludeUserGUID in $Policy.Conditions.Users.ExcludeUsers)
+        {
+            if ($ExcludeUserGUID -notin 'GuestsOrExternalUsers', 'All', 'None')
+            {
+                $ExcludeUser = $null
+                try
+                {
+                    $ExcludeUser = (Get-MgUser -UserId $ExcludeUserGUID -ErrorAction Stop).userprincipalname
+                }
+                catch
+                {
+                    $message = "Couldn't find ExcludedUser '$ExcludeUserGUID', that is defined in policy '$PolicyDisplayName'. Skipping user."
+                    New-M365DSCLogEntry -Message $message `
+                        -Exception $_ `
+                        -Source $($MyInvocation.MyCommand.Source) `
+                        -TenantId $TenantId `
+                        -Credential $Credential
+                    continue
+                }
+                if ($ExcludeUser)
+                {
+                    $ExcludeUsers += $ExcludeUser
+                }
+            }
+            else
+            {
+                $ExcludeUsers += $ExcludeUserGUID
+            }
+        }
+    }
+
+    Write-Verbose -Message 'Get-TargetResource: Process IncludeGroups'
+    #translate IncludeGroup GUIDs to DisplayName
+    $IncludeGroups = @()
+    if ($Policy.Conditions.Users.IncludeGroups)
+    {
+        foreach ($IncludeGroupGUID in $Policy.Conditions.Users.IncludeGroups)
+        {
+            $IncludeGroup = $null
+            try
+            {
+                $IncludeGroup = (Get-MgGroup -GroupId $IncludeGroupGUID -ErrorAction Stop).displayname
+            }
+            catch
+            {
+                $message = "Couldn't find IncludedGroup '$IncludeGroupGUID', that is defined in policy '$PolicyDisplayName'. Skipping group."
+                New-M365DSCLogEntry -Message $message `
+                    -Exception $_ `
+                    -Source $($MyInvocation.MyCommand.Source) `
+                    -TenantId $TenantId `
+                    -Credential $Credential
+                continue
+            }
+            if ($IncludeGroup)
+            {
+                $IncludeGroups += $IncludeGroup
+            }
+        }
+    }
+
+    Write-Verbose -Message 'Get-TargetResource: Process ExcludeGroups'
+    #translate ExcludeGroup GUIDs to DisplayName
+    $ExcludeGroups = @()
+    if ($Policy.Conditions.Users.ExcludeGroups)
+    {
+        foreach ($ExcludeGroupGUID in $Policy.Conditions.Users.ExcludeGroups)
+        {
+            $ExcludeGroup = $null
+            try
+            {
+                $ExcludeGroup = (Get-MgGroup -GroupId $ExcludeGroupGUID -ErrorAction Stop).displayname
+            }
+            catch
+            {
+                $message = "Couldn't find ExcludedGroup '$ExcludeGroupGUID', that is defined in policy '$PolicyDisplayName'. Skipping group."
+                New-M365DSCLogEntry -Message $message `
+                    -Exception $_ `
+                    -Source $($MyInvocation.MyCommand.Source) `
+                    -TenantId $TenantId `
+                    -Credential $Credential
+                continue
+            }
+            if ($ExcludeGroup)
+            {
+                $ExcludeGroups += $ExcludeGroup
+            }
+        }
+    }
+
+    $IncludeRoles = @()
+    $ExcludeRoles = @()
+    #translate role template guids to role name
+    if ($Policy.Conditions.Users.IncludeRoles -or $Policy.Conditions.Users.ExcludeRoles)
+    {
+        Write-Verbose -Message 'Get-TargetResource: Role condition defined, processing'
+        #build role translation table
+        $rolelookup = @{}
+        foreach ($role in Get-MgDirectoryRoleTemplate -All)
+        {
+            $rolelookup[$role.Id] = $role.DisplayName
+        }
+
+        Write-Verbose -Message 'Get-TargetResource: Processing IncludeRoles'
+        if ($Policy.Conditions.Users.IncludeRoles)
+        {
+            foreach ($IncludeRoleGUID in $Policy.Conditions.Users.IncludeRoles)
+            {
+                if ($null -eq $rolelookup[$IncludeRoleGUID])
+                {
+                    $message = "Couldn't find IncludedRole '$IncludeRoleGUID', that is defined in policy '$PolicyDisplayName'. Skipping role."
                     New-M365DSCLogEntry -Message $message `
                         -Source $($MyInvocation.MyCommand.Source) `
                         -TenantId $TenantId `
                         -Credential $Credential
                 }
-                if ($IncludeGroup)
+                else
                 {
-                    $IncludeGroups += $IncludeGroup
+                    $IncludeRoles += $rolelookup[$IncludeRoleGUID]
                 }
             }
         }
 
-        Write-Verbose -Message 'Get-TargetResource: Process ExcludeGroups'
-        #translate ExcludeGroup GUIDs to DisplayName
-        $ExcludeGroups = @()
-        if ($Policy.Conditions.Users.ExcludeGroups)
+        Write-Verbose -Message 'Get-TargetResource: Processing ExcludeRoles'
+        if ($Policy.Conditions.Users.ExcludeRoles)
         {
-            foreach ($ExcludeGroupGUID in $Policy.Conditions.Users.ExcludeGroups)
+            foreach ($ExcludeRoleGUID in $Policy.Conditions.Users.ExcludeRoles)
             {
-                $ExcludeGroup = $null
-                try
+                if ($null -eq $rolelookup[$ExcludeRoleGUID])
                 {
-                    $ExcludeGroup = (Get-MgGroup -GroupId $ExcludeGroupGUID).displayname
-                }
-                catch
-                {
-                    $message = "Couldn't find Group $ExcludeGroupGUID , that is defined in policy $PolicyDisplayName"
+                    $message = "Couldn't find ExcludedRole '$ExcludeRoleGUID', that is defined in policy '$PolicyDisplayName'. Skipping role."
                     New-M365DSCLogEntry -Message $message `
                         -Source $($MyInvocation.MyCommand.Source) `
                         -TenantId $TenantId `
                         -Credential $Credential
                 }
-                if ($ExcludeGroup)
+                else
                 {
-                    $ExcludeGroups += $ExcludeGroup
+                    $ExcludeRoles += $rolelookup[$ExcludeRoleGUID]
                 }
             }
         }
-
-
-        $IncludeRoles = @()
-        $ExcludeRoles = @()
-        #translate role template guids to role name
-        if ($Policy.Conditions.Users.IncludeRoles -or $Policy.Conditions.Users.ExcludeRoles)
-        {
-            Write-Verbose -Message 'Get-TargetResource: Role condition defined, processing'
-            #build role translation table
-            $rolelookup = @{}
-            foreach ($role in Get-MgDirectoryRoleTemplate)
-            {
-                $rolelookup[$role.Id] = $role.DisplayName
-            }
-
-            Write-Verbose -Message 'Get-TargetResource: Processing IncludeRoles'
-            if ($Policy.Conditions.Users.IncludeRoles)
-            {
-                foreach ($IncludeRoleGUID in $Policy.Conditions.Users.IncludeRoles)
-                {
-                    if ($null -eq $rolelookup[$IncludeRoleGUID])
-                    {
-                        $message = "Couldn't find role $IncludeRoleGUID , couldn't add to policy $PolicyDisplayName"
-                        New-M365DSCLogEntry -Message $message `
-                            -Source $($MyInvocation.MyCommand.Source) `
-                            -TenantId $TenantId `
-                            -Credential $Credential
-                    }
-                    else
-                    {
-                        $IncludeRoles += $rolelookup[$IncludeRoleGUID]
-                    }
-                }
-            }
-
-            Write-Verbose -Message 'Get-TargetResource: Processing ExcludeRoles'
-            if ($Policy.Conditions.Users.ExcludeRoles)
-            {
-                foreach ($ExcludeRoleGUID in $Policy.Conditions.Users.ExcludeRoles)
-                {
-                    if ($null -eq $rolelookup[$ExcludeRoleGUID])
-                    {
-                        $message = "Couldn't find role $ExcludeRoleGUID , couldn't add to policy $PolicyDisplayName"
-                        New-M365DSCLogEntry -Message $message `
-                            -Source $($MyInvocation.MyCommand.Source) `
-                            -TenantId $TenantId `
-                            -Credential $Credential
-                    }
-                    else
-                    {
-                        $ExcludeRoles += $rolelookup[$ExcludeRoleGUID]
-                    }
-                }
-            }
-
-        }
-
-        $IncludeLocations = @()
-        $ExcludeLocations = @()
-        #translate Location template guids to Location name
-        if ($Policy.Conditions.Locations)
-        {
-            Write-Verbose -Message 'Get-TargetResource: Location condition defined, processing'
-            #build Location translation table
-            $Locationlookup = @{}
-            foreach ($Location in Get-MgIdentityConditionalAccessNamedLocation)
-            {
-                $Locationlookup[$Location.Id] = $Location.DisplayName
-            }
-
-            Write-Verbose -Message 'Get-TargetResource: Processing IncludeLocations'
-            if ($Policy.Conditions.Locations.IncludeLocations)
-            {
-                foreach ($IncludeLocationGUID in $Policy.Conditions.Locations.IncludeLocations)
-                {
-                    if ($IncludeLocationGUID -in 'All', 'AllTrusted')
-                    {
-                        $IncludeLocations += $IncludeLocationGUID
-                    }
-                    elseif ($null -eq $Locationlookup[$IncludeLocationGUID])
-                    {
-                        $message = "Couldn't find Location $IncludeLocationGUID , couldn't add to policy $PolicyDisplayName"
-                        New-M365DSCLogEntry -Message $message `
-                            -Source $($MyInvocation.MyCommand.Source) `
-                            -TenantId $TenantId `
-                            -Credential $Credential
-                    }
-                    else
-                    {
-                        $IncludeLocations += $Locationlookup[$IncludeLocationGUID]
-                    }
-                }
-            }
-
-            Write-Verbose -Message 'Get-TargetResource: Processing ExcludeLocations'
-            if ($Policy.Conditions.Locations.ExcludeLocations)
-            {
-                foreach ($ExcludeLocationGUID in $Policy.Conditions.Locations.ExcludeLocations)
-                {
-                    if ($ExcludeLocationGUID -in 'All', 'AllTrusted')
-                    {
-                        $ExcludeLocations += $ExcludeLocationGUID
-                    }
-                    elseif ($null -eq $Locationlookup[$ExcludeLocationGUID])
-                    {
-                        $message = "Couldn't find Location $ExcludeLocationGUID , couldn't add to policy $PolicyDisplayName"
-                        New-M365DSCLogEntry -Message $message `
-                            -Source $($MyInvocation.MyCommand.Source) `
-                            -TenantId $TenantId `
-                            -Credential $Credential
-                    }
-                    else
-                    {
-                        $ExcludeLocations += $Locationlookup[$ExcludeLocationGUID]
-                    }
-                }
-            }
-        }
-        if ($Policy.SessionControls.CloudAppSecurity.IsEnabled)
-        {
-            $CloudAppSecurityType = [System.String]$Policy.SessionControls.CloudAppSecurity.CloudAppSecurityType
-        }
-        else
-        {
-            $CloudAppSecurityType = $null
-        }
-        if ($Policy.SessionControls.SignInFrequency.IsEnabled)
-        {
-            $SignInFrequencyType = [System.String]$Policy.SessionControls.SignInFrequency.Type
-        }
-        else
-        {
-            $SignInFrequencyType = $null
-        }
-        if ($Policy.SessionControls.PersistentBrowser.IsEnabled)
-        {
-            $PersistentBrowserMode = [System.String]$Policy.SessionControls.PersistentBrowser.Mode
-        }
-        else
-        {
-            $PersistentBrowserMode = $null
-        }
-
-        $termsOfUseName = $null
-        if ($Policy.GrantControls.TermsOfUse)
-        {
-            $termofUse = Get-MgAgreement | Where-Object -FilterScript { $_.Id -eq $Policy.GrantControls.TermsOfUse }
-            if ($termOfUse)
-            {
-                $termOfUseName = $termOfUse.DisplayName
-            }
-        }
-
-        $result = @{
-            DisplayName                              = $Policy.DisplayName
-            Id                                       = $Policy.Id
-            State                                    = $Policy.State
-            IncludeApplications                      = [System.String[]](@() + $Policy.Conditions.Applications.IncludeApplications)
-            #no translation of Application GUIDs, return empty string array if undefined
-            ExcludeApplications                      = [System.String[]](@() + $Policy.Conditions.Applications.ExcludeApplications)
-            #no translation of GUIDs, return empty string array if undefined
-            IncludeUserActions                       = [System.String[]](@() + $Policy.Conditions.Applications.IncludeUserActions)
-            #no translation needed, return empty string array if undefined
-            IncludeUsers                             = $IncludeUsers
-            ExcludeUsers                             = $ExcludeUsers
-            IncludeGroups                            = $IncludeGroups
-            ExcludeGroups                            = $ExcludeGroups
-            IncludeRoles                             = $IncludeRoles
-            ExcludeRoles                             = $ExcludeRoles
-
-            IncludePlatforms                         = [System.String[]](@() + $Policy.Conditions.Platforms.IncludePlatforms)
-            #no translation needed, return empty string array if undefined
-            ExcludePlatforms                         = [System.String[]](@() + $Policy.Conditions.Platforms.ExcludePlatforms)
-            #no translation needed, return empty string array if undefined
-            IncludeLocations                         = $IncludeLocations
-            ExcludeLocations                         = $ExcludeLocations
-
-            IncludeDevices                           = [System.String[]](@() + $Policy.Conditions.Devices.IncludeDevices)
-            ExcludeDevices                           = [System.String[]](@() + $Policy.Conditions.Devices.ExcludeDevices)
-
-            #no translation needed, return empty string array if undefined
-            DeviceFilterMode                         = [System.String]$Policy.Conditions.Devices.DeviceFilter.Mode
-            #no translation or conversion needed
-            DeviceFilterRule                         = [System.String]$Policy.Conditions.Devices.DeviceFilter.Rule
-            #no translation or conversion needed
-            UserRiskLevels                           = [System.String[]](@() + $Policy.Conditions.UserRiskLevels)
-            #no translation needed, return empty string array if undefined
-            SignInRiskLevels                         = [System.String[]](@() + $Policy.Conditions.SignInRiskLevels)
-            #no translation needed, return empty string array if undefined
-            ClientAppTypes                           = [System.String[]](@() + $Policy.Conditions.ClientAppTypes)
-            #no translation needed, return empty string array if undefined
-            GrantControlOperator                     = $Policy.GrantControls.Operator
-            #no translation or conversion needed
-            BuiltInControls                          = [System.String[]](@() + $Policy.GrantControls.BuiltInControls)
-            CustomAuthenticationFactors              = [System.String[]](@() + $Policy.GrantControls.CustomAuthenticationFactors)
-            #no translation needed, return empty string array if undefined
-            ApplicationEnforcedRestrictionsIsEnabled = $false -or $Policy.SessionControls.ApplicationEnforcedRestrictions.IsEnabled
-            #make false if undefined, true if true
-            CloudAppSecurityIsEnabled                = $false -or $Policy.SessionControls.CloudAppSecurity.IsEnabled
-            #make false if undefined, true if true
-            CloudAppSecurityType                     = [System.String]$Policy.SessionControls.CloudAppSecurity.CloudAppSecurityType
-            #no translation needed, return empty string array if undefined
-            SignInFrequencyIsEnabled                 = $false -or $Policy.SessionControls.SignInFrequency.IsEnabled
-            #make false if undefined, true if true
-            SignInFrequencyValue                     = $Policy.SessionControls.SignInFrequency.Value
-            #no translation or conversion needed, $null returned if undefined
-            SignInFrequencyType                      = [System.String]$Policy.SessionControls.SignInFrequency.Type
-            #no translation needed
-            PersistentBrowserIsEnabled               = $false -or $Policy.SessionControls.PersistentBrowser.IsEnabled
-            #make false if undefined, true if true
-            PersistentBrowserMode                    = [System.String]$Policy.SessionControls.PersistentBrowser.Mode
-            #no translation needed
-            #Standard part
-            TermsOfUse                               = $termOfUseName
-            Ensure                                   = 'Present'
-            Credential                               = $Credential
-            ApplicationSecret                        = $ApplicationSecret
-            ApplicationId                            = $ApplicationId
-            TenantId                                 = $TenantId
-            CertificateThumbprint                    = $CertificateThumbprint
-            Managedidentity                          = $ManagedIdentity.IsPresent
-        }
-        Write-Verbose -Message "Get-TargetResource Result: `n $(Convert-M365DscHashtableToString -Hashtable $result)"
-        return $result
     }
+
+    $IncludeLocations = @()
+    $ExcludeLocations = @()
+    #translate Location template guids to Location name
+    if ($Policy.Conditions.Locations)
+    {
+        Write-Verbose -Message 'Get-TargetResource: Location condition defined, processing'
+        #build Location translation table
+        $Locationlookup = @{}
+        foreach ($Location in Get-MgBetaIdentityConditionalAccessNamedLocation)
+        {
+            $Locationlookup[$Location.Id] = $Location.DisplayName
+        }
+
+        Write-Verbose -Message 'Get-TargetResource: Processing IncludeLocations'
+        if ($Policy.Conditions.Locations.IncludeLocations)
+        {
+            foreach ($IncludeLocationGUID in $Policy.Conditions.Locations.IncludeLocations)
+            {
+                if ($IncludeLocationGUID -in 'All', 'AllTrusted')
+                {
+                    $IncludeLocations += $IncludeLocationGUID
+                }
+                elseif ($IncludeLocationGUID -eq '00000000-0000-0000-0000-000000000000')
+                {
+                    $IncludeLocations += 'Multifactor authentication trusted IPs'
+                }
+                elseif ($null -eq $Locationlookup[$IncludeLocationGUID])
+                {
+                    $message = "Couldn't find Location $IncludeLocationGUID , couldn't add to policy $PolicyDisplayName"
+                    New-M365DSCLogEntry -Message $message `
+                        -Source $($MyInvocation.MyCommand.Source) `
+                        -TenantId $TenantId `
+                        -Credential $Credential
+                }
+                else
+                {
+                    $IncludeLocations += $Locationlookup[$IncludeLocationGUID]
+                }
+            }
+        }
+
+        Write-Verbose -Message 'Get-TargetResource: Processing ExcludeLocations'
+        if ($Policy.Conditions.Locations.ExcludeLocations)
+        {
+            foreach ($ExcludeLocationGUID in $Policy.Conditions.Locations.ExcludeLocations)
+            {
+                if ($ExcludeLocationGUID -in 'All', 'AllTrusted')
+                {
+                    $ExcludeLocations += $ExcludeLocationGUID
+                }
+                elseif ($ExcludeLocationGUID -eq '00000000-0000-0000-0000-000000000000')
+                {
+                    $ExcludeLocations += 'Multifactor authentication trusted IPs'
+                }
+                elseif ($null -eq $Locationlookup[$ExcludeLocationGUID])
+                {
+                    $message = "Couldn't find Location $ExcludeLocationGUID , couldn't add to policy $PolicyDisplayName"
+                    New-M365DSCLogEntry -Message $message `
+                        -Source $($MyInvocation.MyCommand.Source) `
+                        -TenantId $TenantId `
+                        -Credential $Credential
+                }
+                else
+                {
+                    $ExcludeLocations += $Locationlookup[$ExcludeLocationGUID]
+                }
+            }
+        }
+    }
+    if ($Policy.SessionControls.CloudAppSecurity.IsEnabled)
+    {
+        $CloudAppSecurityType = [System.String]$Policy.SessionControls.CloudAppSecurity.CloudAppSecurityType
+    }
+    else
+    {
+        $CloudAppSecurityType = $null
+    }
+    if ($Policy.SessionControls.SignInFrequency.IsEnabled)
+    {
+        $SignInFrequencyType = [System.String]$Policy.SessionControls.SignInFrequency.Type
+        $SignInFrequencyIntervalValue = [System.String]$Policy.SessionControls.SignInFrequency.FrequencyInterval
+    }
+    else
+    {
+        $SignInFrequencyType = $null
+        $SignInFrequencyIntervalValue = $null
+    }
+    if ($Policy.SessionControls.PersistentBrowser.IsEnabled)
+    {
+        $PersistentBrowserMode = [System.String]$Policy.SessionControls.PersistentBrowser.Mode
+    }
+    else
+    {
+        $PersistentBrowserMode = $null
+    }
+    if ($Policy.Conditions.Users.IncludeGuestsOrExternalUsers.GuestOrExternalUserTypes)
+    {
+        [Array]$IncludeGuestOrExternalUserTypes = ($Policy.Conditions.Users.IncludeGuestsOrExternalUsers.GuestOrExternalUserTypes).Split(',')
+    }
+    if ($Policy.Conditions.Users.ExcludeGuestsOrExternalUsers.GuestOrExternalUserTypes)
+    {
+        [Array]$ExcludeGuestOrExternalUserTypes = ($Policy.Conditions.Users.ExcludeGuestsOrExternalUsers.GuestOrExternalUserTypes).Split(',')
+    }
+
+    $termsOfUseName = $null
+    if ($Policy.GrantControls.TermsOfUse)
+    {
+        $termofUse = Get-MgBetaAgreement | Where-Object -FilterScript { $_.Id -eq $Policy.GrantControls.TermsOfUse }
+        if ($termOfUse)
+        {
+            $termOfUseName = $termOfUse.DisplayName
+        }
+    }
+
+    $AuthenticationStrengthValue = $null
+    if ($null -ne $Policy.GrantControls -and $null -ne $Policy.GrantControls.AuthenticationStrength -and `
+            $null -ne $Policy.GrantControls.AuthenticationStrength.Id)
+    {
+        $strengthPolicy = Get-MgBetaPolicyAuthenticationStrengthPolicy -AuthenticationStrengthPolicyId $Policy.GrantControls.AuthenticationStrength.Id
+        if ($null -ne $strengthPolicy)
+        {
+            $AuthenticationStrengthValue = $strengthPolicy.DisplayName
+        }
+    }
+
+    $AuthenticationContextsValues = @()
+    if ($null -ne $Policy.Conditions.Applications.IncludeAuthenticationContextClassReferences)
+    {
+        foreach ($class in $Policy.Conditions.Applications.IncludeAuthenticationContextClassReferences)
+        {
+            $classReference = Get-MgBetaIdentityConditionalAccessAuthenticationContextClassReference `
+                -AuthenticationContextClassReferenceId $class `
+                -ErrorAction SilentlyContinue
+            if ($null -ne $classReference)
+            {
+                $AuthenticationContextsValues += $classReference.DisplayName
+            }
+        }
+    }
+
+    $InsiderRiskLevelsValue = $null
+    if (-not [System.String]::IsNullOrEmpty($Policy.Conditions.InsiderRiskLevels))
+    {
+        $InsiderRiskLevelsValue = $Policy.Conditions.InsiderRiskLevels.Split(',')
+    }
+
+    $ProtocolFlowsValue = @()
+    if ($null -ne $Policy.Conditions.AuthenticationFlows.AdditionalProperties.protocolFlows)
+    {
+        $ProtocolFlowsValue = $Policy.Conditions.AuthenticationFlows.AdditionalProperties.protocolFlows.Split(',')
+    }
+
+    $DisableResilienceDefaultsIsEnabledValue = $null
+    if (-not [System.String]::IsNullOrEmpty($Policy.SessionControls.disableResilienceDefaults.isEnabled))
+    {
+        $DisableResilienceDefaultsIsEnabledValue = [Boolean]::Parse($Policy.SessionControls.disableResilienceDefaults.isEnabled)
+    }
+
+    $result = @{
+        DisplayName                              = $Policy.DisplayName
+        Id                                       = $Policy.Id
+        State                                    = $Policy.State
+        IncludeApplications                      = [System.String[]](@() + $Policy.Conditions.Applications.IncludeApplications)
+        #no translation of Application GUIDs, return empty string array if undefined
+        ExcludeApplications                      = [System.String[]](@() + $Policy.Conditions.Applications.ExcludeApplications)
+        ApplicationsFilter                       = $Policy.Conditions.Applications.ApplicationFilter.Rule
+        ApplicationsFilterMode                   = $Policy.Conditions.Applications.ApplicationFilter.Mode
+        #no translation of GUIDs, return empty string array if undefined
+        IncludeUserActions                       = [System.String[]](@() + $Policy.Conditions.Applications.IncludeUserActions)
+        #no translation needed, return empty string array if undefined
+        IncludeUsers                             = $IncludeUsers
+        ExcludeUsers                             = $ExcludeUsers
+        IncludeGroups                            = $IncludeGroups
+        ExcludeGroups                            = $ExcludeGroups
+        IncludeRoles                             = $IncludeRoles
+        ExcludeRoles                             = $ExcludeRoles
+        IncludeGuestOrExternalUserTypes          = [System.String[]]$IncludeGuestOrExternalUserTypes
+        IncludeExternalTenantsMembershipKind     = [System.String]$Policy.Conditions.Users.IncludeGuestsOrExternalUsers.ExternalTenants.MembershipKind
+        IncludeExternalTenantsMembers            = [System.String[]](@() + $Policy.Conditions.Users.IncludeGuestsOrExternalUsers.ExternalTenants.AdditionalProperties.members)
+
+        ExcludeGuestOrExternalUserTypes          = [System.String[]]$ExcludeGuestOrExternalUserTypes
+        ExcludeExternalTenantsMembershipKind     = [System.String]$Policy.Conditions.Users.ExcludeGuestsOrExternalUsers.ExternalTenants.MembershipKind
+        ExcludeExternalTenantsMembers            = [System.String[]](@() + $Policy.Conditions.Users.ExcludeGuestsOrExternalUsers.ExternalTenants.AdditionalProperties.members)
+
+        IncludeServicePrincipals                 = $Policy.Conditions.ClientApplications.IncludeServicePrincipals
+        ExcludeServicePrincipals                 = $Policy.Conditions.ClientApplications.ExcludeServicePrincipals
+        ServicePrincipalFilterMode               = $Policy.Conditions.ClientApplications.ServicePrincipalFilter.Mode
+        ServicePrincipalFilterRule               = $Policy.Conditions.ClientApplications.ServicePrincipalFilter.Rule
+
+        IncludePlatforms                         = [System.String[]](@() + $Policy.Conditions.Platforms.IncludePlatforms)
+        #no translation needed, return empty string array if undefined
+        ExcludePlatforms                         = [System.String[]](@() + $Policy.Conditions.Platforms.ExcludePlatforms)
+        #no translation needed, return empty string array if undefined
+        IncludeLocations                         = $IncludeLocations
+        ExcludeLocations                         = $ExcludeLocations
+
+        #no translation needed, return empty string array if undefined
+        DeviceFilterMode                         = [System.String]$Policy.Conditions.Devices.DeviceFilter.Mode
+        #no translation or conversion needed
+        DeviceFilterRule                         = [System.String]$Policy.Conditions.Devices.DeviceFilter.Rule
+        #no translation or conversion needed
+        UserRiskLevels                           = [System.String[]](@() + $Policy.Conditions.UserRiskLevels)
+        #no translation needed, return empty string array if undefined
+        SignInRiskLevels                         = [System.String[]](@() + $Policy.Conditions.SignInRiskLevels)
+        #no translation needed, return empty string array if undefined
+        ClientAppTypes                           = [System.String[]](@() + $Policy.Conditions.ClientAppTypes)
+        #no translation needed, return empty string array if undefined
+        GrantControlOperator                     = $Policy.GrantControls.Operator
+        #no translation or conversion needed
+        BuiltInControls                          = [System.String[]](@() + $Policy.GrantControls.BuiltInControls)
+        CustomAuthenticationFactors              = [System.String[]](@() + $Policy.GrantControls.CustomAuthenticationFactors)
+        #no translation needed, return empty string array if undefined
+        ApplicationEnforcedRestrictionsIsEnabled = $false -or $Policy.SessionControls.ApplicationEnforcedRestrictions.IsEnabled
+        #make false if undefined, true if true
+        CloudAppSecurityIsEnabled                = $false -or $Policy.SessionControls.CloudAppSecurity.IsEnabled
+        #make false if undefined, true if true
+        CloudAppSecurityType                     = [System.String]$Policy.SessionControls.CloudAppSecurity.CloudAppSecurityType
+        #no translation needed, return empty string array if undefined
+        SignInFrequencyIsEnabled                 = $false -or $Policy.SessionControls.SignInFrequency.IsEnabled
+        #make false if undefined, true if true
+        SignInFrequencyValue                     = $Policy.SessionControls.SignInFrequency.Value
+        #no translation or conversion needed, $null returned if undefined
+        SignInFrequencyType                      = [System.String]$Policy.SessionControls.SignInFrequency.Type
+        SignInFrequencyInterval                  = $SignInFrequencyIntervalValue
+        #no translation needed
+        PersistentBrowserIsEnabled               = $false -or $Policy.SessionControls.PersistentBrowser.IsEnabled
+        #no translation needed
+        DisableResilienceDefaultsIsEnabled       = $DisableResilienceDefaultsIsEnabledValue
+        #make false if undefined, true if true
+        PersistentBrowserMode                    = [System.String]$Policy.SessionControls.PersistentBrowser.Mode
+        #no translation needed
+        AuthenticationStrength                   = $AuthenticationStrengthValue
+        AuthenticationContexts                   = $AuthenticationContextsValues
+        TransferMethods                          = [System.String]$Policy.Conditions.AuthenticationFlows.TransferMethods
+        ProtocolFlows                            = $ProtocolFlowsValue
+        #no translation needed, return empty string array if undefined
+        ServicePrincipalRiskLevels               = [System.String[]](@() + $Policy.Conditions.ServicePrincipalRiskLevels)
+        #Standard part
+        TermsOfUse                               = $termOfUseName
+        InsiderRiskLevels                        = $InsiderRiskLevelsValue
+        Ensure                                   = 'Present'
+        Credential                               = $Credential
+        ApplicationSecret                        = $ApplicationSecret
+        ApplicationId                            = $ApplicationId
+        TenantId                                 = $TenantId
+        CertificateThumbprint                    = $CertificateThumbprint
+        ManagedIdentity                          = $ManagedIdentity.IsPresent
+        AccessTokens                             = $AccessTokens
+    }
+
+    Write-Verbose -Message "Get-TargetResource Result: `n $(Convert-M365DscHashtableToString -Hashtable $result)"
+    return $result
 }
 
 function Set-TargetResource
@@ -602,13 +789,13 @@ function Set-TargetResource
     [CmdletBinding()]
     param
     (
-        [Parameter(Mandatory = $true)]
-        [System.String]
-        $DisplayName,
-
         [Parameter()]
         [System.String]
         $Id,
+
+        [Parameter(Mandatory = $true)]
+        [System.String]
+        $DisplayName,
 
         [Parameter()]
         [System.String]
@@ -623,6 +810,15 @@ function Set-TargetResource
         [Parameter()]
         [System.String[]]
         $ExcludeApplications,
+
+        [Parameter()]
+        [System.String]
+        $ApplicationsFilter,
+
+        [Parameter()]
+        [ValidateSet('include', 'exclude')]
+        [System.String]
+        $ApplicationsFilterMode,
 
         [Parameter()]
         [System.String[]]
@@ -653,6 +849,51 @@ function Set-TargetResource
         [System.String[]]
         $ExcludeRoles,
 
+        [Parameter()]
+        [System.String[]]
+        [validateSet('none', 'internalGuest', 'b2bCollaborationGuest', 'b2bCollaborationMember', 'b2bDirectConnectUser', 'otherExternalUser', 'serviceProvider', 'unknownFutureValue')]
+        $IncludeGuestOrExternalUserTypes,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet('', 'all', 'enumerated', 'unknownFutureValue')]
+        $IncludeExternalTenantsMembershipKind,
+
+        [Parameter()]
+        [System.String[]]
+        $IncludeExternalTenantsMembers,
+
+        [Parameter()]
+        [System.String[]]
+        [validateSet('none', 'internalGuest', 'b2bCollaborationGuest', 'b2bCollaborationMember', 'b2bDirectConnectUser', 'otherExternalUser', 'serviceProvider', 'unknownFutureValue')]
+        $ExcludeGuestOrExternalUserTypes,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet('', 'all', 'enumerated', 'unknownFutureValue')]
+        $ExcludeExternalTenantsMembershipKind,
+
+        [Parameter()]
+        [System.String[]]
+        $ExcludeExternalTenantsMembers,
+
+        [Parameter()]
+        [System.String[]]
+        $IncludeServicePrincipals,
+
+        [Parameter()]
+        [System.String[]]
+        $ExcludeServicePrincipals,
+
+        [Parameter()]
+        [ValidateSet('include', 'exclude')]
+        [System.String]
+        $ServicePrincipalFilterMode,
+
+        [Parameter()]
+        [System.String]
+        $ServicePrincipalFilterRule,
+
         #ConditionalAccessPlatformCondition
         [Parameter()]
         [System.String[]]
@@ -670,17 +911,6 @@ function Set-TargetResource
         [Parameter()]
         [System.String[]]
         $ExcludeLocations,
-
-        #ConditionalAccessDevicesCondition
-        #DEPRECATED
-        [Parameter()]
-        [System.String[]]
-        $IncludeDevices,
-
-        #DEPRECATED
-        [Parameter()]
-        [System.String[]]
-        $ExcludeDevices,
 
         [Parameter()]
         [ValidateSet('include', 'exclude')]
@@ -741,6 +971,11 @@ function Set-TargetResource
         $SignInFrequencyIsEnabled,
 
         [Parameter()]
+        [ValidateSet('timeBased', 'everyTime', 'unknownFutureValue')]
+        [System.String]
+        $SignInFrequencyInterval,
+
+        [Parameter()]
         [ValidateSet('Always', 'Never', '')]
         [System.String]
         $PersistentBrowserMode,
@@ -750,12 +985,42 @@ function Set-TargetResource
         $PersistentBrowserIsEnabled,
 
         [Parameter()]
+        [nullable[System.Boolean]]
+        $DisableResilienceDefaultsIsEnabled,
+
+        [Parameter()]
         [System.String]
         $TermsOfUse,
 
         [Parameter()]
         [System.String[]]
         $CustomAuthenticationFactors,
+
+        [Parameter()]
+        [System.String]
+        $AuthenticationStrength,
+
+        [Parameter()]
+        [System.String[]]
+        $AuthenticationContexts,
+
+        [Parameter()]
+        [System.String]
+        $TransferMethods,
+
+        [Parameter()]
+        [ValidateSet('minor', 'moderate', 'elevated', 'unknownFutureValue')]
+        [System.String[]]
+        $InsiderRiskLevels,
+
+        [Parameter()]
+        [ValidateSet('low', 'medium', 'high', 'none', 'unknownFutureValue')]
+        [System.String[]]
+        $ServicePrincipalRiskLevels,
+
+        [Parameter()]
+        [System.String[]]
+        $ProtocolFlows,
 
         #generic
         [Parameter()]
@@ -785,9 +1050,14 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-    Write-Verbose -Message 'Setting configuration of AzureAD Conditional Access Policy'
+
+    Write-Verbose -Message "Setting configuration of AzureAD Conditional Access Policy for {$DisplayName}"
 
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
@@ -801,103 +1071,220 @@ function Set-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message 'Set-Targetresource: Running Get-TargetResource'
     $currentPolicy = Get-TargetResource @PSBoundParameters
-    Write-Verbose -Message 'Set-Targetresource: Cleaning up parameters'
-    $currentParameters = $PSBoundParameters
-    $currentParameters.Remove('ApplicationId') | Out-Null
-    $currentParameters.Remove('TenantId') | Out-Null
-    $currentParameters.Remove('CertificateThumbprint') | Out-Null
-    $currentParameters.Remove('ApplicationSecret') | Out-Null
-    $currentParameters.Remove('Ensure') | Out-Null
-    $currentParameters.Remove('Credential') | Out-Null
-    $currentParameters.Remove('ManagedIdentity') | Out-Null
+    $currentParameters = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
 
     if ($Ensure -eq 'Present')#create policy attribute objects
     {
         Write-Verbose -Message "Set-Targetresource: Policy $Displayname Ensure Present"
         $NewParameters = @{}
-        $NewParameters.Add('DisplayName', $DisplayName)
-        $NewParameters.Add('State', $State)
+        $NewParameters.Add('displayName', $DisplayName)
+        $NewParameters.Add('state', $State)
         #create Conditions object
-        Write-Verbose -Message 'Set-Targetresource: create Conditions object'
         $conditions = @{
-            Applications = @{
-            }
-            Users        = @{
-            }
+            applications = @{}
         }
         #create and provision Application Condition object
         Write-Verbose -Message 'Set-Targetresource: create Application Condition object'
-        if ($IncludeApplications)
+        if ($currentParameters.ContainsKey('IncludeApplications'))
         {
-            $conditions.Applications.Add('IncludeApplications', $IncludeApplications)
+            $IncludeApplicationsValue = @()
+            foreach ($app in $IncludeApplications)
+            {
+                $ObjectGuid = [System.Guid]::empty
+                if ([System.Guid]::TryParse($app, [System.Management.Automation.PSReference]$ObjectGuid))
+                {
+                    $IncludeApplicationsValue += $app
+                }
+                else
+                {
+                    $appInfo = Get-MgApplication -Filter "DisplayName eq '$($app -replace "'", "''")'" -ErrorAction SilentlyContinue
+                    if ($null -ne $appInfo)
+                    {
+                        $IncludeApplicationsValue += $appInfo.AppId
+                    }
+                    else
+                    {
+                        $IncludeApplicationsValue += $app
+                    }
+                }
+            }
+
+            $conditions.Applications.Add('includeApplications', $IncludeApplicationsValue)
         }
-        if ($ExcludeApplications)
+        if ($currentParameters.ContainsKey('ExcludeApplications'))
         {
-            $conditions.Applications.Add('ExcludeApplications', $ExcludeApplications)
+            $ExcludeApplicationsValue = @()
+            foreach ($app in $ExcludeApplications)
+            {
+                $ObjectGuid = [System.Guid]::empty
+                if ([System.Guid]::TryParse($app, [System.Management.Automation.PSReference]$ObjectGuid))
+                {
+                    $ExcludeApplicationsValue += $app
+                }
+                else
+                {
+                    $appInfo = Get-MgApplication -Filter "DisplayName eq '$($app -replace "'", "''")'" -ErrorAction SilentlyContinue
+                    if ($null -ne $appInfo)
+                    {
+                        $ExcludeApplicationsValue += $appInfo.AppId
+                    }
+                    else
+                    {
+                        $ExcludeApplicationsValue += $app
+                    }
+                }
+            }
+            $conditions.Applications.Add('excludeApplications', $ExcludeApplicationsValue)
+        }
+        if ($ApplicationsFilter -and $ApplicationsFilterMode)
+        {
+            $appFilterValue = @{
+                rule = $ApplicationsFilter
+                mode = $ApplicationsFilterMode
+            }
+            $conditions.Applications.Add('applicationFilter', $appFilterValue)
         }
         if ($IncludeUserActions)
         {
-            $conditions.Applications.Add('IncludeUserActions', $IncludeUserActions)
+            $conditions.Applications.Add('includeUserActions', $IncludeUserActions)
+        }
+        if ($AuthenticationContexts)
+        {
+            # Retrieve the class reference based on display name.
+            $AuthenticationContextsValues = @()
+            $classReferences = Get-MgBetaIdentityConditionalAccessAuthenticationContextClassReference -ErrorAction SilentlyContinue
+            foreach ($authContext in $AuthenticationContexts)
+            {
+                $currentClassId = $classReferences | Where-Object -FilterScript { $_.DisplayName -eq $authContext }
+                if ($null -ne $currentClassId)
+                {
+                    $AuthenticationContextsValues += $currentClassId.Id
+                }
+            }
+            $conditions.Applications.Add('includeAuthenticationContextClassReferences', $AuthenticationContextsValues)
         }
 
         #create and provision User Condition object
         Write-Verbose -Message 'Set-Targetresource: process includeusers'
-        $conditions.Users.Add('IncludeUsers', @())
-        foreach ($includeuser in $IncludeUsers)
+        if ($currentParameters.ContainsKey('IncludeUsers'))
         {
-            #translate user UPNs to GUID, except id value is GuestsOrExternalUsers, None or All
-            if ($includeuser)
+            if (-not $conditions.ContainsKey('users'))
             {
-                if ($includeuser -notin 'GuestsOrExternalUsers', 'All', 'None')
+                $conditions.Add('users', @{})
+            }
+            $conditions.Users.Add('includeUsers', @())
+            foreach ($includeuser in $IncludeUsers)
+            {
+                #translate user UPNs to GUID, except id value is GuestsOrExternalUsers, None or All
+                if ($includeuser)
                 {
-                    $userguid = $null
-                    try
+                    if ($includeuser -notin 'GuestsOrExternalUsers', 'All', 'None')
                     {
-                        $userguid = (Get-MgUser -UserId $includeuser).Id
-                    }
-                    catch
-                    {
-                        New-M365DSCLogEntry -Message 'Error updating data:' `
-                            -Exception $_ `
-                            -Source $($MyInvocation.MyCommand.Source) `
-                            -TenantId $TenantId `
-                            -Credential $Credential
-                    }
-                    if ($null -eq $userguid)
-                    {
-                        $message = "Couldn't find user $includeuser , couldn't add to policy $DisplayName"
-                        New-M365DSCLogEntry -Message $message `
-                            -Source $($MyInvocation.MyCommand.Source) `
-                            -TenantId $TenantId `
-                            -Credential $Credential
+                        $userguid = $null
+                        try
+                        {
+                            $userguid = (Get-MgUser -UserId $includeuser -ErrorAction Stop).Id
+                        }
+                        catch
+                        {
+                            New-M365DSCLogEntry -Message 'Error updating data:' `
+                                -Exception $_ `
+                                -Source $($MyInvocation.MyCommand.Source) `
+                                -TenantId $TenantId `
+                                -Credential $Credential
+                            throw $_
+                        }
+                        if ($null -eq $userguid)
+                        {
+                            $message = "Couldn't find user '$includeuser', couldn't add to policy '$DisplayName'"
+                            New-M365DSCLogEntry -Message $message `
+                                -Source $($MyInvocation.MyCommand.Source) `
+                                -TenantId $TenantId `
+                                -Credential $Credential
+                            throw $message
+                        }
+                        else
+                        {
+                            $conditions.users.includeUsers += $userguid
+                        }
                     }
                     else
                     {
-                        $conditions.Users.IncludeUsers += $userguid
+                        $conditions.users.includeUsers += $includeuser
                     }
-                }
-                else
-                {
-                    $conditions.Users.IncludeUsers += $includeuser
                 }
             }
         }
+
         Write-Verbose -Message 'Set-Targetresource: process excludeusers'
-
-        $conditions.Users.Add('ExcludeUsers', @())
-        foreach ($excludeuser in $ExcludeUsers)
+        if ($currentParameters.ContainsKey('ExcludeUsers'))
         {
-            #translate user UPNs to GUID, except id value is GuestsOrExternalUsers, None or All
-            if ($excludeuser)
+            if (-not $conditions.ContainsKey('users'))
             {
-                if ($excludeuser -notin 'GuestsOrExternalUsers', 'All', 'None')
+                $conditions.Add('users', @{})
+            }
+            $conditions.users.Add('excludeUsers', @())
+            foreach ($excludeuser in $ExcludeUsers)
+            {
+                #translate user UPNs to GUID, except id value is GuestsOrExternalUsers, None or All
+                if ($excludeuser)
                 {
-                    $userguid = $null
+                    if ($excludeuser -notin 'GuestsOrExternalUsers', 'All', 'None')
+                    {
+                        $userguid = $null
+                        try
+                        {
+                            $userguid = (Get-MgUser -UserId $excludeuser -ErrorAction Stop).Id
+                        }
+                        catch
+                        {
+                            New-M365DSCLogEntry -Message 'Error updating data:' `
+                                -Exception $_ `
+                                -Source $($MyInvocation.MyCommand.Source) `
+                                -TenantId $TenantId `
+                                -Credential $Credential
+                            throw $_
+                        }
+                        if ($null -eq $userguid)
+                        {
+                            $message = "Couldn't find user '$excludeuser', couldn't add to policy '$DisplayName'"
+                            New-M365DSCLogEntry -Message $message `
+                                -Source $($MyInvocation.MyCommand.Source) `
+                                -TenantId $TenantId `
+                                -Credential $Credential
+                            throw $message
+                        }
+                        else
+                        {
+                            $conditions.users.excludeUsers += $userguid
+                        }
+                    }
+                    else
+                    {
+                        $conditions.users.excludeUsers += $excludeuser
+                    }
+                }
+            }
+        }
+
+        Write-Verbose -Message 'Set-Targetresource: process includegroups'
+        if ($currentParameters.ContainsKey('IncludeGroups'))
+        {
+            if (-not $conditions.ContainsKey('users'))
+            {
+                $conditions.Add('users', @{})
+            }
+            $conditions.users.Add('includeGroups', @())
+            foreach ($includegroup in $IncludeGroups)
+            {
+                #translate user Group names to GUID
+                if ($includegroup)
+                {
+                    $GroupLookup = $null
                     try
                     {
-                        $userguid = (Get-MgUser -UserId $excludeuser).Id
+                        $GroupLookup = Get-MgGroup -Filter "DisplayName eq '$($includegroup -replace "'", "''")'" -ErrorAction Stop
                     }
                     catch
                     {
@@ -906,417 +1293,635 @@ function Set-TargetResource
                             -Source $($MyInvocation.MyCommand.Source) `
                             -TenantId $TenantId `
                             -Credential $Credential
+                        throw $_
                     }
-                    if ($null -eq $userguid)
+                    if ($GroupLookup.Length -gt 1)
                     {
-                        $message = "Couldn't find user $excludeuser , couldn't add to policy $DisplayName"
+                        $message = "Duplicate group found with displayname '$includegroup', couldn't add to policy '$DisplayName'"
                         New-M365DSCLogEntry -Message $message `
                             -Source $($MyInvocation.MyCommand.Source) `
                             -TenantId $TenantId `
                             -Credential $Credential
+                        throw $message
+                    }
+                    elseif ($null -eq $GroupLookup)
+                    {
+                        $message = "Couldn't find group '$includegroup', couldn't add to policy '$DisplayName'"
+                        New-M365DSCLogEntry -Message $message `
+                            -Source $($MyInvocation.MyCommand.Source) `
+                            -TenantId $TenantId `
+                            -Credential $Credential
+                        throw $message
                     }
                     else
                     {
-                        $conditions.Users.ExcludeUsers += $userguid
+                        Write-Verbose -Message 'Adding group to includegroups'
+                        $conditions.Users.IncludeGroups += $GroupLookup.Id
                     }
-                }
-                else
-                {
-                    $conditions.Users.ExcludeUsers += $excludeuser
-                }
-            }
-        }
-        Write-Verbose -Message 'Set-Targetresource: process includegroups'
-        $conditions.Users.Add('IncludeGroups', @())
-        foreach ($includegroup in $IncludeGroups)
-        {
-            #translate user Group names to GUID
-            if ($includegroup)
-            {
-                $GroupLookup = $null
-                try
-                {
-                    $GroupLookup = Get-MgGroup -Filter "DisplayName eq '$includegroup'"
-                }
-                catch
-                {
-                    New-M365DSCLogEntry -Message 'Error updating data:' `
-                        -Exception $_ `
-                        -Source $($MyInvocation.MyCommand.Source) `
-                        -TenantId $TenantId `
-                        -Credential $Credential
-                }
-                if ($GroupLookup.Length -gt 1)
-                {
-                    $message = "Duplicate group found with displayname $includegroup , couldn't add to policy $DisplayName"
-                    New-M365DSCLogEntry -Message $message `
-                        -Source $($MyInvocation.MyCommand.Source) `
-                        -TenantId $TenantId `
-                        -Credential $Credential
-                }
-                elseif ($null -eq $GroupLookup)
-                {
-                    $message = "Couldn't find group $includegroup , couldn't add to policy $DisplayName"
-                    New-M365DSCLogEntry -Message $message `
-                        -Source $($MyInvocation.MyCommand.Source) `
-                        -TenantId $TenantId `
-                        -Credential $Credential
-                }
-                else
-                {
-                    Write-Verbose -Message 'adding group to includegroups'
-                    $conditions.Users.IncludeGroups += $GroupLookup.Id
                 }
             }
         }
 
-        $conditions.Users.Add('ExcludeGroups', @())
         Write-Verbose -Message 'Set-Targetresource: process excludegroups'
-        foreach ($ExcludeGroup in $ExcludeGroups)
+        if ($currentParameters.ContainsKey('ExcludeGroups'))
         {
-            #translate user Group names to GUID
-            if ($ExcludeGroup)
+            if (-not $conditions.ContainsKey('users'))
             {
-                $GroupLookup = $null
-                try
+                $conditions.Add('users', @{})
+            }
+            $conditions.users.Add('excludeGroups', @())
+            foreach ($ExcludeGroup in $ExcludeGroups)
+            {
+                #translate user Group names to GUID
+                if ($ExcludeGroup)
                 {
-                    $GroupLookup = Get-MgGroup -Filter "DisplayName eq '$ExcludeGroup'"
+                    $GroupLookup = $null
+                    try
+                    {
+                        $GroupLookup = Get-MgGroup -Filter "DisplayName eq '$($ExcludeGroup -replace "'", "''")'" -ErrorAction Stop
+                    }
+                    catch
+                    {
+                        New-M365DSCLogEntry -Message 'Error updating data:' `
+                            -Exception $_ `
+                            -Source $($MyInvocation.MyCommand.Source) `
+                            -TenantId $TenantId `
+                            -Credential $Credential
+                        throw $_
+                    }
+                    if ($GroupLookup.Length -gt 1)
+                    {
+                        $message = "Duplicate group found with displayname '$ExcludeGroup', couldn't add to policy '$DisplayName'"
+                        New-M365DSCLogEntry -Message $message `
+                            -Source $($MyInvocation.MyCommand.Source) `
+                            -TenantId $TenantId `
+                            -Credential $Credential
+                        throw $message
+                    }
+                    elseif ($null -eq $GroupLookup)
+                    {
+                        $message = "Couldn't find group '$ExcludeGroup', couldn't add to policy '$DisplayName'"
+                        New-M365DSCLogEntry -Message $message `
+                            -Source $($MyInvocation.MyCommand.Source) `
+                            -TenantId $TenantId `
+                            -Credential $Credential
+                        throw $message
+                    }
+                    else
+                    {
+                        Write-Verbose -Message 'Adding group to ExcludeGroups'
+                        $conditions.users.excludeGroups += $GroupLookup.Id
+                    }
                 }
-                catch
+            }
+        }
+
+        Write-Verbose -Message 'Set-Targetresource: process includeroles'
+        if ($currentParameters.ContainsKey('IncludeRoles'))
+        {
+            if (-not $conditions.ContainsKey('users'))
+            {
+                $conditions.Add('users', @{})
+            }
+            $conditions.Users.Add('includeRoles', @())
+            if ($IncludeRoles)
+            {
+                #translate role names to template guid if defined
+                $rolelookup = @{}
+                foreach ($role in Get-MgDirectoryRoleTemplate -All)
                 {
-                    New-M365DSCLogEntry -Message 'Error updating data:' `
-                        -Exception $_ `
-                        -Source $($MyInvocation.MyCommand.Source) `
-                        -TenantId $TenantId `
-                        -Credential $Credential
+                    $rolelookup[$role.DisplayName] = $role.Id
                 }
-                if ($GroupLookup.Length -gt 1)
+                foreach ($IncludeRole in $IncludeRoles)
                 {
-                    $message = "Duplicate group found with displayname $ExcludeGroup , couldn't add to policy $DisplayName"
-                    New-M365DSCLogEntry -Message $message `
-                        -Source $($MyInvocation.MyCommand.Source) `
-                        -TenantId $TenantId `
-                        -Credential $Credential
+                    if ($IncludeRole)
+                    {
+                        if ($null -eq $rolelookup[$IncludeRole])
+                        {
+                            $message = "Couldn't find role '$IncludeRole', couldn't add to policy '$DisplayName'"
+                            New-M365DSCLogEntry -Message $message `
+                                -Source $($MyInvocation.MyCommand.Source) `
+                                -TenantId $TenantId `
+                                -Credential $Credential
+                            throw $message
+                        }
+                        else
+                        {
+                            $conditions.users.includeRoles += $rolelookup[$IncludeRole]
+                        }
+                    }
                 }
-                elseif ($null -eq $GroupLookup)
+            }
+        }
+
+        Write-Verbose -Message 'Set-Targetresource: process excluderoles'
+        if ($currentParameters.ContainsKey('ExcludeRoles'))
+        {
+            if (-not $conditions.ContainsKey('users'))
+            {
+                $conditions.Add('users', @{})
+            }
+            $conditions.users.Add('excludeRoles', @())
+            if ($ExcludeRoles)
+            {
+                #translate role names to template guid if defined
+                $rolelookup = @{}
+                foreach ($role in Get-MgDirectoryRoleTemplate -All)
                 {
-                    $message = "Couldn't find group $ExcludeGroup , couldn't add to policy $DisplayName"
-                    New-M365DSCLogEntry -Message $message `
-                        -Source $($MyInvocation.MyCommand.Source) `
-                        -TenantId $TenantId `
-                        -Credential $Credential
+                    $rolelookup[$role.DisplayName] = $role.Id
+                }
+                foreach ($ExcludeRole in $ExcludeRoles)
+                {
+                    if ($ExcludeRole)
+                    {
+                        if ($null -eq $rolelookup[$ExcludeRole])
+                        {
+                            $message = "Couldn't find role '$ExcludeRole', couldn't add to policy '$DisplayName'"
+                            New-M365DSCLogEntry -Message $message `
+                                -Source $($MyInvocation.MyCommand.Source) `
+                                -TenantId $TenantId `
+                                -Credential $Credential
+                            throw $message
+                        }
+                        else
+                        {
+                            $conditions.users.excludeRoles += $rolelookup[$ExcludeRole]
+                        }
+                    }
+                }
+            }
+        }
+
+        Write-Verbose -Message 'Set-Targetresource: process includeGuestOrExternalUser'
+        If ($currentParameters.ContainsKey('IncludeGuestOrExternalUserTypes'))
+        {
+            if (-not $conditions.ContainsKey('users'))
+            {
+                $conditions.Add('users', @{})
+            }
+            $includeGuestsOrExternalUsers = $null
+            if ($IncludeGuestOrExternalUserTypes.Count -ne 0)
+            {
+                if ($IncludeGuestOrExternalUserTypes -ne 'None')
+                {
+                    $includeGuestsOrExternalUsers = @{}
+                    [string]$IncludeGuestOrExternalUserTypes = $IncludeGuestOrExternalUserTypes -join ','
+                    $includeGuestsOrExternalUsers.Add('guestOrExternalUserTypes', $IncludeGuestOrExternalUserTypes)
+                    $externalTenants = @{}
+                    if ($IncludeExternalTenantsMembershipKind -eq 'All')
+                    {
+                        $externalTenants.Add('@odata.type', '#microsoft.graph.conditionalAccessAllExternalTenants')
+                    }
+                    elseif ($IncludeExternalTenantsMembershipKind -eq 'enumerated')
+                    {
+                        $externalTenants.Add('@odata.type', '#microsoft.graph.conditionalAccessEnumeratedExternalTenants')
+                    }
+                    $externalTenants.Add('membershipKind', $IncludeExternalTenantsMembershipKind)
+                    if ($IncludeExternalTenantsMembers)
+                    {
+                        $externalTenants.Add('members', $IncludeExternalTenantsMembers)
+                    }
+                    $includeGuestsOrExternalUsers.Add('externalTenants', $externalTenants)
+                }
+            }
+            $conditions.Users.Add('includeGuestsOrExternalUsers', $includeGuestsOrExternalUsers)
+        }
+
+        Write-Verbose -Message 'Set-Targetresource: process excludeGuestsOrExternalUsers'
+        If ($currentParameters.ContainsKey('ExcludeGuestOrExternalUserTypes'))
+        {
+            if (-not $conditions.ContainsKey('users'))
+            {
+                $conditions.Add('users', @{})
+            }
+            $excludeGuestsOrExternalUsers = $null
+            if ($ExcludeGuestOrExternalUserTypes.Count -ne 0)
+            {
+                if ($ExcludeGuestOrExternalUserTypes -ne 'None')
+                {
+                    $excludeGuestsOrExternalUsers = @{}
+                    [string]$ExcludeGuestOrExternalUserTypes = $ExcludeGuestOrExternalUserTypes -join ','
+                    $excludeGuestsOrExternalUsers.Add('guestOrExternalUserTypes', $ExcludeGuestOrExternalUserTypes)
+                    $externalTenants = @{}
+                    if ($ExcludeExternalTenantsMembershipKind -eq 'All')
+                    {
+                        $externalTenants.Add('@odata.type', '#microsoft.graph.conditionalAccessAllExternalTenants')
+                    }
+                    elseif ($ExcludeExternalTenantsMembershipKind -eq 'enumerated')
+                    {
+                        $externalTenants.Add('@odata.type', '#microsoft.graph.conditionalAccessEnumeratedExternalTenants')
+                    }
+                    $externalTenants.Add('membershipKind', $ExcludeExternalTenantsMembershipKind)
+                    if ($ExcludeExternalTenantsMembers)
+                    {
+                        $externalTenants.Add('members', $ExcludeExternalTenantsMembers)
+                    }
+                    $excludeGuestsOrExternalUsers.Add('externalTenants', $externalTenants)
+                }
+            }
+            $conditions.Users.Add('excludeGuestsOrExternalUsers', $excludeGuestsOrExternalUsers)
+        }
+
+        Write-Verbose -Message 'Set-Targetresource: process includeServicePrincipals'
+        if ($currentParameters.ContainsKey('IncludeServicePrincipals'))
+        {
+            if (-not $conditions.ContainsKey('clientApplications'))
+            {
+                $conditions.Add('clientApplications', @{})
+            }
+            $conditions.clientApplications.Add('includeServicePrincipals', $IncludeServicePrincipals)
+        }
+
+        Write-Verbose -Message 'Set-Targetresource: process excludeServicePrincipals'
+        if ($currentParameters.ContainsKey('ExcludeServicePrincipals'))
+        {
+            if (-not $conditions.ContainsKey('clientApplications'))
+            {
+                $conditions.Add('clientApplications', @{})
+            }
+            $conditions.clientApplications.Add('excludeServicePrincipals', $ExcludeServicePrincipals)
+        }
+
+        Write-Verbose -Message 'Set-Targetresource: process servicePrincipalFilter'
+        if ($currentParameters.ContainsKey('ServicePrincipalFilterMode') -and $currentParameters.ContainsKey('ServicePrincipalFilterRule'))
+        {
+            #check if the custom attribute exist.
+            $customattribute = Invoke-MgGraphRequest -Method GET -Uri ((Get-MSCloudLoginConnectionProfile -Workload MicrosoftGraph).ResourceUrl + 'v1.0/directory/customSecurityAttributeDefinitions')
+            $ServicePrincipalFilterRule -match 'CustomSecurityAttribute.(?<attribute>.*) -.*'
+            $attrinrule = $matches.attribute
+            if ($customattribute.value.id -contains $attrinrule)
+            {
+                if (-not $conditions.ContainsKey('clientApplications'))
+                {
+                    $conditions.Add('clientApplications', @{})
+                }
+                $conditions.clientApplications.Add('servicePrincipalFilter', @{})
+                $conditions.clientApplications.servicePrincipalFilter.Add('mode', $ServicePrincipalFilterMode)
+                $conditions.clientApplications.servicePrincipalFilter.Add('rule', $ServicePrincipalFilterRule)
+            }
+            else
+            {
+                $message = "Couldn't find the custom attribute $attrinrule in the tenant, couldn't add the filter to policy $DisplayName"
+                Write-Verbose -Message $message
+                New-M365DSCLogEntry -Message $message `
+                    -Source $($MyInvocation.MyCommand.Source) `
+                    -TenantId $TenantId `
+                    -Credential $Credential
+            }
+        }
+
+        Write-Verbose -Message 'Set-Targetresource: process platform condition'
+        if ($currentParameters.ContainsKey('IncludePlatforms') -or $currentParameters.ContainsKey('ExcludePlatforms'))
+        {
+            if ($IncludePlatforms -or $ExcludePlatforms)
+            {
+                #create and provision Platform condition object if used
+                if (-not $conditions.Contains('platforms'))
+                {
+                    $conditions.Add('platforms', @{
+                            includePlatforms = @()
+                        })
                 }
                 else
                 {
-                    Write-Verbose -Message 'adding group to ExcludeGroups'
-                    $conditions.Users.ExcludeGroups += $GroupLookup.Id
+                    $conditions.platforms.Add('includePlatforms', @())
                 }
+                Write-Verbose -Message "Set-Targetresource: IncludePlatforms: $IncludePlatforms"
+                if (([Array]$IncludePlatforms).Length -eq 0)
+                {
+                    $conditions.platforms.includePlatforms = @('all')
+                }
+                else
+                {
+                    $conditions.platforms.includePlatforms = @() + $IncludePlatforms
+                }
+                #no translation or conversion needed
+                if (([Array]$ExcludePlatforms).Length -ne 0)
+                {
+                    $conditions.platforms.Add('excludePlatforms', @())
+                    $conditions.platforms.excludePlatforms = @() + $ExcludePlatforms
+                }
+                else
+                {
+                    $conditions.platforms.Add('excludePlatforms', @())
+                }
+                #no translation or conversion needed
+            }
+            else
+            {
+                Write-Verbose -Message 'Set-Targetresource: setting platform condition to null'
+                $conditions.platforms = $null
             }
         }
-        Write-Verbose -Message 'Set-Targetresource: process includeroles'
-        $conditions.Users.Add('IncludeRoles', @())
-        if ($IncludeRoles)
-        {
-            #translate role names to template guid if defined
-            $rolelookup = @{}
-            foreach ($role in Get-MgDirectoryRoleTemplate)
-            {
-                $rolelookup[$role.DisplayName] = $role.Id
-            }
-            foreach ($IncludeRole in $IncludeRoles)
-            {
-                if ($IncludeRole)
-                {
-                    if ($null -eq $rolelookup[$IncludeRole])
-                    {
-                        $message = "Couldn't find role $IncludeRole , couldn't add to policy $DisplayName"
-                        New-M365DSCLogEntry -Message $message `
-                            -Source $($MyInvocation.MyCommand.Source) `
-                            -TenantId $TenantId `
-                            -Credential $Credential
-                    }
-                    else
-                    {
-                        $conditions.Users.IncludeRoles += $rolelookup[$IncludeRole]
-                    }
-                }
-            }
-        }
-        Write-Verbose -Message 'Set-Targetresource: process excluderoles'
-        $conditions.Users.Add('ExcludeRoles', @())
-        if ($ExcludeRoles)
-        {
-            #translate role names to template guid if defined
-            $rolelookup = @{}
-            foreach ($role in Get-MgDirectoryRoleTemplate)
-            {
-                $rolelookup[$role.DisplayName] = $role.Id
-            }
-            foreach ($ExcludeRole in $ExcludeRoles)
-            {
-                if ($ExcludeRole)
-                {
-                    if ($null -eq $rolelookup[$ExcludeRole])
-                    {
-                        $message = "Couldn't find role $ExcludeRole , couldn't add to policy $DisplayName"
-                        New-M365DSCLogEntry -Message $message `
-                            -Source $($MyInvocation.MyCommand.Source) `
-                            -TenantId $TenantId `
-                            -Credential $Credential
-                    }
-                    else
-                    {
-                        $conditions.Users.ExcludeRoles += $rolelookup[$ExcludeRole]
-                    }
 
-                }
-            }
-        }
-        Write-Verbose -Message 'Set-Targetresource: process platform condition'
-        if ($IncludePlatforms -or $ExcludePlatforms)
-        {
-            #create and provision Platform condition object if used
-            if (-not $conditions.Contains('Platforms'))
-            {
-                $conditions.Add('Platforms', @{
-                        ExcludePlatforms = @()
-                        IncludePlatforms = @()
-                    })
-            }
-            else
-            {
-                $conditions.Platforms.Add('ExcludePlatforms', @())
-                $conditions.Platforms.Add('IncludePlatforms', @())
-            }
-            Write-Verbose -Message "Set-Targetresource: IncludePlatforms: $IncludePlatforms"
-            if (([Array]$IncludePlatforms).Length -eq 0)
-            {
-                $conditions.Platforms.IncludePlatforms = @('all')
-            }
-            else
-            {
-                $conditions.Platforms.IncludePlatforms = @() + $IncludePlatforms
-            }
-            #no translation or conversion needed
-            Write-Verbose -Message "Set-Targetresource: ExcludePlatforms: $ExcludePlatforms"
-            $conditions.Platforms.ExcludePlatforms = @() + $ExcludePlatforms
-            #no translation or conversion needed
-        }
-        else
-        {
-            Write-Verbose -Message 'Set-Targetresource: setting platform condition to null'
-            $conditions.Platforms = $null
-        }
         Write-Verbose -Message 'Set-Targetresource: process include and exclude locations'
-        if ($IncludeLocations -or $ExcludeLocations)
+        if ($currentParameters.ContainsKey('IncludeLocations') -or $currentParameters.ContainsKey('ExcludeLocations'))
         {
-            $conditions.Add('Locations', @{
-                    ExcludeLocations = @()
-                    IncludeLocations = @()
-                })
-            $conditions.Locations.IncludeLocations = @()
-            $conditions.Locations.ExcludeLocations = @()
-            Write-Verbose -Message 'Set-Targetresource: locations specified'
-            #create and provision Location condition object if used, translate Location names to guid
-            $LocationLookup = @{}
-            foreach ($Location in Get-MgIdentityConditionalAccessNamedLocation)
+            if ($IncludeLocations -or $ExcludeLocations)
             {
-                $LocationLookup[$Location.DisplayName] = $Location.Id
-            }
-            foreach ($IncludeLocation in $IncludeLocations)
-            {
-                if ($IncludeLocation)
+                $conditions.Add('locations', @{
+                        excludeLocations = @()
+                        includeLocations = @()
+                    })
+                $conditions.locations.includeLocations = @()
+                $conditions.locations.excludeLocations = @()
+                Write-Verbose -Message 'Set-Targetresource: locations specified'
+                #create and provision Location condition object if used, translate Location names to guid
+                $LocationLookup = @{}
+                foreach ($Location in Get-MgBetaIdentityConditionalAccessNamedLocation)
                 {
-                    if ($IncludeLocation -in 'All', 'AllTrusted')
+                    $LocationLookup[$Location.displayName] = $Location.Id
+                }
+                foreach ($IncludeLocation in $IncludeLocations)
+                {
+                    if ($IncludeLocation)
                     {
-                        $conditions.Locations.IncludeLocations += $IncludeLocation
+                        if ($IncludeLocation -in 'All', 'AllTrusted')
+                        {
+                            $conditions.locations.includeLocations += $IncludeLocation
+                        }
+                        elseif ($IncludeLocation -eq 'Multifactor authentication trusted IPs')
+                        {
+                            $conditions.locations.includeLocations += '00000000-0000-0000-0000-000000000000'
+                        }
+                        elseif ($null -eq $LocationLookup[$IncludeLocation])
+                        {
+                            $message = "Couldn't find Location $IncludeLocation , couldn't add to policy $DisplayName"
+                            New-M365DSCLogEntry -Message $message `
+                                -Source $($MyInvocation.MyCommand.Source) `
+                                -TenantId $TenantId `
+                                -Credential $Credential
+                            throw $message # and avoid creating or updating a policy with a missing location
+                        }
+                        else
+                        {
+                            $conditions.locations.includeLocations += $LocationLookup[$IncludeLocation]
+                        }
                     }
-                    elseif ($null -eq $LocationLookup[$IncludeLocation])
+                }
+                foreach ($ExcludeLocation in $ExcludeLocations)
+                {
+                    if ($ExcludeLocation)
                     {
-                        $message = "Couldn't find Location $IncludeLocation , couldn't add to policy $DisplayName"
-                        New-M365DSCLogEntry -Message $message `
-                            -Source $($MyInvocation.MyCommand.Source) `
-                            -TenantId $TenantId `
-                            -Credential $Credential
-                    }
-                    else
-                    {
-                        $conditions.Locations.IncludeLocations += $LocationLookup[$IncludeLocation]
+                        if ($ExcludeLocation -eq 'All' -or $ExcludeLocation -eq 'AllTrusted')
+                        {
+                            $conditions.locations.excludeLocations += $ExcludeLocation
+                        }
+                        elseif ($ExcludeLocation -eq 'Multifactor authentication trusted IPs')
+                        {
+                            $conditions.locations.excludeLocations += '00000000-0000-0000-0000-000000000000'
+                        }
+                        elseif ($null -eq $LocationLookup[$ExcludeLocation])
+                        {
+                            $message = "Couldn't find Location $ExcludeLocation , couldn't add to policy $DisplayName"
+                            New-M365DSCLogEntry -Message $message `
+                                -Source $($MyInvocation.MyCommand.Source) `
+                                -TenantId $TenantId `
+                                -Credential $Credential
+                            throw $message # and avoid creating or updating a policy with a missing location
+                        }
+                        else
+                        {
+                            $conditions.locations.excludeLocations += $LocationLookup[$ExcludeLocation]
+                        }
                     }
                 }
             }
-            foreach ($ExcludeLocation in $ExcludeLocations)
-            {
-                if ($ExcludeLocation)
-                {
-                    if ($ExcludeLocation -eq 'All' -or $ExcludeLocation -eq 'AllTrusted')
-                    {
-                        $conditions.Locations.ExcludeLocations += $ExcludeLocation
-                    }
-                    elseif ($null -eq $LocationLookup[$ExcludeLocation])
-                    {
-                        $message = "Couldn't find Location $ExcludeLocation , couldn't add to policy $DisplayName"
-                        New-M365DSCLogEntry -Message $message `
-                            -Source $($MyInvocation.MyCommand.Source) `
-                            -TenantId $TenantId `
-                            -Credential $Credential
-                    }
-                    else
-                    {
-                        $conditions.Locations.ExcludeLocations += $LocationLookup[$ExcludeLocation]
-                    }
-                }
-            }
-        }
-
-        #DEPRECATED
-        if ($IncludeDevices -or $ExcludeDevices)
-        {
-            Write-Verbose -Message 'IncludeDevices and ExcludeDevices parameters are deprecated. These settings will not be applied. Instead, use the DeviceFilterMode and DeviceFilterRule parameters.'
         }
 
         Write-Verbose -Message 'Set-Targetresource: process device filter'
-        if ($DeviceFilterMode -and $DeviceFilterRule)
+        if ($currentParameters.ContainsKey('DeviceFilterMode') -and $currentParameters.ContainsKey('DeviceFilterRule'))
         {
-            if (-not $conditions.Contains('Devices'))
+            if ($DeviceFilterMode -and $DeviceFilterRule)
             {
-                $conditions.Add('Devices', @{})
-                $conditions.Devices.Add('DeviceFilter', @{})
-                $conditions.Devices.DeviceFilter.Add('Mode', $DeviceFilterMode)
-                $conditions.Devices.DeviceFilter.Add('Rule', $DeviceFilterRule)
-            }
-            else
-            {
-                if (-not $conditions.Devices.Contains('DeviceFilter'))
+                if (-not $conditions.Contains('Devices'))
                 {
-                    $conditions.Devices.Add('DeviceFilter', @{})
-                    $conditions.Devices.DeviceFilter.Add('Mode', $DeviceFilterMode)
-                    $conditions.Devices.DeviceFilter.Add('Rule', $DeviceFilterRule)
+                    $conditions.Add('devices', @{})
+                    $conditions.devices.Add('deviceFilter', @{})
+                    $conditions.devices.deviceFilter.Add('mode', $DeviceFilterMode)
+                    $conditions.devices.deviceFilter.Add('rule', $DeviceFilterRule)
                 }
                 else
                 {
-                    if (-not $conditions.Devices.DeviceFilter.Contains('Mode'))
+                    if (-not $conditions.Devices.Contains('DeviceFilter'))
                     {
-                        $conditions.Devices.DeviceFilter.Add('Mode', $DeviceFilterMode)
+                        $conditions.devices.Add('DeviceFilter', @{})
+                        $conditions.devices.deviceFilter.Add('mode', $DeviceFilterMode)
+                        $conditions.devices.deviceFilter.Add('rule', $DeviceFilterRule)
                     }
                     else
                     {
-                        $conditions.Devices.DeviceFilter.Mode = $DeviceFilterMode
-                    }
-                    if (-not $conditions.Devices.DeviceFilter.Contains('Rule'))
-                    {
-                        $conditions.Devices.DeviceFilter.Add('Rule', $DeviceFilterRule)
-                    }
-                    else
-                    {
-                        $conditions.Devices.DeviceFilter.Rule = $DeviceFilterRule
+                        if (-not $conditions.devices.deviceFilter.Contains('mode'))
+                        {
+                            $conditions.devices.deviceFilter.Add('mode', $DeviceFilterMode)
+                        }
+                        else
+                        {
+                            $conditions.devices.deviceFilter.mode = $DeviceFilterMode
+                        }
+                        if (-not $conditions.devices.deviceFilter.Contains('rule'))
+                        {
+                            $conditions.devices.deviceFilter.Add('rule', $DeviceFilterRule)
+                        }
+                        else
+                        {
+                            $conditions.devices.deviceFilter.rule = $DeviceFilterRule
+                        }
                     }
                 }
             }
+        }
+
+        if ([String]::IsNullOrEmpty($InsiderRiskLevels) -eq $false)
+        {
+            $conditions.Add('insiderRiskLevels', $($InsiderRiskLevels -join ','))
+        }
+
+        if ($ServicePrincipalRiskLevels -is [string[]] -and $ServicePrincipalRiskLevels.Count -gt 0)
+        {
+            $conditions.Add('servicePrincipalRiskLevels', $ServicePrincipalRiskLevels)
         }
 
         Write-Verbose -Message 'Set-Targetresource: process risk levels and app types'
         Write-Verbose -Message "Set-Targetresource: UserRiskLevels: $UserRiskLevels"
-        $Conditions.Add('UserRiskLevels', $UserRiskLevels)
-        #no translation or conversion needed
+        If ($currentParameters.ContainsKey('UserRiskLevels'))
+        {
+            $Conditions.Add('userRiskLevels', $UserRiskLevels)
+            #no translation or conversion needed
+        }
+
+
         Write-Verbose -Message "Set-Targetresource: SignInRiskLevels: $SignInRiskLevels"
-        $Conditions.Add('SignInRiskLevels', $SignInRiskLevels)
-        #no translation or conversion needed
+        If ($currentParameters.ContainsKey('SignInRiskLevels'))
+        {
+            $Conditions.Add('signInRiskLevels', $SignInRiskLevels)
+            #no translation or conversion needed
+        }
+
+
         Write-Verbose -Message "Set-Targetresource: ClientAppTypes: $ClientAppTypes"
-        $Conditions.Add('ClientAppTypes', $ClientAppTypes)
-        #no translation or conversion needed
+        If ($currentParameters.ContainsKey('ClientAppTypes'))
+        {
+            $Conditions.Add('clientAppTypes', $ClientAppTypes)
+            #no translation or conversion needed
+        }
+
+        Write-Verbose -Message "Set-TargetResource: authenticationFlows transferMethods: $TransferMethods"
+        if ($currentParameters.ContainsKey('TransferMethods') -or `
+            $currentParameters.ContainsKey('ProtocolFlows'))
+        {
+            #create and provision TransferMethods condition object if used
+            $authenticationFlows = if ([System.String]::IsNullOrEmpty($TransferMethods) -and [System.String]::IsNullOrEmpty($ProtocolFlows))
+            {
+                $null
+            }
+            else
+            {
+                $value = @{}
+
+                if (-not [System.String]::IsNullOrEmpty($TransferMethods))
+                {
+                    $value.Add('transferMethods', $TransferMethods)
+                }
+                if (-not [System.String]::IsNullOrEmpty($ProtocolFlows))
+                {
+                    $value.Add('protocolFlows', $ProtocolFlows -join ',')
+                }
+                $value
+            }
+            if (-not $conditions.Contains('authenticationFlows'))
+            {
+                $conditions.Add('authenticationFlows', $authenticationFlows)
+            }
+            else
+            {
+                $conditions.authenticationFlows = $authenticationFlows
+            }
+        }
         Write-Verbose -Message 'Set-Targetresource: Adding processed conditions'
         #add all conditions to the parameter list
-        $NewParameters.Add('Conditions', $Conditions)
+        $NewParameters.Add('conditions', $Conditions)
         #create and provision Grant Control object
         Write-Verbose -Message 'Set-Targetresource: create and provision Grant Control object'
 
-        if ($GrantControlOperator -and ($BuiltInControls -or $TermsOfUse -or $CustomAuthenticationFactors))
+        if ($GrantControlOperator -and ($BuiltInControls -or $TermsOfUse -or $CustomAuthenticationFactors -or $AuthenticationStrength))
         {
-            $GrantControls = @{
-                Operator = $GrantControlOperator
+            $grantControls = @{
+                operator = $GrantControlOperator
             }
 
-            if ($BuiltInControls)
+            if ($currentParameters.ContainsKey('BuiltInControls'))
             {
-                $GrantControls.Add('BuiltInControls', $BuiltInControls)
+                $GrantControls.Add('builtInControls', $BuiltInControls)
             }
-            if ($customAuthenticationFactors)
+            if ($currentParameters.ContainsKey('CustomAuthenticationFactors'))
             {
                 $GrantControls.Add('customAuthenticationFactors', $CustomAuthenticationFactors)
             }
-
-            if ($TermsOfUse)
+            if ($currentParameters.ContainsKey('AuthenticationStrength'))
             {
-                Write-Verbose -Message "Gettign Terms of Use {$TermsOfUse}"
-                $TermsOfUseObj = Get-MgAgreement | Where-Object -FilterScript { $_.DisplayName -eq $TermsOfUse }
-                $GrantControls.Add('TermsOfUse', $TermsOfUseObj.Id)
+                $strengthPolicy = Get-MgBetaPolicyAuthenticationStrengthPolicy | Where-Object -FilterScript { $_.DisplayName -eq $AuthenticationStrength } -ErrorAction SilentlyContinue
+                if ($null -ne $strengthPolicy)
+                {
+                    $authenticationStrengthInstance = @{
+                        id            = $strengthPolicy.Id
+                        '@odata.type' = '#microsoft.graph.authenticationStrengthPolicy'
+                    }
+                    $GrantControls.Add('authenticationStrength', $authenticationStrengthInstance)
+                }
             }
+
+           if ($currentParameters.ContainsKey('TermsOfUse'))
+           {
+               Write-Verbose -Message "Getting Terms of Use {$TermsOfUse}"
+               $TermsOfUseObj = Get-MgBetaAgreement | Where-Object -FilterScript { $_.DisplayName -eq $TermsOfUse }
+               $GrantControls.Add('termsOfUse', @($TermsOfUseObj.Id))
+           }
+
 
             #no translation or conversion needed
             Write-Verbose -Message 'Set-Targetresource: Adding processed grant controls'
-            $NewParameters.Add('GrantControls', $GrantControls)
+            $NewParameters.Add('grantControls', $GrantControls)
         }
 
-        Write-Verbose -Message 'Set-Targetresource: process session controls'
-
-        $sessioncontrols = $null
-        if ($ApplicationEnforcedRestrictionsIsEnabled -or $CloudAppSecurityIsEnabled -or $SignInFrequencyIsEnabled -or $PersistentBrowserIsEnabled)
+        if ($ApplicationEnforcedRestrictionsIsEnabled -or $CloudAppSecurityIsEnabled -or $SignInFrequencyIsEnabled -or $PersistentBrowserIsEnabled -or ($null -ne $DisableResilienceDefaultsIsEnabled))
         {
+            Write-Verbose -Message 'Set-Targetresource: process session controls'
+            $sessioncontrols = $null
             Write-Verbose -Message 'Set-Targetresource: create provision Session Control object'
-            $sessioncontrols = @{
-                ApplicationEnforcedRestrictions = @{
-                    IsEnabled = $false
-                }
-            }
+            $sessioncontrols = @{}
 
-            if ($ApplicationEnforcedRestrictionsIsEnabled)
+            if ($ApplicationEnforcedRestrictionsIsEnabled -eq $true)
             {
+                $sessioncontrols.Add('applicationEnforcedRestrictions', @{})
                 #create and provision ApplicationEnforcedRestrictions object if used
-                $sessioncontrols.ApplicationEnforcedRestrictions.IsEnabled = $true
+                $sessioncontrols.applicationEnforcedRestrictions.Add('IsEnabled', $true)
             }
             if ($CloudAppSecurityIsEnabled)
             {
-                $CloudAppSecurityValue = @{
-                    IsEnabled            = $false
-                    CloudAppSecurityType = $null
+                $cloudAppSecurityValue = @{
+                    isEnabled            = $false
+                    cloudAppSecurityType = $null
                 }
 
-                $sessioncontrols.Add('CloudAppSecurity', $CloudAppSecurityValue)
+                $sessioncontrols.Add('cloudAppSecurity', $CloudAppSecurityValue)
                 #create and provision CloudAppSecurity object if used
-                $sessioncontrols.CloudAppSecurity.IsEnabled = $true
-                $sessioncontrols.CloudAppSecurity.CloudAppSecurityType = $CloudAppSecurityType
+                $sessioncontrols.cloudAppSecurity.isEnabled = $true
+                $sessioncontrols.cloudAppSecurity.cloudAppSecurityType = $CloudAppSecurityType
             }
             if ($SignInFrequencyIsEnabled)
             {
-                $SigninFrequencyProp = @{
-                    IsEnabled = $true
-                    Type      = $null
-                    Value     = $null
+                $signinFrequencyProp = @{
+                    isEnabled         = $true
+                    type              = $null
+                    value             = $null
+                    frequencyInterval = $null
                 }
 
-                $sessioncontrols.Add('SignInFrequency', $SigninFrequencyProp)
+                $sessioncontrols.Add('signInFrequency', $SigninFrequencyProp)
                 #create and provision SignInFrequency object if used
-                $sessioncontrols.SignInFrequency.IsEnabled = $true
-                $sessioncontrols.SignInFrequency.Type = $SignInFrequencyType
-                $sessioncontrols.SignInFrequency.Value = $SignInFrequencyValue
+                $sessioncontrols.signInFrequency.isEnabled = $true
+                if ($SignInFrequencyType -ne '')
+                {
+                    $sessioncontrols.signInFrequency.type = $SignInFrequencyType
+                }
+                else
+                {
+                    $sessioncontrols.signInFrequency.Remove('type') | Out-Null
+                }
+                if ($SignInFrequencyValue -gt 0)
+                {
+                    $sessioncontrols.signInFrequency.value = $SignInFrequencyValue
+                }
+                else
+                {
+                    $sessioncontrols.signInFrequency.Remove('value') | Out-Null
+                }
+                $sessioncontrols.signInFrequency.frequencyInterval = $SignInFrequencyInterval
             }
             if ($PersistentBrowserIsEnabled)
             {
-                $PersistentBrowserValue = @{
-                    IsEnabled = $false
-                    Mode      = $false
+                $persistentBrowserValue = @{
+                    isEnabled = $false
+                    mode      = $false
                 }
-                $sessioncontrols.Add('PersistentBrowser', $PersistentBrowserValue)
+                $sessioncontrols.Add('persistentBrowser', $PersistentBrowserValue)
                 Write-Verbose -Message "Set-Targetresource: Persistent Browser settings defined: PersistentBrowserIsEnabled:$PersistentBrowserIsEnabled, PersistentBrowserMode:$PersistentBrowserMode"
                 #create and provision PersistentBrowser object if used
-                $sessioncontrols.PersistentBrowser.IsEnabled = $true
-                $sessioncontrols.PersistentBrowser.Mode = $PersistentBrowserMode
+                $sessioncontrols.persistentBrowser.isEnabled = $true
+                $sessioncontrols.persistentBrowser.mode = $PersistentBrowserMode
             }
+            if (-not [System.String]::IsNullOrEmpty($DisableResilienceDefaultsIsEnabled))
+            {
+                $sessioncontrols.Add('disableResilienceDefaults', $DisableResilienceDefaultsIsEnabled)
+            }
+            $NewParameters.Add('sessionControls', $sessioncontrols)
+            #add SessionControls to the parameter list
         }
-        $NewParameters.Add('SessionControls', $sessioncontrols)
-        #add SessionControls to the parameter list
     }
+
+    Write-M365DSCHost -Message "newparameters: $($NewParameters | ConvertTo-Json -Depth 5)"
+
     if ($Ensure -eq 'Present' -and $currentPolicy.Ensure -eq 'Present')
     {
         Write-Verbose -Message "Set-Targetresource: Change policy $DisplayName"
@@ -1324,7 +1929,9 @@ function Set-TargetResource
         try
         {
             Write-Verbose -Message "Updating existing policy with values: $(Convert-M365DscHashtableToString -Hashtable $NewParameters)"
-            Update-MgIdentityConditionalAccessPolicy @NewParameters
+
+            $Uri = (Get-MSCloudLoginConnectionProfile -Workload MicrosoftGraph).ResourceUrl + "beta/identity/conditionalAccess/policies/$($currentPolicy.Id)"
+            Invoke-MgGraphRequest -Method PATCH -Uri $Uri -Body $NewParameters
         }
         catch
         {
@@ -1334,7 +1941,7 @@ function Set-TargetResource
                 -TenantId $TenantId `
                 -Credential $Credential
 
-            Write-Verbose -Message "Set-Targetresource: Failed change policy $DisplayName"
+            Write-Error -Message "Set-Targetresource: Failed changing policy $DisplayName"
         }
     }
     elseif ($Ensure -eq 'Present' -and $currentPolicy.Ensure -eq 'Absent')
@@ -1342,19 +1949,33 @@ function Set-TargetResource
         Write-Verbose -Message "Set-Targetresource: create policy $DisplayName"
         Write-Verbose -Message 'Create Parameters:'
         Write-Verbose -Message (Convert-M365DscHashtableToString $NewParameters)
-        try
+
+        if ($newparameters.Conditions.applications.count -gt 0 -and ($newparameters.Conditions.Users.count -gt 0 -or $newparameters.Conditions.ClientApplications.count -gt 0) -and ($newparameters.GrantControls.count -gt 0 -or $newparameters.SessionControls.count -gt 0))
         {
-            New-MgIdentityConditionalAccessPolicy @NewParameters
+            try
+            {
+                $Uri = (Get-MSCloudLoginConnectionProfile -Workload MicrosoftGraph).ResourceUrl + 'beta/identity/conditionalAccess/policies'
+                Invoke-MgGraphRequest -Method POST -Uri $Uri -Body $NewParameters
+            }
+            catch
+            {
+                New-M365DSCLogEntry -Message 'Error creating new policy:' `
+                    -Exception $_ `
+                    -Source $($MyInvocation.MyCommand.Source) `
+                    -TenantId $TenantId `
+                    -Credential $Credential
+
+                Write-Error -Message 'Set-Targetresource: Failed creating new policy'
+            }
         }
-        catch
+        else
         {
-            New-M365DSCLogEntry -Message 'Error updating data:' `
-                -Exception $_ `
+            New-M365DSCLogEntry -Message 'Error creating new policy:' `
                 -Source $($MyInvocation.MyCommand.Source) `
                 -TenantId $TenantId `
                 -Credential $Credential
 
-            Write-Verbose -Message 'Set-Targetresource: Failed creating policy'
+            Write-Error -Message 'Set-Targetresource: Failed creating new policy. At least a user rule, application rule and grant or session control is required'
         }
     }
     elseif ($Ensure -eq 'Absent' -and $currentPolicy.Ensure -eq 'Present')
@@ -1362,7 +1983,7 @@ function Set-TargetResource
         Write-Verbose -Message "Set-Targetresource: delete policy $DisplayName"
         try
         {
-            Remove-MgIdentityConditionalAccessPolicy -ConditionalAccessPolicyId $currentPolicy.ID
+            Remove-MgBetaIdentityConditionalAccessPolicy -ConditionalAccessPolicyId $currentPolicy.ID
         }
         catch
         {
@@ -1372,10 +1993,10 @@ function Set-TargetResource
                 -TenantId $TenantId `
                 -Credential $Credential
 
-            Write-Verbose -Message "Set-Targetresource: Failed deleting policy $DisplayName"
+            Write-Error -Message "Set-Targetresource: Failed deleting policy $DisplayName"
         }
     }
-    Write-Verbose -Message "Set-Targetresource: finished processing Policy $Displayname"
+    Write-Verbose -Message "Set-Targetresource: Finished processing Policy $Displayname"
 }
 
 function Test-TargetResource
@@ -1384,13 +2005,13 @@ function Test-TargetResource
     [OutputType([System.Boolean])]
     param
     (
-        [Parameter(Mandatory = $true)]
-        [System.String]
-        $DisplayName,
-
         [Parameter()]
         [System.String]
         $Id,
+
+        [Parameter(Mandatory = $true)]
+        [System.String]
+        $DisplayName,
 
         [Parameter()]
         [System.String]
@@ -1405,6 +2026,15 @@ function Test-TargetResource
         [Parameter()]
         [System.String[]]
         $ExcludeApplications,
+
+        [Parameter()]
+        [System.String]
+        $ApplicationsFilter,
+
+        [Parameter()]
+        [ValidateSet('include', 'exclude')]
+        [System.String]
+        $ApplicationsFilterMode,
 
         [Parameter()]
         [System.String[]]
@@ -1435,6 +2065,51 @@ function Test-TargetResource
         [System.String[]]
         $ExcludeRoles,
 
+        [Parameter()]
+        [System.String[]]
+        [validateSet('none', 'internalGuest', 'b2bCollaborationGuest', 'b2bCollaborationMember', 'b2bDirectConnectUser', 'otherExternalUser', 'serviceProvider', 'unknownFutureValue')]
+        $IncludeGuestOrExternalUserTypes,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet('', 'all', 'enumerated', 'unknownFutureValue')]
+        $IncludeExternalTenantsMembershipKind,
+
+        [Parameter()]
+        [System.String[]]
+        $IncludeExternalTenantsMembers,
+
+        [Parameter()]
+        [System.String[]]
+        [validateSet('none', 'internalGuest', 'b2bCollaborationGuest', 'b2bCollaborationMember', 'b2bDirectConnectUser', 'otherExternalUser', 'serviceProvider', 'unknownFutureValue')]
+        $ExcludeGuestOrExternalUserTypes,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet('', 'all', 'enumerated', 'unknownFutureValue')]
+        $ExcludeExternalTenantsMembershipKind,
+
+        [Parameter()]
+        [System.String[]]
+        $ExcludeExternalTenantsMembers,
+
+        [Parameter()]
+        [System.String[]]
+        $IncludeServicePrincipals,
+
+        [Parameter()]
+        [System.String[]]
+        $ExcludeServicePrincipals,
+
+        [Parameter()]
+        [ValidateSet('include', 'exclude')]
+        [System.String]
+        $ServicePrincipalFilterMode,
+
+        [Parameter()]
+        [System.String]
+        $ServicePrincipalFilterRule,
+
         #ConditionalAccessPlatformCondition
         [Parameter()]
         [System.String[]]
@@ -1452,17 +2127,6 @@ function Test-TargetResource
         [Parameter()]
         [System.String[]]
         $ExcludeLocations,
-
-        #ConditionalAccessDevicesCondition
-        #DEPRECATED
-        [Parameter()]
-        [System.String[]]
-        $IncludeDevices,
-
-        #DEPRECATED
-        [Parameter()]
-        [System.String[]]
-        $ExcludeDevices,
 
         [Parameter()]
         [ValidateSet('include', 'exclude')]
@@ -1523,6 +2187,11 @@ function Test-TargetResource
         $SignInFrequencyIsEnabled,
 
         [Parameter()]
+        [ValidateSet('timeBased', 'everyTime', 'unknownFutureValue')]
+        [System.String]
+        $SignInFrequencyInterval,
+
+        [Parameter()]
         [ValidateSet('Always', 'Never', '')]
         [System.String]
         $PersistentBrowserMode,
@@ -1532,12 +2201,42 @@ function Test-TargetResource
         $PersistentBrowserIsEnabled,
 
         [Parameter()]
+        [System.Boolean]
+        $DisableResilienceDefaultsIsEnabled,
+
+        [Parameter()]
         [System.String]
         $TermsOfUse,
 
         [Parameter()]
         [System.String[]]
         $CustomAuthenticationFactors,
+
+        [Parameter()]
+        [System.String]
+        $AuthenticationStrength,
+
+        [Parameter()]
+        [System.String[]]
+        $AuthenticationContexts,
+
+        [Parameter()]
+        [System.String]
+        $TransferMethods,
+
+        [Parameter()]
+        [ValidateSet('minor', 'moderate', 'elevated', 'unknownFutureValue')]
+        [System.String[]]
+        $InsiderRiskLevels,
+
+        [Parameter()]
+        [ValidateSet('low', 'medium', 'high', 'none', 'unknownFutureValue')]
+        [System.String[]]
+        $ServicePrincipalRiskLevels,
+
+        [Parameter()]
+        [System.String[]]
+        $ProtocolFlows,
 
         #generic
         [Parameter()]
@@ -1567,30 +2266,25 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
-    Write-Verbose -Message 'Testing configuration of AzureAD CA Policies'
+    #region Telemetry
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
+    $CommandName = $MyInvocation.MyCommand
+    $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
+        -CommandName $CommandName `
+        -Parameters $PSBoundParameters
+    Add-M365DSCTelemetryEvent -Data $data
+    #endregion
 
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('ApplicationId') | Out-Null
-    $ValuesToCheck.Remove('TenantId') | Out-Null
-    $ValuesToCheck.Remove('ApplicationSecret') | Out-Null
-    $ValuesToCheck.Remove('ManagedIdentity') | Out-Null
-    $ValuesToCheck.Remove('Id') | Out-Null
-
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck $ValuesToCheck.Keys
-
-    Write-Verbose -Message "Test-TargetResource returned $TestResult"
-
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '')
+    return $result
 }
 
 function Export-TargetResource
@@ -1625,7 +2319,11 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     #Ensure the proper dependencies are installed in the current environment.
@@ -1641,27 +2339,29 @@ function Export-TargetResource
     #endregion
 
     $ConnectionMode = New-M365DSCConnection -Workload 'MicrosoftGraph' `
-        -InboundParameters $PSBoundParameters `
-        -ProfileName 'beta'
-
-    Select-MgProfile -Name 'beta'
+        -InboundParameters $PSBoundParameters
 
     try
     {
-        [array] $Policies = Get-MgIdentityConditionalAccessPolicy -Filter $Filter -All:$true -ErrorAction Stop
+        [array] $Policies = Get-MgBetaIdentityConditionalAccessPolicy -Filter $Filter -All:$true -ErrorAction Stop
         $i = 1
         $dscContent = ''
 
         if ($Policies.Length -eq 0)
         {
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         }
         else
         {
-            Write-Host "`r`n" -NoNewline
+            Write-M365DSCHost -Message "`r`n" -DeferWrite
             foreach ($Policy in $Policies)
             {
-                Write-Host "    |---[$i/$($Policies.Count)] $($Policy.DisplayName)" -NoNewline
+                if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+                {
+                    $Global:M365DSCExportResourceInstancesCount++
+                }
+
+                Write-M365DSCHost -Message "    |---[$i/$($Policies.Count)] $($Policy.DisplayName)" -DeferWrite
                 $Params = @{
                     DisplayName           = $Policy.DisplayName
                     Id                    = $Policy.Id
@@ -1670,30 +2370,16 @@ function Export-TargetResource
                     ApplicationSecret     = $ApplicationSecret
                     CertificateThumbprint = $CertificateThumbprint
                     Credential            = $Credential
-                    Managedidentity       = $ManagedIdentity.IsPresent
+                    ManagedIdentity       = $ManagedIdentity.IsPresent
+                    AccessTokens          = $AccessTokens
                 }
+                $Script:exportedInstance = $Policy
                 $Results = Get-TargetResource @Params
-
-                #DEPRECATED
-                if ($Results.IncludeDevices)
-                {
-                    Write-Host "`r`n    $($Global:M365DSCEmojiYellowCircle) The Include Devices parameter is deprecated. Instead use the Device Filter Mode and Device Filter Rule parameters in the portal."
-                    $Results.Remove('IncludeDevices') | Out-Null
-                }
-                #DEPRECATED
-                if ($Results.ExcludeDevices)
-                {
-                    Write-Host "`r`n    $($Global:M365DSCEmojiYellowCircle) The Exclude Devices parameter is deprecated. Instead use the Device Filter Mode and Device Filter Rule parameters in the portal."
-                    $Results.Remove('ExcludeDevices') | Out-Null
-                }
-
                 if ([System.String]::IsNullOrEmpty($Results.DeviceFilterMode))
                 {
                     $Results.Remove('DeviceFilterMode') | Out-Null
                 }
 
-                $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                    -Results $Results
                 $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                     -ConnectionMode $ConnectionMode `
                     -ModulePath $PSScriptRoot `
@@ -1703,7 +2389,7 @@ function Export-TargetResource
                 $dscContent += $currentDSCBlock
                 Save-M365DSCPartialExport -Content $currentDSCBlock `
                     -FileName $Global:PartialExportFileName
-                Write-Host $Global:M365DSCEmojiGreenCheckMark
+                Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
                 $i++
             }
         }
@@ -1712,7 +2398,7 @@ function Export-TargetResource
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `

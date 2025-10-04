@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_EXOQuarantinePolicy'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -63,19 +65,48 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String]
+        $CustomDisclaimer,
+
+        [Parameter()]
+        [System.String]
+        $EndUserSpamNotificationFrequency,
+
+        [Parameter()]
+        [System.String]
+        $EndUserSpamNotificationFrequencyInDays,
+
+        [Parameter()]
+        [System.String]
+        $EndUserSpamNotificationCustomFromAddress,
+
+        [Parameter()]
+        [System.String[]]
+        $EsnCustomSubject,
+
+        [Parameter()]
+        [System.String]
+        $QuarantinePolicyType,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Getting configuration of QuarantinePolicy for $($Identity)"
+
     if ($Global:CurrentModeIsExport)
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+        $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
             -InboundParameters $PSBoundParameters `
             -SkipModuleReload $true
     }
     else
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+        $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
             -InboundParameters $PSBoundParameters
     }
 
@@ -96,9 +127,15 @@ function Get-TargetResource
 
     try
     {
-        $QuarantinePolicys = Get-QuarantinePolicy -ErrorAction Stop
-
-        $QuarantinePolicy = $QuarantinePolicys | Where-Object -FilterScript { $_.Identity -eq $Identity }
+        if ($QuarantinePolicyType -eq 'GlobalQuarantineTag')
+        {
+            $QuarantinePolicy = Get-QuarantinePolicy -QuarantinePolicyType GlobalQuarantinePolicy -ErrorAction Stop
+        }
+        else
+        {
+            $QuarantinePolicies = Get-QuarantinePolicy -ErrorAction Stop
+            $QuarantinePolicy = $QuarantinePolicies | Where-Object -FilterScript { $_.Identity -eq $Identity }
+        }
         if ($null -eq $QuarantinePolicy)
         {
             Write-Verbose -Message "QuarantinePolicy $($Identity) does not exist."
@@ -106,104 +143,132 @@ function Get-TargetResource
         }
         else
         {
-            $EndUserQuarantinePermissionsValueDecimal = 0
-            if ($QuarantinePolicy.EndUserQuarantinePermissions)
+            if ($QuarantinePolicy.QuarantinePolicyType -eq 'GlobalQuarantineTag')
             {
-                # Convert string output of EndUserQuarantinePermissions to binary value and then to decimal value
-                # needed for EndUserQuarantinePermissionsValue attribute of New-/Set-QuarantinePolicy cmdlet.
-                # This parameter uses a decimal value that's converted from a binary value.
-                # The binary value corresponds to the list of available permissions in a specific order.
-                # For each permission, the value 1 equals True and the value 0 equals False.
-
-                $EndUserQuarantinePermissionsBinary = ''
-                if ($QuarantinePolicy.EndUserQuarantinePermissions.Contains('PermissionToViewHeader: True'))
-                {
-                    $PermissionToViewHeader = '1'
+                $result = @{
+                    CustomDisclaimer                         = $QuarantinePolicy.CustomDisclaimer
+                    EndUserSpamNotificationFrequency         = $QuarantinePolicy.EndUserSpamNotificationFrequency
+                    EndUserSpamNotificationFrequencyInDays   = $QuarantinePolicy.EndUserSpamNotificationFrequencyInDays
+                    EndUserSpamNotificationCustomFromAddress = $QuarantinePolicy.EndUserSpamNotificationCustomFromAddress
+                    MultiLanguageCustomDisclaimer            = $QuarantinePolicy.MultiLanguageCustomDisclaimer
+                    EsnCustomSubject                         = $QuarantinePolicy.EsnCustomSubject
+                    MultiLanguageSenderName                  = $QuarantinePolicy.MultiLanguageSenderName
+                    MultiLanguageSetting                     = $QuarantinePolicy.MultiLanguageSetting
+                    OrganizationBrandingEnabled              = $QuarantinePolicy.OrganizationBrandingEnabled
+                    QuarantinePolicyType                     = $QuarantinePolicy.QuarantinePolicyType
+                    Identity                                 = $Identity
+                    Credential                               = $Credential
+                    Ensure                                   = 'Present'
+                    ApplicationId                            = $ApplicationId
+                    CertificateThumbprint                    = $CertificateThumbprint
+                    CertificatePath                          = $CertificatePath
+                    CertificatePassword                      = $CertificatePassword
+                    ManagedIdentity                          = $ManagedIdentity.IsPresent
+                    TenantId                                 = $TenantId
+                    AccessTokens                             = $AccessTokens
                 }
-                else
-                {
-                    $PermissionToViewHeader = '0'
-                }
-                if ($QuarantinePolicy.EndUserQuarantinePermissions.Contains('PermissionToDownload: True'))
-                {
-                    $PermissionToDownload = '1'
-                }
-                else
-                {
-                    $PermissionToDownload = '0'
-                }
-                if ($QuarantinePolicy.EndUserQuarantinePermissions.Contains('PermissionToAllowSender: True'))
-                {
-                    $PermissionToAllowSender = '1'
-                }
-                else
-                {
-                    $PermissionToAllowSender = '0'
-                }
-                if ($QuarantinePolicy.EndUserQuarantinePermissions.Contains('PermissionToBlockSender: True'))
-                {
-                    $PermissionToBlockSender = '1'
-                }
-                else
-                {
-                    $PermissionToBlockSender = '0'
-                }
-                if ($QuarantinePolicy.EndUserQuarantinePermissions.Contains('PermissionToRequestRelease: True'))
-                {
-                    $PermissionToRequestRelease = '1'
-                }
-                else
-                {
-                    $PermissionToRequestRelease = '0'
-                }
-                if ($QuarantinePolicy.EndUserQuarantinePermissions.Contains('PermissionToRelease: True'))
-                {
-                    $PermissionToRelease = '1'
-                }
-                else
-                {
-                    $PermissionToRelease = '0'
-                }
-                if ($QuarantinePolicy.EndUserQuarantinePermissions.Contains('PermissionToPreview: True'))
-                {
-                    $PermissionToPreview = '1'
-                }
-                else
-                {
-                    $PermissionToPreview = '0'
-                }
-                if ($QuarantinePolicy.EndUserQuarantinePermissions.Contains('PermissionToDelete: True'))
-                {
-                    $PermissionToDelete = '1'
-                }
-                else
-                {
-                    $PermissionToDelete = '0'
-                }
-                # Concat values to binary value
-                $EndUserQuarantinePermissionsBinary = [System.String]::Concat($PermissionToViewHeader, $PermissionToDownload, $PermissionToAllowSender, $PermissionToBlockSender, $PermissionToRequestRelease, $PermissionToRelease, $PermissionToPreview, $PermissionToDelete)
-
-                # Convert to Decimal value
-                [int]$EndUserQuarantinePermissionsValueDecimal = [System.Convert]::ToByte($EndUserQuarantinePermissionsBinary, 2)
             }
-            $result = @{
-                Identity                          = $Identity
-                EndUserQuarantinePermissionsValue = $EndUserQuarantinePermissionsValueDecimal
-                ESNEnabled                        = $QuarantinePolicy.ESNEnabled
-                MultiLanguageCustomDisclaimer     = $QuarantinePolicy.MultiLanguageCustomDisclaimer
-                MultiLanguageSenderName           = $QuarantinePolicy.MultiLanguageSenderName
-                MultiLanguageSetting              = $QuarantinePolicy.MultiLanguageSetting
-                OrganizationBrandingEnabled       = $QuarantinePolicy.OrganizationBrandingEnabled
-                Credential                        = $Credential
-                Ensure                            = 'Present'
-                ApplicationId                     = $ApplicationId
-                CertificateThumbprint             = $CertificateThumbprint
-                CertificatePath                   = $CertificatePath
-                CertificatePassword               = $CertificatePassword
-                Managedidentity                   = $ManagedIdentity.IsPresent
-                TenantId                          = $TenantId
-            }
+            else
+            {
+                $EndUserQuarantinePermissionsValueDecimal = 0
+                if ($QuarantinePolicy.EndUserQuarantinePermissions)
+                {
+                    # Convert string output of EndUserQuarantinePermissions to binary value and then to decimal value
+                    # needed for EndUserQuarantinePermissionsValue attribute of New-/Set-QuarantinePolicy cmdlet.
+                    # This parameter uses a decimal value that's converted from a binary value.
+                    # The binary value corresponds to the list of available permissions in a specific order.
+                    # For each permission, the value 1 equals True and the value 0 equals False.
 
+                    $EndUserQuarantinePermissionsBinary = ''
+                    if ($QuarantinePolicy.EndUserQuarantinePermissions.Contains('PermissionToViewHeader: True'))
+                    {
+                        $PermissionToViewHeader = '1'
+                    }
+                    else
+                    {
+                        $PermissionToViewHeader = '0'
+                    }
+                    if ($QuarantinePolicy.EndUserQuarantinePermissions.Contains('PermissionToDownload: True'))
+                    {
+                        $PermissionToDownload = '1'
+                    }
+                    else
+                    {
+                        $PermissionToDownload = '0'
+                    }
+                    if ($QuarantinePolicy.EndUserQuarantinePermissions.Contains('PermissionToAllowSender: True'))
+                    {
+                        $PermissionToAllowSender = '1'
+                    }
+                    else
+                    {
+                        $PermissionToAllowSender = '0'
+                    }
+                    if ($QuarantinePolicy.EndUserQuarantinePermissions.Contains('PermissionToBlockSender: True'))
+                    {
+                        $PermissionToBlockSender = '1'
+                    }
+                    else
+                    {
+                        $PermissionToBlockSender = '0'
+                    }
+                    if ($QuarantinePolicy.EndUserQuarantinePermissions.Contains('PermissionToRequestRelease: True'))
+                    {
+                        $PermissionToRequestRelease = '1'
+                    }
+                    else
+                    {
+                        $PermissionToRequestRelease = '0'
+                    }
+                    if ($QuarantinePolicy.EndUserQuarantinePermissions.Contains('PermissionToRelease: True'))
+                    {
+                        $PermissionToRelease = '1'
+                    }
+                    else
+                    {
+                        $PermissionToRelease = '0'
+                    }
+                    if ($QuarantinePolicy.EndUserQuarantinePermissions.Contains('PermissionToPreview: True'))
+                    {
+                        $PermissionToPreview = '1'
+                    }
+                    else
+                    {
+                        $PermissionToPreview = '0'
+                    }
+                    if ($QuarantinePolicy.EndUserQuarantinePermissions.Contains('PermissionToDelete: True'))
+                    {
+                        $PermissionToDelete = '1'
+                    }
+                    else
+                    {
+                        $PermissionToDelete = '0'
+                    }
+                    # Concat values to binary value
+                    $EndUserQuarantinePermissionsBinary = [System.String]::Concat($PermissionToViewHeader, $PermissionToDownload, $PermissionToAllowSender, $PermissionToBlockSender, $PermissionToRequestRelease, $PermissionToRelease, $PermissionToPreview, $PermissionToDelete)
+
+                    # Convert to Decimal value
+                    [int]$EndUserQuarantinePermissionsValueDecimal = [System.Convert]::ToByte($EndUserQuarantinePermissionsBinary, 2)
+                }
+                $result = @{
+                    Identity                          = $Identity
+                    EndUserQuarantinePermissionsValue = $EndUserQuarantinePermissionsValueDecimal
+                    ESNEnabled                        = $QuarantinePolicy.ESNEnabled
+                    MultiLanguageCustomDisclaimer     = $QuarantinePolicy.MultiLanguageCustomDisclaimer
+                    MultiLanguageSenderName           = $QuarantinePolicy.MultiLanguageSenderName
+                    MultiLanguageSetting              = $QuarantinePolicy.MultiLanguageSetting
+                    OrganizationBrandingEnabled       = $QuarantinePolicy.OrganizationBrandingEnabled
+                    Credential                        = $Credential
+                    Ensure                            = 'Present'
+                    ApplicationId                     = $ApplicationId
+                    CertificateThumbprint             = $CertificateThumbprint
+                    CertificatePath                   = $CertificatePath
+                    CertificatePassword               = $CertificatePassword
+                    ManagedIdentity                   = $ManagedIdentity.IsPresent
+                    TenantId                          = $TenantId
+                    AccessTokens                      = $AccessTokens
+                }
+            }
             Write-Verbose -Message "Found QuarantinePolicy $($Identity)"
             Write-Verbose -Message "Get-TargetResource Result: `n $(Convert-M365DscHashtableToString -Hashtable $result)"
             return $result
@@ -285,8 +350,39 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String]
+        $CustomDisclaimer,
+
+        [Parameter()]
+        [System.String]
+        $EndUserSpamNotificationFrequency,
+
+        [Parameter()]
+        [System.String]
+        $EndUserSpamNotificationFrequencyInDays,
+
+        [Parameter()]
+        [System.String]
+        $EndUserSpamNotificationCustomFromAddress,
+
+        [Parameter()]
+        [System.String[]]
+        $EsnCustomSubject,
+
+        [Parameter()]
+        [System.String]
+        $QuarantinePolicyType,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
+    Write-Verbose -Message "Setting configuration of QuarantinePolicy for $($Identity)"
+
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
 
@@ -298,22 +394,21 @@ function Set-TargetResource
         -Parameters $PSBoundParameters
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
-    Write-Verbose -Message "Setting configuration of QuarantinePolicy for $($Identity)"
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+    $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
         -InboundParameters $PSBoundParameters
 
-    $QuarantinePolicys = Get-QuarantinePolicy
-    $QuarantinePolicy = $QuarantinePolicys | Where-Object -FilterScript { $_.Identity -eq $Identity }
-    $QuarantinePolicyParams = [System.Collections.Hashtable]($PSBoundParameters)
-    $QuarantinePolicyParams.Remove('Ensure') | Out-Null
-    $QuarantinePolicyParams.Remove('Credential') | Out-Null
-    $QuarantinePolicyParams.Remove('ApplicationId') | Out-Null
-    $QuarantinePolicyParams.Remove('TenantId') | Out-Null
-    $QuarantinePolicyParams.Remove('CertificateThumbprint') | Out-Null
-    $QuarantinePolicyParams.Remove('CertificatePath') | Out-Null
-    $QuarantinePolicyParams.Remove('CertificatePassword') | Out-Null
-    $QuarantinePolicyParams.Remove('ManagedIdentity') | Out-Null
+    if ($QuarantinePolicyType -eq 'GlobalQuarantineTag')
+    {
+        $QuarantinePolicy = Get-QuarantinePolicy -QuarantinePolicyType GlobalQuarantinePolicy
+    }
+    else
+    {
+        $QuarantinePolicies = Get-QuarantinePolicy
+        $QuarantinePolicy = $QuarantinePolicies | Where-Object -FilterScript { $_.Identity -eq $Identity }
+    }
+    $QuarantinePolicyParams = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
+    $QuarantinePolicyParams.Remove('QuarantinePolicyType') | Out-Null
 
     if (('Present' -eq $Ensure ) -and ($null -eq $QuarantinePolicy))
     {
@@ -325,7 +420,21 @@ function Set-TargetResource
     elseif (('Present' -eq $Ensure ) -and ($Null -ne $QuarantinePolicy))
     {
         Write-Verbose -Message "Setting QuarantinePolicy $($Identity) with values: $(Convert-M365DscHashtableToString -Hashtable $QuarantinePolicyParams)"
-        Set-QuarantinePolicy @QuarantinePolicyParams
+        if ($QuarantinePolicyType -eq 'GlobalQuarantineTag')
+        {
+            $QuarantinePolicyParams.Remove('Identity') | Out-Null
+            Get-QuarantinePolicy -QuarantinePolicyType GlobalQuarantinePolicy | Set-QuarantinePolicy @QuarantinePolicyParams
+        }
+        else
+        {
+            $IdentityValue = $Identity.Split('\')
+            if ($IdentityValue.Length -gt 1)
+            {
+                $IdentityValue = $IdentityValue[1]
+                $QuarantinePolicyParams.Identity = $IdentityValue
+            }
+            Set-QuarantinePolicy @QuarantinePolicyParams
+        }
     }
     elseif (('Absent' -eq $Ensure ) -and ($null -ne $QuarantinePolicy))
     {
@@ -399,13 +508,39 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String]
+        $CustomDisclaimer,
+
+        [Parameter()]
+        [System.String]
+        $EndUserSpamNotificationFrequency,
+
+        [Parameter()]
+        [System.String]
+        $EndUserSpamNotificationFrequencyInDays,
+
+        [Parameter()]
+        [System.String]
+        $EndUserSpamNotificationCustomFromAddress,
+
+        [Parameter()]
+        [System.String[]]
+        $EsnCustomSubject,
+
+        [Parameter()]
+        [System.String]
+        $QuarantinePolicyType,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
 
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -413,30 +548,9 @@ function Test-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message "Testing configuration of QuarantinePolicy for $($Identity)"
-
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-
-    Write-Verbose -Message "Current Values: $(Convert-M365DscHashtableToString -Hashtable $CurrentValues)"
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('Credential') | Out-Null
-    $ValuesToCheck.Remove('ApplicationId') | Out-Null
-    $ValuesToCheck.Remove('TenantId') | Out-Null
-    $ValuesToCheck.Remove('CertificateThumbprint') | Out-Null
-    $ValuesToCheck.Remove('CertificatePath') | Out-Null
-    $ValuesToCheck.Remove('CertificatePassword') | Out-Null
-    $ValuesToCheck.Remove('ManagedIdentity') | Out-Null
-
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck $ValuesToCheck.Keys
-
-    Write-Verbose -Message "Test-TargetResource returned $($TestResult)"
-
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '')
+    return $result
 }
 
 function Export-TargetResource
@@ -471,8 +585,13 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
         -InboundParameters $PSBoundParameters `
         -SkipModuleReload $true
@@ -491,20 +610,26 @@ function Export-TargetResource
 
     try
     {
-        [array]$QuarantinePolicys = Get-QuarantinePolicy -ErrorAction Stop
-        if ($QuarantinePolicys.Length -eq 0)
+        [array]$QuarantinePolicies = Get-QuarantinePolicy -ErrorAction Stop
+        [array]$QuarantinePolicies += Get-QuarantinePolicy -QuarantinePolicyType GlobalQuarantinePolicy -ErrorAction Stop
+        if ($QuarantinePolicies.Length -eq 0)
         {
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         }
         else
         {
-            Write-Host "`r`n" -NoNewline
+            Write-M365DSCHost -Message "`r`n" -DeferWrite
         }
         $dscContent = ''
         $i = 1
-        foreach ($QuarantinePolicy in $QuarantinePolicys)
+        foreach ($QuarantinePolicy in $QuarantinePolicies)
         {
-            Write-Host "    |---[$i/$($QuarantinePolicys.length)] $($QuarantinePolicy.Identity)" -NoNewline
+            if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+            {
+                $Global:M365DSCExportResourceInstancesCount++
+            }
+
+            Write-M365DSCHost -Message "    |---[$i/$($QuarantinePolicies.length)] $($QuarantinePolicy.Identity)" -DeferWrite
 
             $Params = @{
                 Identity              = $QuarantinePolicy.Identity
@@ -513,12 +638,13 @@ function Export-TargetResource
                 TenantId              = $TenantId
                 CertificateThumbprint = $CertificateThumbprint
                 CertificatePassword   = $CertificatePassword
-                Managedidentity       = $ManagedIdentity.IsPresent
+                ManagedIdentity       = $ManagedIdentity.IsPresent
                 CertificatePath       = $CertificatePath
+                QuarantinePolicyType  = $QuarantinePolicy.QuarantinePolicyType
+                AccessTokens          = $AccessTokens
             }
 
             $Results = Get-TargetResource @Params
-
             $keysToRemove = @()
             foreach ($key in $Results.Keys)
             {
@@ -531,8 +657,6 @@ function Export-TargetResource
             {
                 $Results.Remove($key) | Out-Null
             }
-            $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                -Results $Results
             $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                 -ConnectionMode $ConnectionMode `
                 -ModulePath $PSScriptRoot `
@@ -541,14 +665,14 @@ function Export-TargetResource
             $dscContent += $currentDSCBlock
             Save-M365DSCPartialExport -Content $currentDSCBlock `
                 -FileName $Global:PartialExportFileName
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
             $i++
         }
         return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `
@@ -560,4 +684,3 @@ function Export-TargetResource
     }
 }
 Export-ModuleMember -Function *-TargetResource
-

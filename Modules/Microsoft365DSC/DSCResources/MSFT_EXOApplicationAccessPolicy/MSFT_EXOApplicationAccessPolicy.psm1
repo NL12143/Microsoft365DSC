@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_EXOApplicationAccessPolicy'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -56,19 +58,23 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Getting Application Access Policy configuration for $Identity"
     if ($Global:CurrentModeIsExport)
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+        $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
             -InboundParameters $PSBoundParameters `
             -SkipModuleReload $true
     }
     else
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+        $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
             -InboundParameters $PSBoundParameters
     }
 
@@ -89,20 +95,45 @@ function Get-TargetResource
 
     try
     {
+        $ApplicationAccessPolicy = $null
         try
         {
-            $AllApplicationAccessPolicies = Get-ApplicationAccessPolicy -ErrorAction Stop
+            [Array]$ApplicationAccessPolicy = Get-ApplicationAccessPolicy -Identity $Identity -ErrorAction Stop
+            Write-Verbose -Message "Found policy by Identity {$Identity}"
         }
         catch
         {
-            if ($_.Exception -like "The operation couldn't be performed because object*")
-            {
-                Write-Verbose 'Could not obtain Application Access Policies for Tenant'
-                return $nullReturn
-            }
+            Write-Verbose -Message "Could not find policy by Identity {$Identity}"
         }
 
-        $ApplicationAccessPolicy = $AllApplicationAccessPolicies | Where-Object -FilterScript { $_.Identity -eq $Identity }
+        $ScopeIdentityValue = $null
+        if ($null -eq $ApplicationAccessPolicy)
+        {
+            $scopeIdentityGroup = $null
+            try
+            {
+                $scopeIdentityGroup = Get-Group -Identity $PolicyScopeGroupId -ErrorAction Stop
+            }
+            catch
+            {
+                Write-Verbose -Message "Could not find Group with Identity {$PolicyScopeGroupId}"
+            }
+
+            if ($null -ne $scopeIdentityGroup)
+            {
+                $ScopeIdentityValue = $scopeIdentityGroup.WindowsEmailAddress
+                $ApplicationAccessPolicy = Get-ApplicationAccessPolicy | Where-Object -FilterScript { $AppID -eq $_.AppId -and $_.ScopeIdentity -eq $scopeIdentityGroup }
+            }
+
+            if ($null -ne $ApplicationAccessPolicy)
+            {
+                Write-Verbose -Message "Found Application Access Policy by Scope {$PolicyScopeGroupId}"
+            }
+        }
+        else
+        {
+            $ScopeIdentityValue = $ApplicationAccessPolicy.ScopeIdentity
+        }
 
         if ($null -eq $ApplicationAccessPolicy)
         {
@@ -111,11 +142,12 @@ function Get-TargetResource
         }
         else
         {
+            $ApplicationAccessPolicy = $ApplicationAccessPolicy[0]
             $result = @{
                 Identity              = $ApplicationAccessPolicy.Identity
                 AccessRight           = $ApplicationAccessPolicy.AccessRight
                 AppID                 = $ApplicationAccessPolicy.AppID
-                PolicyScopeGroupId    = $ApplicationAccessPolicy.ScopeIdentity
+                PolicyScopeGroupId    = $ScopeIdentityValue
                 Description           = $ApplicationAccessPolicy.Description
                 Ensure                = 'Present'
                 Credential            = $Credential
@@ -123,11 +155,12 @@ function Get-TargetResource
                 CertificateThumbprint = $CertificateThumbprint
                 CertificatePath       = $CertificatePath
                 CertificatePassword   = $CertificatePassword
-                Managedidentity       = $ManagedIdentity.IsPresent
+                ManagedIdentity       = $ManagedIdentity.IsPresent
                 TenantId              = $TenantId
+                AccessTokens          = $AccessTokens
             }
 
-            Write-Verbose -Message "Found Application Access Policy $($Identity)"
+            Write-Verbose -Message "Found Application Access Policy {$($Identity)}"
             return $result
         }
     }
@@ -200,7 +233,11 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Setting Application Access Policy configuration for $Identity"
@@ -219,7 +256,7 @@ function Set-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+    $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
         -InboundParameters $PSBoundParameters
 
     $NewApplicationAccessPolicyParams = @{
@@ -231,7 +268,7 @@ function Set-TargetResource
     }
 
     $SetApplicationAccessPolicyParams = @{
-        Identity    = $Identity
+        Identity    = $currentApplicationAccessPolicyConfig.Identity
         Description = $Description
         Confirm     = $false
     }
@@ -253,16 +290,18 @@ function Set-TargetResource
     # CASE: Application Access Policy exists and it should, but Description attribute has different values than desired (Set-ApplicationAccessPolicy is only able to change description attribute)
     elseif ($Ensure -eq 'Present' -and $currentApplicationAccessPolicyConfig.Ensure -eq 'Present' -and $currentApplicationAccessPolicyConfig.Description -ne $Description)
     {
-        Write-Verbose -Message "Application Access Policy '$($Identity)' already exists, but needs updating."
-        Write-Verbose -Message "Setting Application Access Policy $($Identity) with values: $(Convert-M365DscHashtableToString -Hashtable $SetApplicationAccessPolicyParams)"
+        Write-Verbose -Message "Application Access Policy '$($currentApplicationAccessPolicyConfig.Identity)' already exists, but needs updating."
+        Write-Verbose -Message "Setting Application Access Policy $($currentApplicationAccessPolicyConfig.Identity) with values: $(Convert-M365DscHashtableToString -Hashtable $SetApplicationAccessPolicyParams)"
         Set-ApplicationAccessPolicy @SetApplicationAccessPolicyParams
     }
     # CASE: Application Access Policy exists and it should, but has different values than the desired one
     # Set-ApplicationAccessPolicy is only able to change description attribute, therefore re-create policy
     elseif ($Ensure -eq 'Present' -and $currentApplicationAccessPolicyConfig.Ensure -eq 'Present' -and $currentApplicationAccessPolicyConfig.Description -eq $Description)
     {
-        Write-Verbose -Message "Re-create Application Access Policy '$($Identity)'"
-        Remove-ApplicationAccessPolicy -Identity $Identity -Confirm:$false
+        Write-Verbose -Message "Re-create Application Access Policy '$($currentApplicationAccessPolicyConfig.Identity)'"
+        Remove-ApplicationAccessPolicy -Identity $currentApplicationAccessPolicyConfig.Identity -Confirm:$false
+        Write-Verbose -Message 'Removing existing policy was successful'
+        Write-Verbose -Message "Creating new instance with parameters: $(Convert-M365DscHashtableToString -Hashtable $NewApplicationAccessPolicyParams)"
         New-ApplicationAccessPolicy @NewApplicationAccessPolicyParams
     }
 }
@@ -325,13 +364,15 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
 
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -339,30 +380,9 @@ function Test-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message "Testing Application Access Policy configuration for $Identity"
-
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-
-    Write-Verbose -Message "Current Values: $(Convert-M365DscHashtableToString -Hashtable $CurrentValues)"
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('Credential') | Out-Null
-    $ValuesToCheck.Remove('ApplicationId') | Out-Null
-    $ValuesToCheck.Remove('TenantId') | Out-Null
-    $ValuesToCheck.Remove('CertificateThumbprint') | Out-Null
-    $ValuesToCheck.Remove('CertificatePath') | Out-Null
-    $ValuesToCheck.Remove('CertificatePassword') | Out-Null
-    $ValuesToCheck.Remove('ManagedIdentity') | Out-Null
-
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck $ValuesToCheck.Keys
-
-    Write-Verbose -Message "Test-TargetResource returned $TestResult"
-
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '')
+    return $result
 }
 
 function Export-TargetResource
@@ -397,8 +417,13 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
         -InboundParameters $PSBoundParameters `
         -SkipModuleReload $true
@@ -419,13 +444,13 @@ function Export-TargetResource
     {
         try
         {
-            [array]$AllApplicationAccessPolicies = Get-ApplicationAccessPolicy -ErrorAction SilentlyContinue
+            [array]$AllApplicationAccessPolicies = Get-ApplicationAccessPolicy -ErrorAction Stop
         }
         catch
         {
             if ($_.Exception -like "*The operation couldn't be performed because object*")
             {
-                Write-Host "`r`n    $($Global:M365DSCEmojiYellowCircle) The current tenant is not registered to allow for Application Access Policies"
+                Write-M365DSCHost -Message "`r`n    $($Global:M365DSCEmojiYellowCircle) The current tenant is not registered to allow for Application Access Policies" -CommitWrite
                 return ''
             }
             throw $_
@@ -434,16 +459,21 @@ function Export-TargetResource
         $dscContent = ''
         if ($AllApplicationAccessPolicies.Length -eq 0)
         {
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         }
         else
         {
-            Write-Host "`r`n" -NoNewline
+            Write-M365DSCHost -Message "`r`n" -DeferWrite
         }
         $i = 1
         foreach ($ApplicationAccessPolicy in $AllApplicationAccessPolicies)
         {
-            Write-Host "    |---[$i/$($AllApplicationAccessPolicies.Count)] $($ApplicationAccessPolicy.Identity)" -NoNewline
+            if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+            {
+                $Global:M365DSCExportResourceInstancesCount++
+            }
+
+            Write-M365DSCHost -Message "    |---[$i/$($AllApplicationAccessPolicies.Count)] $($ApplicationAccessPolicy.Identity)" -DeferWrite
 
             $Params = @{
                 Identity              = $ApplicationAccessPolicy.Identity
@@ -452,12 +482,11 @@ function Export-TargetResource
                 TenantId              = $TenantId
                 CertificateThumbprint = $CertificateThumbprint
                 CertificatePassword   = $CertificatePassword
-                Managedidentity       = $ManagedIdentity.IsPresent
+                ManagedIdentity       = $ManagedIdentity.IsPresent
                 CertificatePath       = $CertificatePath
+                AccessTokens          = $AccessTokens
             }
             $Results = Get-TargetResource @Params
-            $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                -Results $Results
             $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                 -ConnectionMode $ConnectionMode `
                 -ModulePath $PSScriptRoot `
@@ -467,14 +496,14 @@ function Export-TargetResource
             $dscContent += $currentDSCBlock
             Save-M365DSCPartialExport -Content $currentDSCBlock `
                 -FileName $Global:PartialExportFileName
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
             $i++
         }
         return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `
@@ -487,4 +516,3 @@ function Export-TargetResource
 }
 
 Export-ModuleMember -Function *-TargetResource
-

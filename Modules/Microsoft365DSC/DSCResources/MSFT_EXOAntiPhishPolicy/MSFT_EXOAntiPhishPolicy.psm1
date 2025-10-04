@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_EXOAntiPhishPolicy'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -20,11 +22,6 @@ function Get-TargetResource
         [Parameter()]
         [System.Boolean]
         $Enabled = $true,
-
-        # Deprecated
-        [Parameter()]
-        [System.Boolean]
-        $EnableAntispoofEnforcement = $true,
 
         [Parameter()]
         [System.Boolean]
@@ -88,6 +85,10 @@ function Get-TargetResource
         $ExcludedSenders = @(),
 
         [Parameter()]
+        [System.Boolean]
+        $HonorDmarcPolicy,
+
+        [Parameter()]
         [ValidateSet('Automatic', 'Manual', 'Off')]
         [System.String]
         $ImpersonationProtectionState = 'Automatic',
@@ -114,15 +115,14 @@ function Get-TargetResource
         $MakeDefault = $false,
 
         [Parameter()]
-        [ValidateSet('1', '2', '3', '4')]
-        [System.String]
-        $PhishThresholdLevel = '1',
+        [ValidateSet(1, 2, 3, 4)]
+        [System.Int32]
+        $PhishThresholdLevel = 1,
 
         [Parameter()]
         [System.String[]]
         $TargetedDomainActionRecipients = @(),
 
-        # Deprecated
         [Parameter()]
         [ValidateSet('BccMessage', 'Delete', 'MoveToJmf', 'NoAction', 'Quarantine', 'Redirect')]
         [System.String]
@@ -154,6 +154,16 @@ function Get-TargetResource
         $TargetedUserQuarantineTag,
 
         [Parameter()]
+        [System.String]
+        [ValidateSet('MoveToJmf', 'Quarantine')]
+        $DmarcQuarantineAction,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet('Quarantine', 'Reject')]
+        $DmarcRejectAction,
+
+        [Parameter()]
         [System.Management.Automation.PSCredential]
         $Credential,
 
@@ -179,20 +189,24 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Getting configuration of AntiPhishPolicy for $Identity"
 
     if ($Global:CurrentModeIsExport)
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+        $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
             -InboundParameters $PSBoundParameters `
             -SkipModuleReload $true
     }
     else
     {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+        $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
             -InboundParameters $PSBoundParameters
     }
 
@@ -225,13 +239,19 @@ function Get-TargetResource
             $PhishThresholdLevelValue = $AntiPhishPolicy.PhishThresholdLevel
             if ([System.String]::IsNullOrEmpty($PhishThresholdLevelValue))
             {
-                $PhishThresholdLevelValue = '1'
+                $PhishThresholdLevelValue = 1
             }
 
             $TargetedUserProtectionActionValue = $AntiPhishPolicy.TargetedUserProtectionAction
             if ([System.String]::IsNullOrEmpty($TargetedUserProtectionActionValue))
             {
                 $TargetedUserProtectionActionValue = 'NoAction'
+            }
+
+            $TargetedDomainProtectionActionValue = $AntiPhishPolicy.TargetedDomainProtectionAction
+            if ([System.String]::IsNullOrEmpty($TargetedDomainProtectionActionValue))
+            {
+                $TargetedDomainProtectionActionValue = 'NoAction'
             }
 
             $result = @{
@@ -253,6 +273,7 @@ function Get-TargetResource
                 EnableViaTag                                  = $AntiPhishPolicy.EnableViaTag
                 ExcludedDomains                               = $AntiPhishPolicy.ExcludedDomains
                 ExcludedSenders                               = $AntiPhishPolicy.ExcludedSenders
+                HonorDmarcPolicy                              = $AntiPhishPolicy.HonorDmarcPolicy
                 ImpersonationProtectionState                  = $AntiPhishPolicy.ImpersonationProtectionState
                 MailboxIntelligenceProtectionAction           = $AntiPhishPolicy.MailboxIntelligenceProtectionAction
                 MailboxIntelligenceProtectionActionRecipients = $AntiPhishPolicy.MailboxIntelligenceProtectionActionRecipients
@@ -261,20 +282,24 @@ function Get-TargetResource
                 MakeDefault                                   = $AntiPhishPolicy.IsDefault
                 PhishThresholdLevel                           = $PhishThresholdLevelValue
                 TargetedDomainActionRecipients                = $AntiPhishPolicy.TargetedDomainActionRecipients
+                TargetedDomainProtectionAction                = $TargetedDomainProtectionActionValue
                 TargetedDomainsToProtect                      = $AntiPhishPolicy.TargetedDomainsToProtect
                 TargetedDomainQuarantineTag                   = $AntiPhishPolicy.TargetedDomainQuarantineTag
                 TargetedUserActionRecipients                  = $AntiPhishPolicy.TargetedUserActionRecipients
                 TargetedUserProtectionAction                  = $TargetedUserProtectionActionValue
                 TargetedUsersToProtect                        = $AntiPhishPolicy.TargetedUsersToProtect
                 TargetedUserQuarantineTag                     = $AntiPhishPolicy.TargetedUserQuarantineTag
+                DmarcQuarantineAction                         = $AntiPhishPolicy.DmarcQuarantineAction
+                DmarcRejectAction                             = $AntiPhishPolicy.DmarcRejectAction
                 Credential                                    = $Credential
                 Ensure                                        = 'Present'
                 ApplicationId                                 = $ApplicationId
                 CertificateThumbprint                         = $CertificateThumbprint
                 CertificatePath                               = $CertificatePath
                 CertificatePassword                           = $CertificatePassword
-                Managedidentity                               = $ManagedIdentity.IsPresent
+                ManagedIdentity                               = $ManagedIdentity.IsPresent
                 TenantId                                      = $TenantId
+                AccessTokens                                  = $AccessTokens
             }
 
             Write-Verbose -Message "Found AntiPhishPolicy $($Identity)"
@@ -316,11 +341,6 @@ function Set-TargetResource
         [System.Boolean]
         $Enabled = $true,
 
-        # Deprecated
-        [Parameter()]
-        [System.Boolean]
-        $EnableAntispoofEnforcement = $true,
-
         [Parameter()]
         [System.Boolean]
         $EnableFirstContactSafetyTips = $true,
@@ -383,6 +403,10 @@ function Set-TargetResource
         $ExcludedSenders = @(),
 
         [Parameter()]
+        [System.Boolean]
+        $HonorDmarcPolicy,
+
+        [Parameter()]
         [ValidateSet('Automatic', 'Manual', 'Off')]
         [System.String]
         $ImpersonationProtectionState = 'Automatic',
@@ -409,15 +433,14 @@ function Set-TargetResource
         $MakeDefault = $false,
 
         [Parameter()]
-        [ValidateSet('1', '2', '3', '4')]
-        [System.String]
-        $PhishThresholdLevel = '1',
+        [ValidateSet(1, 2, 3, 4)]
+        [System.Int32]
+        $PhishThresholdLevel = 1,
 
         [Parameter()]
         [System.String[]]
         $TargetedDomainActionRecipients = @(),
 
-        # Deprecated
         [Parameter()]
         [ValidateSet('BccMessage', 'Delete', 'MoveToJmf', 'NoAction', 'Quarantine', 'Redirect')]
         [System.String]
@@ -449,6 +472,16 @@ function Set-TargetResource
         $TargetedUserQuarantineTag,
 
         [Parameter()]
+        [System.String]
+        [ValidateSet('MoveToJmf', 'Quarantine')]
+        $DmarcQuarantineAction,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet('Quarantine', 'Reject')]
+        $DmarcRejectAction,
+
+        [Parameter()]
         [System.Management.Automation.PSCredential]
         $Credential,
 
@@ -474,20 +507,12 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-
-    if ($EnableAntispoofEnforcement)
-    {
-        Write-Verbose -Message ('The EnableAntispoofEnforcement parameter is now deprecated. ' + `
-                'It will be removed in the next major release. Please update your configuraton.')
-    }
-
-    if ($TargetedDomainProtectionAction)
-    {
-        Write-Verbose -Message ('The TargetedDomainProtectionAction parameter is now deprecated. ' + `
-                'It will be removed in the next major release. Please update your configuraton.')
-    }
 
     Write-Verbose -Message "Setting configuration of AntiPhishPolicy for $Identity"
 
@@ -503,32 +528,24 @@ function Set-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
+    $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
         -InboundParameters $PSBoundParameters
 
     $currentInstance = Get-TargetResource @PSBoundParameters
 
-    $PSBoundParameters.Remove('ApplicationId') | Out-Null
-    $PSBoundParameters.Remove('TenantId') | Out-Null
-    $PSBoundParameters.Remove('CertificateThumbprint') | Out-Null
-    $PSBoundParameters.Remove('CertificatePassword') | Out-Null
-    $PSBoundParameters.Remove('ManagedIdentity') | Out-Null
-    $PSBoundParameters.Remove('CertificatePath') | Out-Null
-    $PSBoundParameters.Remove('Credential') | Out-Null
-
     if (('Present' -eq $Ensure ) -and $currentInstance.Ensure -eq 'Absent')
     {
         Write-Verbose -Message "Creating new instance of AntiPhish Policy {$Identity}"
-        $CreateParams = $PSBoundParameters
-        $CreateParams.Remove('Ensure') | Out-Null
+        $createParams = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
+        $createParams.Remove('Ensure') | Out-Null
         $createParams.Add('Name', $Identity)
         $createParams.Remove('Identity') | Out-Null
-        New-AntiPhishPolicy @PSBoundParameters
+        New-AntiPhishPolicy @createParams
     }
     elseif (('Present' -eq $Ensure ) -and $currentInstance.Ensure -eq 'Present')
     {
         Write-Verbose -Message "Updating existing AntiPhishPolicy {$Identity}"
-        $UpdateParams = $PSBoundParameters
+        $UpdateParams = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
         $UpdateParams.Remove('Ensure') | Out-Null
         Set-AntiphishPolicy @UpdateParams
     }
@@ -562,11 +579,6 @@ function Test-TargetResource
         [System.Boolean]
         $Enabled = $true,
 
-        # Deprecated
-        [Parameter()]
-        [System.Boolean]
-        $EnableAntispoofEnforcement = $true,
-
         [Parameter()]
         [System.Boolean]
         $EnableFirstContactSafetyTips = $true,
@@ -629,6 +641,10 @@ function Test-TargetResource
         $ExcludedSenders = @(),
 
         [Parameter()]
+        [System.Boolean]
+        $HonorDmarcPolicy,
+
+        [Parameter()]
         [ValidateSet('Automatic', 'Manual', 'Off')]
         [System.String]
         $ImpersonationProtectionState = 'Automatic',
@@ -655,15 +671,14 @@ function Test-TargetResource
         $MakeDefault = $false,
 
         [Parameter()]
-        [ValidateSet('1', '2', '3', '4')]
-        [System.String]
-        $PhishThresholdLevel = '1',
+        [ValidateSet(1, 2, 3, 4)]
+        [System.Int32]
+        $PhishThresholdLevel = 1,
 
         [Parameter()]
         [System.String[]]
         $TargetedDomainActionRecipients = @(),
 
-        # Deprecated
         [Parameter()]
         [ValidateSet('BccMessage', 'Delete', 'MoveToJmf', 'NoAction', 'Quarantine', 'Redirect')]
         [System.String]
@@ -695,6 +710,16 @@ function Test-TargetResource
         $TargetedUserQuarantineTag,
 
         [Parameter()]
+        [System.String]
+        [ValidateSet('MoveToJmf', 'Quarantine')]
+        $DmarcQuarantineAction,
+
+        [Parameter()]
+        [System.String]
+        [ValidateSet('Quarantine', 'Reject')]
+        $DmarcRejectAction,
+
+        [Parameter()]
         [System.Management.Automation.PSCredential]
         $Credential,
 
@@ -720,14 +745,15 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
-
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -735,24 +761,9 @@ function Test-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message "Testing configuration of AntiPhishPolicy for $Identity"
-
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-
-    Write-Verbose -Message "Current Values: $(Convert-M365DscHashtableToString -Hashtable $CurrentValues)"
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('Credential') | Out-Null
-
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck $ValuesToCheck.Keys
-
-    Write-Verbose -Message "Test-TargetResource returned $TestResult"
-
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '')
+    return $result
 }
 
 function Export-TargetResource
@@ -787,8 +798,13 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
         -InboundParameters $PSBoundParameters `
         -SkipModuleReload $true
@@ -813,15 +829,20 @@ function Export-TargetResource
 
         if ($AntiphishPolicies.Length -eq 0)
         {
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         }
         else
         {
-            Write-Host "`r`n" -NoNewline
+            Write-M365DSCHost -Message "`r`n" -DeferWrite
         }
         foreach ($Policy in $AntiPhishPolicies)
         {
-            Write-Host "    |---[$i/$($AntiphishPolicies.Length)] $($Policy.Identity)" -NoNewline
+            if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+            {
+                $Global:M365DSCExportResourceInstancesCount++
+            }
+
+            Write-M365DSCHost -Message "    |---[$i/$($AntiphishPolicies.Length)] $($Policy.Identity)" -DeferWrite
 
             $Params = @{
                 Identity              = $Policy.Identity
@@ -830,12 +851,11 @@ function Export-TargetResource
                 TenantId              = $TenantId
                 CertificateThumbprint = $CertificateThumbprint
                 CertificatePassword   = $CertificatePassword
-                Managedidentity       = $ManagedIdentity.IsPresent
+                ManagedIdentity       = $ManagedIdentity.IsPresent
                 CertificatePath       = $CertificatePath
+                AccessTokens          = $AccessTokens
             }
             $Results = Get-TargetResource @Params
-            $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                -Results $Results
             $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                 -ConnectionMode $ConnectionMode `
                 -ModulePath $PSScriptRoot `
@@ -845,14 +865,14 @@ function Export-TargetResource
 
             Save-M365DSCPartialExport -Content $currentDSCBlock `
                 -FileName $Global:PartialExportFileName
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
             $i++
         }
         return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `

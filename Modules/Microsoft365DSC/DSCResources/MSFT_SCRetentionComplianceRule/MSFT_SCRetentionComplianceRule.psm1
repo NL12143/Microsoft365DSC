@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_SCRetentionComplianceRule'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -48,79 +50,107 @@ function Get-TargetResource
         [System.String]
         $Ensure = 'Present',
 
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [System.Management.Automation.PSCredential]
-        $Credential
+        $Credential,
+
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [System.String]
+        $CertificatePath,
+
+        [Parameter()]
+        [System.Management.Automation.PSCredential]
+        $CertificatePassword,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Getting configuration of RetentionComplianceRule for $Name"
-    if ($Global:CurrentModeIsExport)
-    {
-        $ConnectionMode = New-M365DSCConnection -Workload 'SecurityComplianceCenter' `
-            -InboundParameters $PSBoundParameters `
-            -SkipModuleReload $true
-    }
-    else
-    {
-        $ConnectionMode = New-M365DSCConnection -Workload 'SecurityComplianceCenter' `
-            -InboundParameters $PSBoundParameters
-    }
 
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
-
-    #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
-    $CommandName = $MyInvocation.MyCommand
-    $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
-        -CommandName $CommandName `
-        -Parameters $PSBoundParameters
-    Add-M365DSCTelemetryEvent -Data $data
-    #endregion
-
-
-    $nullReturn = $PSBoundParameters
-    $nullReturn.Ensure = 'Absent'
     try
     {
-        $RuleObject = Get-RetentionComplianceRule -Identity $Name `
-            -ErrorAction SilentlyContinue
-
-        if ($null -eq $RuleObject)
+        if (-not $Script:exportedInstance -or $Script:exportedInstance.Name -ne $Name)
         {
-            Write-Verbose -Message "RetentionComplianceRule $($Name) does not exist."
-            return $nullReturn
+            $null = New-M365DSCConnection -Workload 'SecurityComplianceCenter' `
+                -InboundParameters $PSBoundParameters
+
+            #Ensure the proper dependencies are installed in the current environment.
+            Confirm-M365DSCDependencies
+
+            #region Telemetry
+            $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+            $CommandName = $MyInvocation.MyCommand
+            $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
+                -CommandName $CommandName `
+                -Parameters $PSBoundParameters
+            Add-M365DSCTelemetryEvent -Data $data
+            #endregion
+
+
+            $nullReturn = $PSBoundParameters
+            $nullReturn.Ensure = 'Absent'
+
+            $RuleObject = Get-RetentionComplianceRule -Identity $Name `
+                -ErrorAction SilentlyContinue
+
+            if ($null -eq $RuleObject)
+            {
+                Write-Verbose -Message "RetentionComplianceRule $($Name) does not exist."
+                return $nullReturn
+            }
         }
         else
         {
-            Write-Verbose "Found existing RetentionComplianceRule $($Name)"
-            $AssociatedPolicy = Get-RetentionCompliancePolicy $RuleObject.Policy
-            $RetentionComplianceActionValue = $null
-            if (-not [System.String]::IsNullOrEmpty($ruleObject.RetentionComplianceAction))
-            {
-                $RetentionComplianceActionValue = $RuleObject.RetentionComplianceAction
-            }
-            $result = @{
-                Name                         = $RuleObject.Name
-                Comment                      = $RuleObject.Comment
-                Policy                       = $AssociatedPolicy.Name
-                RetentionDuration            = $RuleObject.RetentionDuration
-                RetentionComplianceAction    = $RetentionComplianceActionValue
-                RetentionDurationDisplayHint = $RuleObject.RetentionDurationDisplayHint
-                ExpirationDateOption         = $RuleObject.ExpirationDateOption
-                Credential                   = $Credential
-                Ensure                       = 'Present'
-            }
-            if (-not $associatedPolicy.TeamsPolicy)
-            {
-                $result.Add('ExcludedItemClasses', $RuleObject.ExcludedItemClasses)
-                $result.Add('ContentMatchQuery', $RuleObject.ContentMatchQuery)
-            }
-
-            Write-Verbose -Message "Found RetentionComplianceRule $($Name)"
-            Write-Verbose -Message "Get-TargetResource Result: `n $(Convert-M365DscHashtableToString -Hashtable $result)"
-            return $result
+            $RuleObject = $Script:exportedInstance
         }
+
+        Write-Verbose "Found existing RetentionComplianceRule $($Name)"
+        $AssociatedPolicy = Get-RetentionCompliancePolicy $RuleObject.Policy
+        $RetentionComplianceActionValue = $null
+        if (-not [System.String]::IsNullOrEmpty($ruleObject.RetentionComplianceAction))
+        {
+            $RetentionComplianceActionValue = $RuleObject.RetentionComplianceAction
+        }
+        $result = @{
+            Name                         = $RuleObject.Name
+            Comment                      = $RuleObject.Comment
+            Policy                       = $AssociatedPolicy.Name
+            RetentionDuration            = $RuleObject.RetentionDuration
+            RetentionComplianceAction    = $RetentionComplianceActionValue
+            RetentionDurationDisplayHint = $RuleObject.RetentionDurationDisplayHint
+            ExpirationDateOption         = $RuleObject.ExpirationDateOption
+            Credential                   = $Credential
+            ApplicationId                = $ApplicationId
+            TenantId                     = $TenantId
+            CertificateThumbprint        = $CertificateThumbprint
+            CertificatePath              = $CertificatePath
+            CertificatePassword          = $CertificatePassword
+            Ensure                       = 'Present'
+            AccessTokens                 = $AccessTokens
+        }
+        if (-not $associatedPolicy.TeamsPolicy)
+        {
+            $result.Add('ExcludedItemClasses', $RuleObject.ExcludedItemClasses)
+            $result.Add('ContentMatchQuery', $RuleObject.ContentMatchQuery)
+        }
+
+        Write-Verbose -Message "Found RetentionComplianceRule $($Name)"
+        Write-Verbose -Message "Get-TargetResource Result: `n $(Convert-M365DscHashtableToString -Hashtable $result)"
+        return $result
     }
     catch
     {
@@ -183,9 +213,33 @@ function Set-TargetResource
         [System.String]
         $Ensure = 'Present',
 
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [System.Management.Automation.PSCredential]
-        $Credential
+        $Credential,
+
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [System.String]
+        $CertificatePath,
+
+        [Parameter()]
+        [System.Management.Automation.PSCredential]
+        $CertificatePassword,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Setting configuration of RetentionComplianceRule for $Name"
@@ -202,25 +256,20 @@ function Set-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    $ConnectionMode = New-M365DSCConnection -Workload 'SecurityComplianceCenter' `
-        -InboundParameters $PSBoundParameters
-
     $CurrentRule = Get-TargetResource @PSBoundParameters
 
     if (('Present' -eq $Ensure) -and ('Absent' -eq $CurrentRule.Ensure))
     {
-        $CreationParams = $PSBoundParameters
-        $CreationParams.Remove('Credential')
-        $CreationParams.Remove('Ensure')
+        $CreationParams = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
 
         Write-Verbose -Message 'Checking to see if the policy is a Teams based one.'
         $RuleObject = Get-RetentionComplianceRule -Identity $Name `
             -ErrorAction SilentlyContinue
-        $AssociatedPolicy = Get-RetentionCompliancePolicy $RuleObject.Policy
+        $AssociatedPolicy = Get-RetentionCompliancePolicy $Policy
 
         if ($AssociatedPolicy.TeamsPolicy)
         {
-            Write-Verbose -Message 'The current policy is a Teams based one, removing invalid parameters.'
+            Write-Verbose -Message 'The current policy is a Teams based one, removing invalid parameters for Creation.'
             if ($CreationParams.ContainsKey('ApplyComplianceTag'))
             {
                 $CreationParams.Remove('ApplyComplianceTag') | Out-Null
@@ -251,13 +300,12 @@ function Set-TargetResource
             }
         }
 
+        Write-Verbose -Message "Creating new RetentionComplianceRule with values:`r`n$(Convert-M365DscHashtableToString -Hashtable $CreationParams)"
         New-RetentionComplianceRule @CreationParams
     }
     elseif (('Present' -eq $Ensure) -and ('Present' -eq $CurrentRule.Ensure))
     {
-        $CreationParams = $PSBoundParameters
-        $CreationParams.Remove('Credential')
-        $CreationParams.Remove('Ensure')
+        $CreationParams = Remove-M365DSCAuthenticationParameter -BoundParameters $PSBoundParameters
         $CreationParams.Remove('Name')
         $CreationParams.Add('Identity', $Name)
         $CreationParams.Remove('Policy')
@@ -269,7 +317,7 @@ function Set-TargetResource
 
         if ($AssociatedPolicy.TeamsPolicy)
         {
-            Write-Verbose -Message 'The current policy is a Teams based one, removing invalid parameters.'
+            Write-Verbose -Message 'The current policy is a Teams based one, removing invalid parameters for Update.'
 
             if ($CreationParams.ContainsKey('ApplyComplianceTag'))
             {
@@ -301,7 +349,31 @@ function Set-TargetResource
             }
         }
 
-        Set-RetentionComplianceRule @CreationParams
+        Write-Verbose -Message "Updating RetentionComplianceRule with values:`r`n$(Convert-M365DscHashtableToString -Hashtable $CreationParams)"
+
+        $success = $false
+        $retries = 1
+        while (!$success -and $retries -le 10)
+        {
+            try
+            {
+                Set-RetentionComplianceRule @CreationParams -ErrorAction Stop
+                $success = $true
+            }
+            catch
+            {
+                if ($_.Exception.Message -like '*are being deployed. Once deployed, additional actions can be performed*')
+                {
+                    Write-Verbose -Message "The associated policy has pending changes being deployed. Waiting 30 seconds for a maximum of 300 seconds (5 minutes). Total time waited so far {$($retries * 30) seconds}"
+                    Start-Sleep -Seconds 30
+                }
+                else
+                {
+                    $success = $true
+                }
+            }
+            $retries++
+        }
     }
     elseif (('Absent' -eq $Ensure) -and ('Present' -eq $CurrentPolicy.Ensure))
     {
@@ -360,15 +432,37 @@ function Test-TargetResource
         [System.String]
         $Ensure = 'Present',
 
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [System.Management.Automation.PSCredential]
-        $Credential
+        $Credential,
+
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [System.String]
+        $CertificatePath,
+
+        [Parameter()]
+        [System.Management.Automation.PSCredential]
+        $CertificatePassword,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
 
     #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+    $ResourceName = $MyInvocation.MyCommand.ModuleName.Replace('MSFT_', '')
     $CommandName = $MyInvocation.MyCommand
     $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
         -CommandName $CommandName `
@@ -376,22 +470,9 @@ function Test-TargetResource
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
 
-    Write-Verbose -Message "Testing configuration of RetentionComplianceRule for $Name"
-
-    $CurrentValues = Get-TargetResource @PSBoundParameters
-    Write-Verbose -Message "Target Values: $(Convert-M365DscHashtableToString -Hashtable $PSBoundParameters)"
-
-    $ValuesToCheck = $PSBoundParameters
-    $ValuesToCheck.Remove('Credential') | Out-Null
-
-    $TestResult = Test-M365DSCParameterState -CurrentValues $CurrentValues `
-        -Source $($MyInvocation.MyCommand.Source) `
-        -DesiredValues $PSBoundParameters `
-        -ValuesToCheck $ValuesToCheck.Keys
-
-    Write-Verbose -Message "Test-TargetResource returned $TestResult"
-
-    return $TestResult
+    $result = Test-M365DSCTargetResource -DesiredValues $PSBoundParameters `
+                                         -ResourceName $($MyInvocation.MyCommand.Source).Replace('MSFT_', '')
+    return $result
 }
 
 function Export-TargetResource
@@ -400,14 +481,37 @@ function Export-TargetResource
     [OutputType([System.String])]
     param
     (
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [System.Management.Automation.PSCredential]
-        $Credential
+        $Credential,
+
+        [Parameter()]
+        [System.String]
+        $ApplicationId,
+
+        [Parameter()]
+        [System.String]
+        $TenantId,
+
+        [Parameter()]
+        [System.String]
+        $CertificateThumbprint,
+
+        [Parameter()]
+        [System.String]
+        $CertificatePath,
+
+        [Parameter()]
+        [System.Management.Automation.PSCredential]
+        $CertificatePassword,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     $ConnectionMode = New-M365DSCConnection -Workload 'SecurityComplianceCenter' `
-        -InboundParameters $PSBoundParameters `
-        -SkipModuleReload $true
+        -InboundParameters $PSBoundParameters
 
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
@@ -429,35 +533,36 @@ function Export-TargetResource
         $dscContent = ''
         if ($policies.Length -eq 0)
         {
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         }
         else
         {
-            Write-Host "`r`n" -NoNewline
+            Write-M365DSCHost -Message "`r`n" -DeferWrite
         }
         foreach ($policy in $policies)
         {
             [array]$rules = Get-RetentionComplianceRule -Policy $policy.Name
-            Write-Host "    Policy [$j/$($policies.Length)] $($policy.Name)"
+            Write-M365DSCHost -Message "    Policy [$j/$($policies.Length)] $($policy.Name)"
             $i = 1
 
             foreach ($rule in $rules)
             {
-                Write-Host "        |---[$i/$($rules.Length)] $($rule.Name)" -NoNewline
-
-                $Params = @{
-                    Credential = $Credential
-                    Name       = $rule.Name
-                    Policy     = $rule.Policy
+                if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+                {
+                    $Global:M365DSCExportResourceInstancesCount++
                 }
-                $Results = Get-TargetResource @Params
+
+                Write-M365DSCHost -Message "        |---[$i/$($rules.Length)] $($rule.Name)" -DeferWrite
+
+                $Script:exportedInstance = $rule
+                $Results = Get-TargetResource @PSBoundParameters `
+                    -Name $rule.Name `
+                    -Policy $rule.Policy
 
                 if ([System.String]::IsNullOrEmpty($Results.ExpirationDateOption))
                 {
                     $Results.Remove('ExpirationDateOption') | Out-Null
                 }
-                $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                    -Results $Results
                 $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                     -ConnectionMode $ConnectionMode `
                     -ModulePath $PSScriptRoot `
@@ -466,7 +571,7 @@ function Export-TargetResource
                 $dscContent += $currentDSCBlock
                 Save-M365DSCPartialExport -Content $currentDSCBlock `
                     -FileName $Global:PartialExportFileName
-                Write-Host $Global:M365DSCEmojiGreenCheckMark
+                Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
                 $i++
             }
             $j++
@@ -475,7 +580,7 @@ function Export-TargetResource
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `

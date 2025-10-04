@@ -21,17 +21,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
 
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
-            }
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
@@ -44,18 +37,34 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             Mock -CommandName Remove-PSSession -MockWith {
             }
 
-            Mock -CommandName New-MalwareFilterPolicy -MockWith {
+            Mock -CommandName New-QuarantinePolicy -MockWith {
             }
 
-            Mock -CommandName Set-MalwareFilterPolicy -MockWith {
+            Mock -CommandName Set-QuarantinePolicy -MockWith {
             }
 
-            Mock -CommandName Remove-MalwareFilterPolicy -MockWith {
+            Mock -CommandName Remove-QuarantinePolicy -MockWith {
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            Mock -CommandName Get-QuarantinePolicy -ParameterFilter { $QuarantinePolicyType -eq 'GlobalQuarantinePolicy' } -MockWith {
+                return @{
+                    Identity = 'DefaultGlobalPolicy'
+                }
             }
+
+            Mock -CommandName Get-QuarantinePolicy -MockWith {
+                return @{
+                    Identity                    = 'TestQuarantinePolicy'
+                    OrganizationBrandingEnabled = $True
+                    ESNEnabled                  = $False
+                }
+            }
+
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -64,16 +73,13 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 $testParams = @{
                     Ensure                      = 'Present'
                     Credential                  = $Credential
-                    Identity                    = 'DefaultFullAccessPolicy'
+                    Identity                    = 'TestQuarantinePolicy'
                     OrganizationBrandingEnabled = $False
                     ESNEnabled                  = $False
                 }
 
-
                 Mock -CommandName Get-QuarantinePolicy -MockWith {
-                    return @{
-                        Identity = 'SomeOtherQuarantinePolicy'
-                    }
+                    return $null
                 }
             }
 
@@ -87,8 +93,8 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the Set method' {
                 Set-TargetResource @testParams
+                Should -Invoke -CommandName New-QuarantinePolicy -Exactly 1
             }
-
         }
 
         Context -Name 'QuarantinePolicy update not required.' -Fixture {
@@ -96,19 +102,9 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 $testParams = @{
                     Ensure                      = 'Present'
                     Credential                  = $Credential
-                    Identity                    = 'DefaultFullAccessPolicy'
+                    Identity                    = 'TestQuarantinePolicy'
                     OrganizationBrandingEnabled = $True
                     ESNEnabled                  = $False
-                }
-
-                Mock -CommandName Get-QuarantinePolicy -MockWith {
-                    return @{
-                        Ensure                      = 'Present'
-                        Credential                  = $Credential
-                        Identity                    = 'DefaultFullAccessPolicy'
-                        OrganizationBrandingEnabled = $True
-                        ESNEnabled                  = $False
-                    }
                 }
             }
 
@@ -122,25 +118,9 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 $testParams = @{
                     Ensure                      = 'Present'
                     Credential                  = $Credential
-                    Identity                    = 'DefaultFullAccessPolicy'
+                    Identity                    = 'TestQuarantinePolicy'
                     OrganizationBrandingEnabled = $True
                     ESNEnabled                  = $True
-                }
-
-                Mock -CommandName Get-QuarantinePolicy -MockWith {
-                    return @{
-                        Ensure                      = 'Present'
-                        Credential                  = $Credential
-                        Identity                    = 'DefaultFullAccessPolicy'
-                        OrganizationBrandingEnabled = $False
-                        ESNEnabled                  = $False
-                    }
-                }
-
-                Mock -CommandName Set-QuarantinePolicy -MockWith {
-                    return @{
-
-                    }
                 }
             }
 
@@ -150,6 +130,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should Successfully call the Set method' {
                 Set-TargetResource @testParams
+                Should -Invoke -CommandName Set-QuarantinePolicy -Exactly 1
             }
         }
 
@@ -160,18 +141,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Credential = $Credential
                     Identity   = 'TestQuarantinePolicy'
                 }
-
-                Mock -CommandName Get-QuarantinePolicy -MockWith {
-                    return @{
-                        Identity = 'TestQuarantinePolicy'
-                    }
-                }
-
-                Mock -CommandName Remove-QuarantinePolicy -MockWith {
-                    return @{
-
-                    }
-                }
             }
 
             It 'Should return false from the Test method' {
@@ -180,19 +149,22 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should Remove the Policy in the Set method' {
                 Set-TargetResource @testParams
+                Should -Invoke -CommandName Remove-QuarantinePolicy -Exactly 1
             }
         }
 
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
                 }
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

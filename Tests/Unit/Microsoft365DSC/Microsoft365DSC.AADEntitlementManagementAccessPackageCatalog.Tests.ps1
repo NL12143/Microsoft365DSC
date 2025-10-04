@@ -21,14 +21,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
         BeforeAll {
 
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
             $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-
-            #Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            #}
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName Get-PSSession -MockWith {
@@ -37,22 +33,43 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             Mock -CommandName Remove-PSSession -MockWith {
             }
 
-            Mock -CommandName Update-MgEntitlementManagementAccessPackageCatalog -MockWith {
+            Mock -CommandName Update-MgBetaEntitlementManagementAccessPackageCatalog -MockWith {
             }
 
-            Mock -CommandName New-MgEntitlementManagementAccessPackageCatalog -MockWith {
+            Mock -CommandName New-MgBetaEntitlementManagementAccessPackageCatalog -MockWith {
             }
 
-            Mock -CommandName Remove-MgEntitlementManagementAccessPackageCatalog -MockWith {
+            Mock -CommandName Remove-MgBetaEntitlementManagementAccessPackageCatalog -MockWith {
+            }
+
+            Mock -CommandName Get-MgBetaEntitlementManagementAccessPackageCatalog -MockWith {
+                return @{
+                    CatalogStatus       = 'FakeStringValue'
+                    CatalogType         = 'UserManaged'
+                    Description         = 'FakeStringValue'
+                    DisplayName         = 'FakeStringValue'
+                    Id                  = 'FakeStringValue'
+                    IsExternallyVisible = $True
+                }
+            }
+
+            Mock -CommandName Get-MgBetaEntitlementManagementAccessPackage -MockWith {
+                return @(
+                    @{
+                        CatalogId = 'FakeStringValue'
+                    }
+                )
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
-                return 'Credential'
+                return 'Credentials'
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
             }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -65,12 +82,11 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     DisplayName         = 'FakeStringValue'
                     Id                  = 'FakeStringValue'
                     IsExternallyVisible = $True
-
                     Ensure              = 'Present'
                     Credential          = $Credential
                 }
 
-                Mock -CommandName Get-MgEntitlementManagementAccessPackageCatalog -MockWith {
+                Mock -CommandName Get-MgBetaEntitlementManagementAccessPackageCatalog -MockWith {
                     return $null
                 }
             }
@@ -82,7 +98,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             }
             It 'Should Create the group from the Set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName New-MgEntitlementManagementAccessPackageCatalog -Exactly 1
+                Should -Invoke -CommandName New-MgBetaEntitlementManagementAccessPackageCatalog -Exactly 1
             }
         }
 
@@ -95,21 +111,8 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     DisplayName         = 'FakeStringValue'
                     Id                  = 'FakeStringValue'
                     IsExternallyVisible = $True
-
                     Ensure              = 'Absent'
                     Credential          = $Credential
-                }
-
-                Mock -CommandName Get-MgEntitlementManagementAccessPackageCatalog -MockWith {
-                    return @{
-                        CatalogStatus       = 'FakeStringValue'
-                        CatalogType         = 'UserManaged'
-                        Description         = 'FakeStringValue'
-                        DisplayName         = 'FakeStringValue'
-                        Id                  = 'FakeStringValue'
-                        IsExternallyVisible = $True
-
-                    }
                 }
             }
 
@@ -123,7 +126,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should Remove the group from the Set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName Remove-MgEntitlementManagementAccessPackageCatalog -Exactly 1
+                Should -Invoke -CommandName Remove-MgBetaEntitlementManagementAccessPackageCatalog -Exactly 1
             }
         }
         Context -Name 'The AADEntitlementManagementAccessPackageCatalog Exists and Values are already in the desired state' -Fixture {
@@ -135,24 +138,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     DisplayName         = 'FakeStringValue'
                     Id                  = 'FakeStringValue'
                     IsExternallyVisible = $True
-
                     Ensure              = 'Present'
                     Credential          = $Credential
                 }
-
-                Mock -CommandName Get-MgEntitlementManagementAccessPackageCatalog -MockWith {
-                    return @{
-                        CatalogStatus       = 'FakeStringValue'
-                        CatalogType         = 'UserManaged'
-                        Description         = 'FakeStringValue'
-                        DisplayName         = 'FakeStringValue'
-                        Id                  = 'FakeStringValue'
-                        IsExternallyVisible = $True
-
-                    }
-                }
             }
-
 
             It 'Should return true from the Test method' {
                 Test-TargetResource @testParams | Should -Be $true
@@ -167,21 +156,9 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Description         = 'FakeStringValue'
                     DisplayName         = 'FakeStringValue'
                     Id                  = 'FakeStringValue'
-                    IsExternallyVisible = $True
-
+                    IsExternallyVisible = $false # Drift
                     Ensure              = 'Present'
                     Credential          = $Credential
-                }
-
-                Mock -CommandName Get-MgEntitlementManagementAccessPackageCatalog -MockWith {
-                    return @{
-                        CatalogStatus       = 'FakeStringValue'
-                        CatalogType         = 'UserManaged'
-                        Description         = 'FakeStringValue'
-                        DisplayName         = 'FakeStringValue'
-                        Id                  = 'FakeStringValue'
-                        IsExternallyVisible = $False #Drift
-                    }
                 }
             }
 
@@ -195,31 +172,21 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the Set method' {
                 Set-TargetResource @testParams
-                Should -Invoke -CommandName Update-MgEntitlementManagementAccessPackageCatalog -Exactly 1
+                Should -Invoke -CommandName Update-MgBetaEntitlementManagementAccessPackageCatalog -Exactly 1
             }
         }
 
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
                 }
-
-                Mock -CommandName Get-MgEntitlementManagementAccessPackageCatalog -MockWith {
-                    return @{
-                        CatalogStatus       = 'FakeStringValue'
-                        CatalogType         = 'UserManaged'
-                        Description         = 'FakeStringValue'
-                        DisplayName         = 'FakeStringValue'
-                        Id                  = 'FakeStringValue'
-                        IsExternallyVisible = $True
-
-                    }
-                }
             }
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

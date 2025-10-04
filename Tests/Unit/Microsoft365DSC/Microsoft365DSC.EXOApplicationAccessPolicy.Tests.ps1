@@ -21,17 +21,11 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
 
         BeforeAll {
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin', $secpasswd)
+            $Script:ExportMode = $false
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
+            $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@mydomain.com', $secpasswd)
 
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
-            }
-
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-            }
-
-            Mock -CommandName Confirm-M365DSCDependencies -MockWith {
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
             Mock -CommandName New-M365DSCConnection -MockWith {
@@ -44,9 +38,30 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
             Mock -CommandName Remove-PSSession -MockWith {
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            Mock -CommandName New-ApplicationAccessPolicy -MockWith {
             }
+
+            Mock -CommandName Remove-ApplicationAccessPolicy -MockWith {
+            }
+
+            Mock -CommandName Set-ApplicationAccessPolicy -MockWith {
+            }
+
+            Mock -CommandName Get-ApplicationAccessPolicy -MockWith {
+                return @(@{
+                    Identity      = 'ApplicationAccessPolicy1'
+                    AccessRight   = 'DenyAccess'
+                    AppID         = '3dbc2ae1-7198-45ed-9f9f-d86ba3ec35b5'
+                    ScopeIdentity = 'Engineering Staff'
+                    Description   = 'Engineering Group Policy'
+                })
+            }
+
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
         }
 
         # Test contexts
@@ -63,22 +78,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 }
 
                 Mock -CommandName Get-ApplicationAccessPolicy -MockWith {
-                    return @{
-                        Identity      = 'DifferentApplicationAccessPolicy1'
-                        AccessRight   = 'DenyAccess'
-                        AppID         = '3dbc2ae1-7198-45ed-9f9f-d86ba3ec35b5'
-                        ScopeIdentity = 'Engineering Staff'
-                        Description   = 'Engineering Group Policy'
-                    }
-                }
-
-                Mock -CommandName Set-ApplicationAccessPolicy -MockWith {
-                    return @{
-                        Identity    = 'ApplicationAccessPolicy1'
-                        Description = 'Engineering Group Policy'
-                        Ensure      = 'Present'
-                        Credential  = $Credential
-                    }
+                    return $null
                 }
             }
 
@@ -88,6 +88,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the Set method' {
                 Set-TargetResource @testParams
+                Should -Invoke -CommandName New-ApplicationAccessPolicy -Exactly 1
             }
 
             It 'Should return Absent from the Get method' {
@@ -106,16 +107,6 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Ensure             = 'Present'
                     Credential         = $Credential
                 }
-
-                Mock -CommandName Get-ApplicationAccessPolicy -MockWith {
-                    return @{
-                        Identity      = 'ApplicationAccessPolicy1'
-                        AccessRight   = 'DenyAccess'
-                        AppID         = '3dbc2ae1-7198-45ed-9f9f-d86ba3ec35b5'
-                        ScopeIdentity = 'Engineering Staff'
-                        Description   = 'Engineering Group Policy'
-                    }
-                }
             }
 
             It 'Should return true from the Test method' {
@@ -133,32 +124,10 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                     Identity           = 'ApplicationAccessPolicy1'
                     AccessRight        = 'DenyAccess'
                     AppID              = '3dbc2ae1-7198-45ed-9f9f-d86ba3ec35b5'
-                    PolicyScopeGroupId = 'Engineering Staff'
+                    PolicyScopeGroupId = 'Finance Team' # Drift
                     Description        = 'Engineering Group Policy'
                     Ensure             = 'Present'
                     Credential         = $Credential
-                }
-
-                Mock -CommandName Get-ApplicationAccessPolicy -MockWith {
-                    return @{
-                        Identity      = 'ApplicationAccessPolicy1'
-                        AccessRight   = 'DenyAccess'
-                        AppID         = '3dbc2ae1-7198-45ed-9f9f-d86ba3ec35b5'
-                        ScopeIdentity = 'Finance Team'
-                        Description   = 'Engineering Group Policy'
-                    }
-                }
-
-                Mock -CommandName Set-ApplicationAccessPolicy -MockWith {
-                    return @{
-                        Identity           = 'ApplicationAccessPolicy1'
-                        AccessRight        = 'DenyAccess'
-                        AppID              = '3dbc2ae1-7198-45ed-9f9f-d86ba3ec35b5'
-                        PolicyScopeGroupId = 'Engineering Staff'
-                        Description        = 'Engineering Group Policy'
-                        Ensure             = 'Present'
-                        Credential         = $Credential
-                    }
                 }
             }
 
@@ -168,30 +137,23 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
 
             It 'Should call the Set method' {
                 Set-TargetResource @testParams
+                Should -Invoke -CommandName Remove-ApplicationAccessPolicy -Exactly 1
+                Should -Invoke -CommandName New-ApplicationAccessPolicy -Exactly 1
             }
         }
 
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
-                }
-
-                $ApplicationAccessPolicy = @{
-                    Identity      = 'ApplicationAccessPolicy1'
-                    AccessRight   = 'DenyAccess'
-                    AppID         = '3dbc2ae1-7198-45ed-9f9f-d86ba3ec35b5'
-                    ScopeIdentity = 'Engineering Staff'
-                    Description   = 'Engineering Group Policy'
-                }
-                Mock -CommandName Get-ApplicationAccessPolicy -MockWith {
-                    return $ApplicationAccessPolicy
                 }
             }
 
             It 'Should Reverse Engineer resource from the Export method when single' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

@@ -1,3 +1,5 @@
+Confirm-M365DSCModuleDependency -ModuleName 'MSFT_EXOSharedMailbox'
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -10,20 +12,23 @@ function Get-TargetResource
 
         [Parameter()]
         [System.String]
+        $Identity,
+
+        [Parameter()]
+        [System.String]
         $PrimarySMTPAddress,
 
         [Parameter()]
         [System.String]
         $Alias,
 
-        # DEPRECATED
-        [Parameter()]
-        [System.String[]]
-        $Aliases,
-
         [Parameter()]
         [System.String[]]
         $EmailAddresses,
+
+        [Parameter()]
+        [System.Boolean]
+        $AuditEnabled,
 
         [Parameter()]
         [ValidateSet('Present', 'Absent')]
@@ -56,58 +61,69 @@ function Get-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Getting configuration of Office 365 Shared Mailbox $DisplayName"
-    if ($Global:CurrentModeIsExport)
-    {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
-            -InboundParameters $PSBoundParameters `
-            -SkipModuleReload $true
-    }
-    else
-    {
-        $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
-            -InboundParameters $PSBoundParameters
-    }
-
-    #Ensure the proper dependencies are installed in the current environment.
-    Confirm-M365DSCDependencies
-
-    #region Telemetry
-    $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
-    $CommandName = $MyInvocation.MyCommand
-    $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
-        -CommandName $CommandName `
-        -Parameters $PSBoundParameters
-    Add-M365DSCTelemetryEvent -Data $data
-    #endregion
-
-    # Warning for deprecated parameter
-    if ($PSBoundParameters.ContainsKey('Aliases'))
-    {
-        Write-Warning 'Aliases is deprecated. Please use EmailAddresses instead and remove Aliases from your configuration.'
-        if ($null -eq $EmailAddresses)
-        {
-            $EmailAddresses = $Aliases
-        }
-    }
-
-    $nullReturn = $PSBoundParameters
-    $nullReturn.Ensure = 'Absent'
 
     try
     {
-        $mailbox = Get-Mailbox -Identity $DisplayName `
-            -RecipientTypeDetails 'SharedMailbox' `
-            -ResultSize Unlimited `
-            -ErrorAction Stop
-
-        if ($null -eq $mailbox)
+        if (-not $Script:exportedInstance -or $Script:exportedInstance.DisplayName -ne $DisplayName)
         {
-            Write-Verbose -Message "The specified Shared Mailbox doesn't already exist."
-            return $nullReturn
+            $null = New-M365DSCConnection -Workload 'ExchangeOnline' `
+                -InboundParameters $PSBoundParameters
+
+            #Ensure the proper dependencies are installed in the current environment.
+            Confirm-M365DSCDependencies
+
+            #region Telemetry
+            $ResourceName = $MyInvocation.MyCommand.ModuleName -replace 'MSFT_', ''
+            $CommandName = $MyInvocation.MyCommand
+            $data = Format-M365DSCTelemetryParameters -ResourceName $ResourceName `
+                -CommandName $CommandName `
+                -Parameters $PSBoundParameters
+            Add-M365DSCTelemetryEvent -Data $data
+            #endregion
+
+            $nullReturn = $PSBoundParameters
+            $nullReturn.Ensure = 'Absent'
+
+            try
+            {
+                if (-not [System.String]::IsNullOrEmpty($Identity))
+                {
+                    $mailbox = $mailbox = Get-Mailbox -Identity $Identity `
+                        -RecipientTypeDetails 'SharedMailbox' `
+                        -ResultSize Unlimited `
+                        -ErrorAction Stop
+                }
+
+                if ($null -eq $mailbox)
+                {
+                    $mailbox = $mailbox = Get-Mailbox -Identity $DisplayName `
+                        -RecipientTypeDetails 'SharedMailbox' `
+                        -ResultSize Unlimited `
+                        -ErrorAction Stop
+                }
+            }
+            catch
+            {
+                Write-Verbose -Message "Could not retrieve AAD roledefinition by Id: {$Id}"
+            }
+
+            if ($null -eq $mailbox)
+            {
+                Write-Verbose -Message "The specified Shared Mailbox doesn't already exist."
+                return $nullReturn
+            }
+        }
+        else
+        {
+            $mailbox = $Script:exportedInstance
         }
 
         #region EmailAddresses
@@ -125,8 +141,10 @@ function Get-TargetResource
 
         $result = @{
             DisplayName           = $DisplayName
+            Identity              = $mailbox.Identity
             PrimarySMTPAddress    = $mailbox.PrimarySMTPAddress.ToString()
             Alias                 = $mailbox.Alias
+            AuditEnabled          = $mailbox.AuditEnabled
             EmailAddresses        = $CurrentEmailAddresses
             Ensure                = 'Present'
             Credential            = $Credential
@@ -134,8 +152,9 @@ function Get-TargetResource
             CertificateThumbprint = $CertificateThumbprint
             CertificatePath       = $CertificatePath
             CertificatePassword   = $CertificatePassword
-            Managedidentity       = $ManagedIdentity.IsPresent
+            ManagedIdentity       = $ManagedIdentity.IsPresent
             TenantId              = $TenantId
+            AccessTokens          = $AccessTokens
         }
 
         Write-Verbose -Message "Found an existing instance of Shared Mailbox '$($DisplayName)'"
@@ -164,20 +183,23 @@ function Set-TargetResource
 
         [Parameter()]
         [System.String]
+        $Identity,
+
+        [Parameter()]
+        [System.String]
         $PrimarySMTPAddress,
 
         [Parameter()]
         [System.String]
         $Alias,
 
-        # DEPRECATED
-        [Parameter()]
-        [System.String[]]
-        $Aliases = @(),
-
         [Parameter()]
         [System.String[]]
         $EmailAddresses = @(),
+
+        [Parameter()]
+        [System.Boolean]
+        $AuditEnabled,
 
         [Parameter()]
         [ValidateSet('Present', 'Absent')]
@@ -210,7 +232,11 @@ function Set-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
 
     Write-Verbose -Message "Setting configuration of Office 365 Shared Mailbox $DisplayName"
@@ -239,18 +265,6 @@ function Set-TargetResource
     #endregion
 
     $CurrentParameters = $PSBoundParameters
-    $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
-        -InboundParameters $PSBoundParameters
-
-    # Warning for deprecated parameter
-    if ($PSBoundParameters.ContainsKey('Aliases'))
-    {
-        Write-Warning 'Aliases is deprecated. Please use EmailAddresses instead and remove Aliases from your configuration.'
-        if ($null -eq $EmailAddresses)
-        {
-            $EmailAddresses = $Aliases
-        }
-    }
 
     # CASE: Mailbox doesn't exist but should;
     if ($Ensure -eq 'Present' -and $currentMailbox.Ensure -eq 'Absent')
@@ -333,6 +347,14 @@ function Set-TargetResource
             Write-Verbose -Message "Updating Alias for the Shared Mailbox '$($DisplayName)'"
             Set-Mailbox -Identity $DisplayName -Alias $Alias
         }
+        $current = $currentMailbox.PrimarySMTPAddress
+        $desired = $PrimarySMTPAddress
+        $diff = Compare-Object -ReferenceObject $current -DifferenceObject $desired
+        if ($diff)
+        {
+            Write-Verbose -Message "Updating PrimarySmtpAddress for the Shared Mailbox from $($mailbox.PrimarySMTPAddress) to $PrimarySMTPAddress"
+            Set-Mailbox -Identity $mailbox.guid.guid -WindowsEmailAddress $PrimarySMTPAddress
+        }
     }
 }
 
@@ -348,20 +370,23 @@ function Test-TargetResource
 
         [Parameter()]
         [System.String]
+        $Identity,
+
+        [Parameter()]
+        [System.String]
         $PrimarySMTPAddress,
 
         [Parameter()]
         [System.String]
         $Alias,
 
-        # DEPRECATED
-        [Parameter()]
-        [System.String[]]
-        $Aliases,
-
         [Parameter()]
         [System.String[]]
         $EmailAddresses,
+
+        [Parameter()]
+        [System.Boolean]
+        $AuditEnabled,
 
         [Parameter()]
         [ValidateSet('Present', 'Absent')]
@@ -394,7 +419,11 @@ function Test-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
     #Ensure the proper dependencies are installed in the current environment.
     Confirm-M365DSCDependencies
@@ -407,16 +436,6 @@ function Test-TargetResource
         -Parameters $PSBoundParameters
     Add-M365DSCTelemetryEvent -Data $data
     #endregion
-
-    # Warning for deprecated parameter
-    if ($PSBoundParameters.ContainsKey('Aliases'))
-    {
-        Write-Warning 'Aliases is deprecated. Please use EmailAddresses instead and remove Aliases from your configuration.'
-        if ($null -eq $EmailAddresses)
-        {
-            $EmailAddresses = $Aliases
-        }
-    }
 
     Write-Verbose -Message "Testing configuration of Office 365 Shared Mailbox $DisplayName"
 
@@ -471,8 +490,13 @@ function Export-TargetResource
 
         [Parameter()]
         [Switch]
-        $ManagedIdentity
+        $ManagedIdentity,
+
+        [Parameter()]
+        [System.String[]]
+        $AccessTokens
     )
+
     $ConnectionMode = New-M365DSCConnection -Workload 'ExchangeOnline' `
         -InboundParameters $PSBoundParameters `
         -SkipModuleReload $true
@@ -491,26 +515,33 @@ function Export-TargetResource
 
     try
     {
-        [array]$mailboxes = Get-Mailbox -RecipientTypeDetails 'SharedMailbox' `
+        $Script:ExportMode = $true
+        [array] $Script:exportedInstances = Get-Mailbox -RecipientTypeDetails 'SharedMailbox' `
             -ResultSize Unlimited `
             -ErrorAction Stop
         $dscContent = ''
         $i = 1
-        if ($mailboxes.Length -eq 0)
+        if ($Script:exportedInstances.Length -eq 0)
         {
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
         }
         else
         {
-            Write-Host "`r`n" -NoNewline
+            Write-M365DSCHost -Message "`r`n" -DeferWrite
         }
-        foreach ($mailbox in $mailboxes)
+        foreach ($mailbox in $Script:exportedInstances)
         {
-            Write-Host "    |---[$i/$($mailboxes.Length)] $($mailbox.Name)" -NoNewline
+            Write-M365DSCHost -Message "    |---[$i/$($Script:exportedInstances.Length)] $($mailbox.Name)" -DeferWrite
             $mailboxName = $mailbox.Name
             if ($mailboxName)
             {
+                if ($null -ne $Global:M365DSCExportResourceInstancesCount)
+                {
+                    $Global:M365DSCExportResourceInstancesCount++
+                }
+
                 $params = @{
+                    Identity              = $mailbox.Identity
                     Credential            = $Credential
                     DisplayName           = $mailboxName
                     Alias                 = $mailbox.Alias
@@ -518,12 +549,12 @@ function Export-TargetResource
                     TenantId              = $TenantId
                     CertificateThumbprint = $CertificateThumbprint
                     CertificatePassword   = $CertificatePassword
-                    Managedidentity       = $ManagedIdentity.IsPresent
+                    ManagedIdentity       = $ManagedIdentity.IsPresent
                     CertificatePath       = $CertificatePath
+                    AccessTokens          = $AccessTokens
                 }
+                $Script:exportedInstance = $mailbox
                 $Results = Get-TargetResource @Params
-                $Results = Update-M365DSCExportAuthenticationResults -ConnectionMode $ConnectionMode `
-                    -Results $Results
                 $currentDSCBlock = Get-M365DSCExportContentForResource -ResourceName $ResourceName `
                     -ConnectionMode $ConnectionMode `
                     -ModulePath $PSScriptRoot `
@@ -533,14 +564,14 @@ function Export-TargetResource
                 Save-M365DSCPartialExport -Content $currentDSCBlock `
                     -FileName $Global:PartialExportFileName
             }
-            Write-Host $Global:M365DSCEmojiGreenCheckMark
+            Write-M365DSCHost -Message $Global:M365DSCEmojiGreenCheckMark -CommitWrite
             $i++
         }
         return $dscContent
     }
     catch
     {
-        Write-Host $Global:M365DSCEmojiRedX
+        Write-M365DSCHost -Message $Global:M365DSCEmojiRedX -CommitWrite
 
         New-M365DSCLogEntry -Message 'Error during Export:' `
             -Exception $_ `

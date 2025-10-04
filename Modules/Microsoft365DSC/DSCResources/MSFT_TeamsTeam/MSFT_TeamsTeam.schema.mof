@@ -5,7 +5,7 @@ class MSFT_TeamsTeam : OMI_BaseResource
     [Write, Description("Description of Team.")] string Description;
     [Write, Description("Team group ID, only used to target a Team when duplicated display names occurs.")] string GroupID;
     [Write, Description("MailNickName of O365 Group associated with Team")] string MailNickName;
-    [Write, Description("Owners of the Team")] string Owner[];
+    [Write, Description("Owners of the Team. At least one entry is required.")] string Owner[];
     [Write, Description("Visibility of the Team"),ValueMap{"Public","Private", "HiddenMembership"},Values{"Public","Private", "HiddenMembership"}] String Visibility;
     [Write, Description("Allow add or remove apps from the Team.")] Boolean AllowAddRemoveApps;
     [Write, Description("Allow giphy in Team.")] Boolean AllowGiphy;
@@ -29,5 +29,6 @@ class MSFT_TeamsTeam : OMI_BaseResource
     [Write, Description("Id of the Azure Active Directory application to authenticate with.")] String ApplicationId;
     [Write, Description("Id of the Azure Active Directory tenant used for authentication.")] String TenantId;
     [Write, Description("Thumbprint of the Azure Active Directory application's authentication certificate to use for authentication.")] String CertificateThumbprint;
+    [Write, Description("Managed ID being used for authentication.")] Boolean ManagedIdentity;
+    [Write, Description("Access token used for authentication.")] String AccessTokens[];
 };
-

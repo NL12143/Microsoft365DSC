@@ -21,23 +21,14 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Invoke-Command -ScriptBlock $Global:DscHelper.InitializeScript -NoNewScope
 
         BeforeAll {
-            if ($null -eq (Get-Module PnP.PowerShell))
-            {
-                Import-Module PnP.PowerShell
-
-            }
-
-            $secpasswd = ConvertTo-SecureString 'test@password1' -AsPlainText -Force
+            $secpasswd = ConvertTo-SecureString (New-Guid | Out-String) -AsPlainText -Force
             $Credential = New-Object System.Management.Automation.PSCredential ('tenantadmin@contoso.onmicrosoft.com', $secpasswd)
 
             $Global:PartialExportFileName = 'c:\TestPath'
-            Mock -CommandName Update-M365DSCExportAuthenticationResults -MockWith {
-                return @{}
+
+            Mock -ModuleName M365DSCUtil -CommandName Confirm-M365DSCDependencies -MockWith {
             }
 
-            Mock -CommandName Get-M365DSCExportContentForResource -MockWith {
-                return 'FakeDSCContent'
-            }
             Mock -CommandName Save-M365DSCPartialExport -MockWith {
             }
 
@@ -72,8 +63,13 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                 return $returnval
             }
 
-            # Mock Write-Host to hide output during the tests
-            Mock -CommandName Write-Host -MockWith {
+            # Mock Write-M365DSCHost to hide output during the tests
+            Mock -CommandName Write-M365DSCHost -MockWith {
+            }
+            $Script:exportedInstances =$null
+            $Script:ExportMode = $false
+
+            Mock -CommandName Write-Warning -MockWith {
             }
         }
 
@@ -577,6 +573,7 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
         Context -Name 'ReverseDSC Tests' -Fixture {
             BeforeAll {
                 $Global:CurrentModeIsExport = $true
+                $Global:PartialExportFileName = "$(New-Guid).partial.ps1"
                 $testParams = @{
                     Credential = $Credential
                 }
@@ -609,10 +606,42 @@ Describe -Name $Global:DscHelper.DescribeHeader -Fixture {
                         }
                     }
                 }
+                Mock -CommandName Get-PnPHubSite -MockWith {
+                    return @(
+                        @{
+                            ID                   = 'fcc3c848-6d2f-4821-a56c-980eea7990c5'
+                            Title                = 'Hub Site'
+                            SiteId               = 'fcc3c848-6d2f-4821-a56c-980eea7990c5'
+                            SiteUrl              = 'https://contoso.sharepoint.com/sites/hub'
+                            LogoUrl              = 'https://contoso.sharepoint.com/images/logo.png'
+                            Description          = 'Contoso Hub Site'
+                            Permissions          = @(
+                                @{
+                                    DisplayName   = 'Contoso Admin'
+                                    PrincipalName = 'i:0#.f|membership|admin@contoso.onmicrosoft.com'
+                                    Rights        = 'Join'
+                                },
+                                @{
+                                    DisplayName   = 'Contoso Admin Group'
+                                    PrincipalName = 'c:0t.c|tenant|1e78c600-11ce-4e7b-91c2-f3bb053f7682'
+                                    Rights        = 'Join'
+                                },
+                                @{
+                                    DisplayName   = 'Contoso Admin Office 365 Group'
+                                    PrincipalName = 'c:0o.c|federateddirectoryclaimprovider|bfc75218-faac-4202-bf33-3a8ba2e2b4a7'
+                                    Rights        = 'Join'
+                                }
+                            )
+                            SiteDesignId         = '00000000-0000-0000-0000-000000000000'
+                            RequiresJoinApproval = $false
+                        }
+                    )
+                }
             }
 
             It 'Should Reverse Engineer resource from the Export method' {
-                Export-TargetResource @testParams
+                $result = Export-TargetResource @testParams
+                $result | Should -Not -BeNullOrEmpty
             }
         }
     }

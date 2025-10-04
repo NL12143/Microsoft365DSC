@@ -8,7 +8,7 @@ Configuration Example
     param(
         [Parameter(Mandatory = $true)]
         [PSCredential]
-        $credsGlobalAdmin
+        $Credscredential
     )
     Import-DscResource -ModuleName Microsoft365DSC
 
@@ -36,9 +36,8 @@ Configuration Example
             FolderAnonymousLinkType                    = "Edit"
             NotifyOwnersWhenItemsReshared              = $true
             DefaultLinkPermission                      = "View"
-            RequireAcceptingAccountMatchInvitedAccount = $false
             Ensure                                     = "Present"
-            Credential                                 = $credsGlobalAdmin
+            Credential                                 = $Credscredential
         }
     }
 }

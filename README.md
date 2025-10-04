@@ -10,8 +10,8 @@ remote API calls (therefore requires internet connectivity)
 See latest [![LinkedIn Preview](https://img.shields.io/badge/LinkedIn-Post-blue)](https://www.linkedin.com/feed/update/urn:li:share:7379632619665313792)
 
 ## Quick Install PS v5 
-Note: best install and run using Powershell v5. v7 is possible but  
-[read this first](https://github.com/NL12143/Microsoft365DSC/blob/Dev/docs/docs/user-guide/get-started/powershell7-support.md) 
+Note: best install and run using Powershell v5. 
+In v7 is possible but [read this first](https://github.com/NL12143/Microsoft365DSC/blob/Dev/docs/docs/user-guide/get-started/powershell7-support.md) 
 
 To acquire the latest bits of the module from a machine that has internet connectivity, run the following PowerShell v5, as an ADMIN:
 

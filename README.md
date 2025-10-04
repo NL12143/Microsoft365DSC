@@ -19,6 +19,10 @@ Install-Module -Name Microsoft365DSC -Scope AllUsers -Force
 Update-M365DSCModule # Install dependencies like az, graph, intune, 
 ```
 
+## First runs 
+
+Do NOT run this against your production tenant withour careful settings the various permissions. Use App Registrations (delegated or as app with secret) as much as possible. For production [MUSR read](https://github.com/NL12143/Microsoft365DSC/blob/Dev/docs/docs/user-guide/get-started/authentication-and-permissions.md) 
+
 For information on how to get started, additional documentation or
 additional resources, please navigate to the official web site at
 [Microsoft365DSC.com](http://Microsoft365DSC.com) 

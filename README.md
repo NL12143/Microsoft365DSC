@@ -15,6 +15,8 @@ official YouTube channel
 
 [View LinkedIn Post](https://www.linkedin.com/feed/update/urn:li:share:7379632619665313792)
 
+[![LinkedIn Preview](https://img.shields.io/badge/LinkedIn-Post-blue)](https://www.linkedin.com/feed/update/urn:li:share:7379632619665313792)
+
 ## Branches
 
 ### master

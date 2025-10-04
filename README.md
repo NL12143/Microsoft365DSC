@@ -22,9 +22,7 @@ For information on how to get started, additional documentation or
 additional resources, please navigate to the official web site at
 [Microsoft365DSC.com](http://Microsoft365DSC.com) 
 
-## 📘 Microsoft365DSC Documentation Index
-
-## 📘 Microsoft365DSC Documentation Index
+## 📘 Full Documentation Index
 
 ### 🏠 Home  
 - [What is Microsoft365DSC?](https://github.com/NL12143/Microsoft365DSC/blob/Dev/docs/docs/home/what-is-M365DSC.md)  

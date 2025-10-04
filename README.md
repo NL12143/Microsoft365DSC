@@ -28,13 +28,9 @@ official YouTube channel
 
 This is the dev branch containing the latest release. No contributions should be made directly to this branch.
 
-Contributors are encouraged to propose their contributions as pull requests to this development branch.
-This branch will periodically be merged to the master branch,
-and be released to [PowerShell Gallery](https://www.powershellgallery.com/).
-
 ## Documentation 
 
-## 📘 Microsoft365DSC Documentation Index
+## 📘 MS365DSC Documentation Index https://microsoft365dsc.com/ 
 
 ### 🏠 Home  
 - [What is Microsoft365DSC?](docs/home/what-is-M365DSC.md)  

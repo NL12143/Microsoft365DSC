@@ -7,10 +7,16 @@ executed from an agent's Local Configuration Manager (LCM) (machine
 or container) which can communicate back remotely to Microsoft 365 via
 remote API calls (therefore requires internet connectivity)
 
-See latest [![LinkedIn Preview](https://img.shields.io/badge/LinkedIn-Post-blue)](https://www.linkedin.com/feed/update/urn:li:share:7379632619665313792)
+See latest
+<a href="https://www.linkedin.com/feed/update/urn:li:share:7379632619665313792" target="_blank">
+  <img src="https://img.shields.io/badge/LinkedIn-Post-blue" alt="LinkedIn Preview">
+</a>
+
+[![LinkedIn Preview](https://img.shields.io/badge/LinkedIn-Post-blue)](https://www.linkedin.com/feed/update/urn:li:share:7379632619665313792)
 
 ## Quick Install PS v5 
 Note: best install and run using Powershell v5. 
+
 In v7 is possible but [read this first](https://github.com/NL12143/Microsoft365DSC/blob/Dev/docs/docs/user-guide/get-started/powershell7-support.md) 
 
 To acquire the latest bits of the module from a machine that has internet connectivity, run the following PowerShell v5, as an ADMIN:

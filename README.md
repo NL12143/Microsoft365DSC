@@ -24,13 +24,9 @@ additional resources, please navigate to the official web site at
 
 ## 📘 Microsoft365DSC Documentation Index
 
-<details>
-  <summary>🏠 Home</summary>
-
+🏠 Home
 - [What is Microsoft365DSC?](docs/home/what-is-M365DSC.md)  
 - [Blog Posts](docs/blog/index.md)
-
-</details>
 
 <details>
   <summary>🚀 Get Started</summary>

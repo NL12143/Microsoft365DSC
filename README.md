@@ -23,14 +23,9 @@ official YouTube channel
 [Microsoft365DSC](https://www.youtube.com/channel/UCveScabVT6pxzqYgGRu17iw).
 
 [View LinkedIn Post](https://www.linkedin.com/feed/update/urn:li:share:7379632619665313792)
-
 [![LinkedIn Preview](https://img.shields.io/badge/LinkedIn-Post-blue)](https://www.linkedin.com/feed/update/urn:li:share:7379632619665313792)
 
-This is the dev branch containing the latest release. No contributions should be made directly to this branch.
-
-## Documentation 
-
-## 📘 MS365DSC Documentation Index https://microsoft365dsc.com/ 
+## 📘 Documentation Index for https://microsoft365dsc.com/ 
 
 ### 🏠 Home  
 - [What is Microsoft365DSC?](docs/home/what-is-M365DSC.md)  

@@ -10,18 +10,17 @@ See latest
 </a>
 
 ## Quick Install PS v5 
-Note: best install and run using Powershell v5. For v7 [read this first](https://github.com/NL12143/Microsoft365DSC/blob/Dev/docs/docs/user-guide/get-started/powershell7-support.md) 
-
 Run the following PowerShell v5, as an ADMIN:
 
 ```PowerShell
 Install-Module -Name Microsoft365DSC -Scope AllUsers -Force
 Update-M365DSCModule # Install dependencies like az, graph, intune, 
 ```
+Note: best install and run using Powershell v5. For v7 [read this first](https://github.com/NL12143/Microsoft365DSC/blob/Dev/docs/docs/user-guide/get-started/powershell7-support.md) 
 
 ## First runs 
 
-Do NOT run this against your production tenant withour careful settings the various permissions. Use App Registrations (delegated or as app with secret) as much as possible. For production [MUSR read](https://github.com/NL12143/Microsoft365DSC/blob/Dev/docs/docs/user-guide/get-started/authentication-and-permissions.md) 
+Do NOT run this against your production tenant without careful setting the various permissions. Use App Registration (delegated or as app, with secret) as much as possible. For production [MUST read](https://github.com/NL12143/Microsoft365DSC/blob/Dev/docs/docs/user-guide/get-started/authentication-and-permissions.md) 
 
 For information on how to get started, additional documentation or
 additional resources, please navigate to the official web site at

@@ -18,5 +18,18 @@ Connect-MgGraph
 Connect-AzureAD
 (Get-AzureADTenantDetail).ObjectId
 
+#CORE 
+if ($Ensure -eq 'Present' -and $currentPolicy.Ensure -eq 'Present') {
+    Write-Verbose -Message "Set-Targetresource: Change policy $DisplayName"
+    $NewParameters.Add('ConditionalAccessPolicyId', $currentPolicy.Id)
+    try {
+        $Uri = (Get-MSCloudLoginConnectionProfile -Workload MicrosoftGraph).ResourceUrl + "beta/identity/conditionalAccess/policies/$($currentPolicy.Id)"
+        Invoke-MgGraphRequest -Method PATCH -Uri $Uri -Body $NewParameters
+    }
+    catch {
+        # Error handling logic
+    }
+}
+
 
 

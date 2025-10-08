@@ -9,7 +9,14 @@ Configure-CA.ps1
 Start-DscConfiguration -Path .\ConditionalAccessPolicyConfig -Wait -Verbose -Force
 
 #INPUT 
+Connect-AzAccount
+(Get-AzTenant).Id
 
+Connect-MgGraph
+(Get-MgOrganization).Id
+
+Connect-AzureAD
+(Get-AzureADTenantDetail).ObjectId
 
 
 

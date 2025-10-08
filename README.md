@@ -1,3 +1,10 @@
+
+[![Docs](https://img.shields.io/badge/M365DSC-Intro-blue)](https://microsoft365dsc.com/user-guide/get-started/introduction/)
+[Getting Started with Microsoft365DSC](https://microsoft365dsc.com/user-guide/get-started/introduction/)
+
+[![Export Tool](https://img.shields.io/badge/Export-M365DSC-blue)](https://export.microsoft365dsc.com)
+[Microsoft365DSC Export Tool](https://export.microsoft365dsc.com) to snapshot your tenant configuration and generate DSC scripts for automation.
+
 # Microsoft365DSC > edits by NL1243
 
 Automate the deployment, configuration, reporting and monitoring of MS365 Tenants. Despite being PowerShell it is decarative upfront, by using Desired State Configuration. Meaning you describe the desired end state rather than scripting step-by-step instructions.  

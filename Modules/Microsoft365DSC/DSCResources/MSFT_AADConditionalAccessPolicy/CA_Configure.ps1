@@ -1,4 +1,21 @@
 
+# GLOBAL VAR
+$env:ApplicationId     = '<your-app-id>'
+$env:ApplicationSecret = '<your-app-secret>'
+$env:TenantId          = '<your-tenant-id>'
+
+# PROJECT VAR
+$CredsPath = Join-Path $PSScriptRoot 'credentials.json'
+$Creds = Get-Content $CredsPath | ConvertFrom-Json
+$AppId     = $Creds.ApplicationId
+$AppSecret = $Creds.ApplicationSecret
+$TenantId  = $Creds.TenantId
+
+# LOCAL VAR
+$AppId     = '<your-app-id>'
+$TenantId  = '<your-tenant-id>'
+$AppSecret = Read-Host -Prompt 'Enter App Secret' -AsSecureString
+
 Configuration ConditionalAccessPolicyConfig {
     Import-DscResource -ModuleName 'Microsoft365DSC'
 
@@ -20,9 +37,10 @@ Configuration ConditionalAccessPolicyConfig {
             DeviceFilterRule       = '(device.deviceManagementStates -any (deviceManagementState eq "compliant"))'
 
             Ensure                 = 'Present'
-            ApplicationId          = '<your-app-id>'
-            ApplicationSecret      = '<your-app-secret>'
-            TenantId               = '<your-tenant-id>'
+
+            ApplicationId          = $AppId
+            ApplicationSecret      = $AppSecret
+            TenantId               = $TenantId
         }
 
     }

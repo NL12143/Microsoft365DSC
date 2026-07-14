@@ -1,4 +1,7 @@
 
+Guides by Australian Signals Directorate (ASD) 
+https://blueprint.asd.gov.au/tools/deployment-and-assessment/desired-state-configuration-setup/ 
+
 [![Docs](https://img.shields.io/badge/M365DSC-Intro-blue)](https://microsoft365dsc.com/user-guide/get-started/introduction/)
 [Getting Started with Microsoft365DSC](https://microsoft365dsc.com/user-guide/get-started/introduction/)
 
